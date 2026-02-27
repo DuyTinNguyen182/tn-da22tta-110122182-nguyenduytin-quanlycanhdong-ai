@@ -11,11 +11,9 @@ import PublicRoute from "./components/Layout/PublicRoute";
 import Dashboard from "./pages/Dashboard";
 import Fields from "./pages/Fields";
 import CropsPage from "./pages/Crops";
+import AIScan from "./pages/AIScan";
 
 // Dummy Pages
-const AICheckPage = () => (
-  <div className="p-8 font-bold text-2xl">Trang AI (Đang phát triển)</div>
-);
 const ReportsPage = () => (
   <div className="p-8 font-bold text-2xl">Trang Báo cáo (Đang phát triển)</div>
 );
@@ -38,7 +36,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/fields" element={<Fields />} />
             <Route path="/crops" element={<CropsPage />} />
-            <Route path="/ai-scan" element={<AICheckPage />} />
+            <Route path="/ai-scan" element={<AIScan />} />
             <Route path="/reports" element={<ReportsPage />} />
           </Route>
 
