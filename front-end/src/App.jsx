@@ -13,6 +13,7 @@ import Fields from "./pages/Fields";
 import CropsPage from "./pages/Crops";
 import AIScan from "./pages/AIScan";
 import AIChat from "./pages/AIChat";
+import Account from "./pages/Account";
 import AdminLayout from "./components/Layout/AdminLayout";
 import AdminOverview from "./pages/Admin/AdminOverview";
 import AdminUsers from "./pages/Admin/AdminUsers";
@@ -44,6 +45,7 @@ function App() {
             <Route path="/crops" element={<CropsPage />} />
             <Route path="/ai-scan" element={<AIScan />} />
             <Route path="/ask-ai" element={<AIChat />} />
+            <Route path="/account" element={<Account />} />
           </Route>
 
           {/* --- ADMIN ROUTES --- */}

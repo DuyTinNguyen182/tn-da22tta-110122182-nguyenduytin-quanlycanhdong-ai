@@ -33,7 +33,10 @@ const Header = () => {
               <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
             </button>
 
-            <div className="flex items-center gap-3 pl-4 border-l border-gray-200 h-8">
+            <div 
+              onClick={() => navigate("/account")}
+              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ml-1"
+            >
               <div className="text-right hidden md:block leading-tight">
                 {/* Hiển thị tên thật lấy từ DB */}
                 <p className="text-sm font-bold text-gray-800">
@@ -46,16 +49,16 @@ const Header = () => {
                 {/* Lấy chữ cái đầu của tên làm Avatar */}
                 {user.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
               </div>
-
-              {/* Nút đăng xuất nhỏ */}
-              <button
-                onClick={handleLogout}
-                className="ml-2 p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="Đăng xuất"
-              >
-                <LogOut size={18} />
-              </button>
             </div>
+
+            {/* Nút đăng xuất */}
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="Đăng xuất"
+            >
+              <LogOut size={18} />
+            </button>
           </>
         ) : (
           /* Nếu CHƯA ĐĂNG NHẬP */

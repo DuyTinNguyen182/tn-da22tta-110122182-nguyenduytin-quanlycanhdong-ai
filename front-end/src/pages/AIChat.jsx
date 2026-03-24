@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { Send, Bot, User, Sparkles } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import api from "../services/api";
 
 const CHAT_SESSION_STORAGE_KEY = "aiChatSessionId";
@@ -138,45 +139,82 @@ const AIChat = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50">
       {/* Header */}
-      <div className="bg-white px-6 py-4 border-b border-gray-100 flex items-center gap-3 shadow-sm z-10">
-        <div className="w-10 h-10 bg-emerald-100 rounded-xl flex flex-shrink-0 items-center justify-center shadow-inner">
-          <Sparkles className="text-emerald-600" size={24} />
+      <div className="bg-white px-4 md:px-5 py-2.5 md:py-3 border-b border-gray-100 flex items-center gap-2.5 shadow-sm z-10">
+        <div className="w-8 h-8 bg-emerald-100 rounded-lg flex flex-shrink-0 items-center justify-center shadow-inner">
+          <Sparkles className="text-emerald-600" size={18} />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-800">AI Tư Vấn Nông Nghiệp</h1>
-          <p className="text-xs text-emerald-600 font-medium">Trợ lý ảo thông minh 24/7</p>
+          <h1 className="text-base md:text-lg font-bold text-gray-800">AI Tư Vấn Nông Nghiệp</h1>
+          <p className="text-[11px] md:text-xs text-emerald-600 font-medium">Trợ lý ảo 24/7</p>
         </div>
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <div className="max-w-4xl mx-auto w-full space-y-6">
+      <div className="flex-1 overflow-y-auto px-3 md:px-4 py-2 md:py-3 space-y-3">
+        <div className="w-full space-y-3">
           {messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`flex max-w-[85%] md:max-w-[75%] gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
+            <div key={idx} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} px-1 md:px-2`}>
+              <div className={`flex max-w-[92%] md:max-w-[88%] lg:max-w-[85%] gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
                 {/* Avatar */}
-                <div className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-emerald-600 text-white"}`}>
-                  {msg.role === "user" ? <User size={18} /> : <Bot size={20} />}
+                <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-emerald-600 text-white"}`}>
+                  {msg.role === "user" ? <User size={14} /> : <Bot size={16} />}
                 </div>
 
                 {/* Message Bubble */}
-                <div className={`px-4 py-3 md:px-5 md:py-3.5 rounded-2xl shadow-sm whitespace-pre-wrap text-[15px] leading-relaxed ${msg.role === "user" ? "bg-blue-600 text-white rounded-tr-none" : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"}`}>
-                  {msg.content}
+                <div className={`px-3.5 md:px-4 py-2 md:py-2.5 rounded-xl shadow-sm text-xs md:text-sm leading-relaxed break-words ${msg.role === "user" ? "bg-blue-600 text-white rounded-tr-none whitespace-pre-wrap" : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"}`}>
+                  {msg.role === "user" ? (
+                    <>{msg.content}</>
+                  ) : (
+                    <div className="prose prose-sm max-w-none space-y-2">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc mb-2 ml-4">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal mb-2 ml-4">{children}</ol>,
+                          li: ({ children }) => <li className="mb-1 ml-2">{children}</li>,
+                          code: ({ children }) => (
+                            <code className="bg-emerald-50 px-1.5 py-0.5 rounded text-emerald-700 font-mono text-xs">
+                              {children}
+                            </code>
+                          ),
+                          pre: ({ children }) => (
+                            <pre className="bg-gray-900 text-gray-100 p-2 md:p-3 rounded-lg overflow-x-auto mb-2 text-xs">
+                              {children}
+                            </pre>
+                          ),
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-4 border-emerald-300 pl-3 italic text-gray-600 mb-2">
+                              {children}
+                            </blockquote>
+                          ),
+                          strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                          em: ({ children }) => <em className="italic">{children}</em>,
+                          a: ({ children, href }) => (
+                            <a href={href} className="text-emerald-600 hover:underline" target="_blank" rel="noopener noreferrer">
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           ))}
 
           {isTyping && (
-            <div className="flex justify-start">
-              <div className="flex max-w-[85%] gap-3 flex-row">
-                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm bg-emerald-600 text-white">
-                  <Bot size={20} />
+            <div className="flex justify-start px-1 md:px-2">
+              <div className="flex max-w-[92%] md:max-w-[88%] lg:max-w-[85%] gap-2 flex-row">
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm bg-emerald-600 text-white">
+                  <Bot size={16} />
                 </div>
-                <div className="px-5 py-4 rounded-2xl rounded-tl-none shadow-sm bg-white border border-gray-100 flex items-center gap-1.5 h-[52px]">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="px-3 md:px-3.5 py-2 md:py-2.5 rounded-xl rounded-tl-none shadow-sm bg-white border border-gray-100 flex items-center gap-1 h-[32px] md:h-[36px]">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
             </div>
@@ -186,25 +224,25 @@ const AIChat = () => {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t border-gray-100 p-4 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
-        <div className="max-w-4xl mx-auto w-full relative flex flex-col justify-end">
+      <div className="bg-white border-t border-gray-100 px-3 md:px-4 py-2.5 md:py-3 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
+        <div className="w-full relative flex flex-col justify-end">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Nhập câu hỏi của bạn về nông nghiệp, mùa vụ, sâu bệnh..."
-            className="w-full bg-gray-50 hover:bg-gray-100/50 focus:bg-white border-2 border-transparent transition-colors text-gray-800 rounded-2xl py-3.5 pl-5 pr-14 focus:outline-none focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50 resize-none shadow-inner"
-            rows={2}
+            placeholder="Nhập câu hỏi của bạn..."
+            className="w-full bg-gray-50 hover:bg-gray-100/50 focus:bg-white border-2 border-transparent transition-colors text-sm md:text-base text-gray-800 rounded-xl py-2 md:py-2.5 pl-3.5 md:pl-4 pr-11 focus:outline-none focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50 resize-none shadow-inner"
+            rows={1}
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || isTyping}
-            className={`absolute right-3 bottom-3 p-2.5 rounded-xl transition-all duration-200 ${input.trim() && !isTyping ? "bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200 text-white scale-100 active:scale-95" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}
+            className={`absolute right-2 md:right-3 top-1/2 -translate-y-1/2 p-1.5 md:p-2 rounded-lg transition-all duration-200 ${input.trim() && !isTyping ? "bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200 text-white scale-100 active:scale-95" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}
           >
-            <Send size={18} className={input.trim() && !isTyping ? "translate-x-[1px] -translate-y-[1px]" : ""} />
+            <Send size={16} className={input.trim() && !isTyping ? "translate-x-[1px] -translate-y-[1px]" : ""} />
           </button>
         </div>
-        <p className="text-center text-[11px] text-gray-400 mt-3 font-medium">AI có thể cung cấp thông tin không chính xác. Hãy kiểm tra lại các lời khuyên quan trọng.</p>
+        <p className="text-center text-[10px] md:text-xs text-gray-400 mt-2 font-medium">AI có thể không chính xác. Kiểm tra lại các lời khuyên quan trọng.</p>
       </div>
     </div>
   );
