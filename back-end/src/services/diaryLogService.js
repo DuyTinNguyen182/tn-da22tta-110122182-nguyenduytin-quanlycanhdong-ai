@@ -8,26 +8,37 @@ const getLogsBySeason = async (seasonId, userId) => {
 };
 
 const createLog = async (data, userId) => {
-  // [FIX] Xử lý plotId: Nếu là chuỗi rỗng "" hoặc null thì gán là null
-  const plotValue = (data.plotId && data.plotId !== "") ? data.plotId : null;
+  const seasonValue = data.seasonId || data.season;
+  const plotInput = data.plotId !== undefined ? data.plotId : data.plot;
+  const plotValue = plotInput && plotInput !== "" ? plotInput : null;
 
   return await DiaryLog.create({
     title: data.title,
     description: data.description,
     date: data.date,
-    type: data.type,
+    type: data.type || "other",
     cost: data.cost,
-    season: data.seasonId,
-    plot: plotValue, // Sử dụng giá trị đã xử lý
+    season: seasonValue,
+    plot: plotValue,
     user: userId,
   });
 };
 
 const updateLog = async (id, data, userId) => {
-  // [FIX] Cũng cần xử lý khi update
   const updateData = { ...data };
-  if (updateData.plotId === "") updateData.plot = null;
-  else if (updateData.plotId) updateData.plot = updateData.plotId;
+
+  if (updateData.seasonId) {
+    updateData.season = updateData.seasonId;
+  }
+
+  if (updateData.plotId === "" || updateData.plot === "") {
+    updateData.plot = null;
+  } else if (updateData.plotId) {
+    updateData.plot = updateData.plotId;
+  }
+
+  delete updateData.seasonId;
+  delete updateData.plotId;
 
   return await DiaryLog.findOneAndUpdate(
     { _id: id, user: userId },

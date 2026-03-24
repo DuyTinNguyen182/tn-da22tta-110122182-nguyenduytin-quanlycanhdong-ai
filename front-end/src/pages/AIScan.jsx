@@ -1,7 +1,17 @@
-import React, { useState } from "react";
-import { UploadCloud, ScanLine, AlertCircle, CheckCircle, Loader2, Sprout, Save, MessageSquare, X } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  UploadCloud,
+  ScanLine,
+  AlertCircle,
+  CheckCircle,
+  Loader2,
+  Sprout,
+  Save,
+  MessageSquare,
+  X,
+  CalendarDays,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
 import api from "../services/api";
 
 const AIScan = () => {
@@ -13,34 +23,159 @@ const AIScan = () => {
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [fields, setFields] = useState([]);
+  const [plots, setPlots] = useState([]);
+  const [seasons, setSeasons] = useState([]);
+  const [selectedSeason, setSelectedSeason] = useState("");
   const [selectedField, setSelectedField] = useState("");
-  const [selectedPlots, setSelectedPlots] = useState([]);
-  const [activeSeason, setActiveSeason] = useState("Đông Xuân 2023-2024");
+  const [selectedPlotIds, setSelectedPlotIds] = useState([]);
+  const [selectAllPlots, setSelectAllPlots] = useState(true);
+  const [detectedDate, setDetectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [saveLoading, setSaveLoading] = useState(false);
 
   useEffect(() => {
     if (showModal) {
       const fetchFields = async () => {
         try {
           const res = await api.get("/fields");
-          setFields(res.data);
-          if (res.data.length > 0) {
-            setSelectedField(res.data[0]._id);
+          const fieldList = res.data || [];
+          setFields(fieldList);
+          if (fieldList.length > 0) {
+            setSelectedField(fieldList[0]._id);
+          } else {
+            setSelectedField("");
           }
         } catch (error) {
           console.error("Lỗi khi tải danh sách cánh đồng", error);
         }
       };
       fetchFields();
+      setDetectedDate(new Date().toISOString().slice(0, 10));
+      setSelectAllPlots(true);
+      setSelectedPlotIds([]);
     }
   }, [showModal]);
+
+  useEffect(() => {
+    if (!showModal || !selectedField) {
+      setPlots([]);
+      setSeasons([]);
+      setSelectedSeason("");
+      return;
+    }
+
+    const fetchFieldData = async () => {
+      try {
+        const [plotsRes, seasonsRes] = await Promise.all([
+          api.get("/plots", { params: { fieldId: selectedField } }),
+          api.get("/seasons", { params: { fieldId: selectedField } }),
+        ]);
+
+        const plotList = plotsRes.data || [];
+        const seasonList = seasonsRes.data || [];
+        const active = seasonList.find((season) => season.status === "active");
+
+        setPlots(plotList);
+        setSeasons(seasonList);
+        setSelectedSeason(active?._id || "");
+        setSelectAllPlots(true);
+        setSelectedPlotIds([]);
+      } catch (fetchError) {
+        console.error("Lỗi khi tải thửa ruộng hoặc mùa vụ", fetchError);
+      }
+    };
+
+    fetchFieldData();
+  }, [showModal, selectedField]);
+
+  const activeSeason = useMemo(
+    () => seasons.find((season) => season.status === "active") || null,
+    [seasons]
+  );
 
   const handleAskAI = () => {
     navigate("/ask-ai", { state: { result } });
   };
 
+  const buildDiagnosisDescription = () => {
+    if (!result) return "Không có dữ liệu chẩn đoán.";
+    const confidenceText =
+      typeof result.confidence === "number"
+        ? `${(result.confidence * 100).toFixed(1)}%`
+        : "Không xác định";
+
+    return [
+      `Kết quả AI: ${result.disease || "Không xác định"}`,
+      `Độ tin cậy: ${confidenceText}`,
+      "Nguồn: AI chẩn đoán bệnh lúa",
+    ].join("\n");
+  };
+
   const handleSaveDiary = async () => {
-    alert("Đã lưu kết quả bệnh vào nhật ký cánh đồng thành công!");
-    setShowModal(false);
+    if (!result) return;
+
+    if (!selectedField) {
+      alert("Vui lòng chọn cánh đồng.");
+      return;
+    }
+
+    if (!selectedSeason) {
+      alert("Không tìm thấy mùa vụ đang canh tác cho cánh đồng này.");
+      return;
+    }
+
+    if (!selectAllPlots && selectedPlotIds.length === 0) {
+      alert("Vui lòng chọn ít nhất 1 thửa hoặc chọn tất cả các thửa.");
+      return;
+    }
+
+    const payloadBase = {
+      title: `Phát hiện bệnh: ${result.disease || "Không xác định"}`,
+      description: buildDiagnosisDescription(),
+      type: "disease",
+      seasonId: selectedSeason,
+      date: new Date(detectedDate),
+    };
+
+    try {
+      setSaveLoading(true);
+      if (selectAllPlots) {
+        if (plots.length === 0) {
+          await api.post("/diary-logs", { ...payloadBase, plotId: null });
+        } else {
+          await Promise.all(
+            plots.map((plot) =>
+              api.post("/diary-logs", { ...payloadBase, plotId: plot._id })
+            )
+          );
+        }
+      } else {
+        await Promise.all(
+          selectedPlotIds.map((plotId) =>
+            api.post("/diary-logs", { ...payloadBase, plotId })
+          )
+        );
+      }
+
+      alert("Đã lưu nhật ký bệnh thành công.");
+      setShowModal(false);
+    } catch (saveError) {
+      console.error("Lỗi khi lưu nhật ký bệnh", saveError);
+      alert(saveError?.response?.data?.message || "Không thể lưu nhật ký. Vui lòng thử lại.");
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const togglePlotSelection = (plotId) => {
+    if (selectAllPlots) {
+      setSelectAllPlots(false);
+      setSelectedPlotIds([plotId]);
+      return;
+    }
+
+    setSelectedPlotIds((prev) =>
+      prev.includes(plotId) ? prev.filter((id) => id !== plotId) : [...prev, plotId]
+    );
   };
 
   // Xử lý khi chọn file
@@ -234,18 +369,141 @@ const AIScan = () => {
                   </div>
 
                   {/* Placeholder cho tính năng tư vấn sau này */}
-                  <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                  {/* <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
                     <h4 className="font-bold text-blue-800 text-sm mb-2">💡 Gợi ý xử lý (Sắp ra mắt)</h4>
                     <p className="text-xs text-blue-600">
                       Tính năng tư vấn thuốc bảo vệ thực vật và quy trình xử lý dựa trên AI đang được phát triển.
                     </p>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden">
+            <div className="px-6 py-4 bg-emerald-600 text-white flex items-center justify-between">
+              <h3 className="font-bold text-lg">Lưu Nhật Ký Bệnh</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="p-1 rounded-lg hover:bg-white/15 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 mb-1 block">Chọn cánh đồng</label>
+                  <select
+                    value={selectedField}
+                    onChange={(e) => setSelectedField(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {fields.length === 0 && <option value="">Chưa có cánh đồng</option>}
+                    {fields.map((field) => (
+                      <option key={field._id} value={field._id}>
+                        {field.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-gray-700 mb-1 block">Mùa vụ đang canh tác</label>
+                  <div className="w-full rounded-xl border border-gray-200 px-3 py-2.5 bg-gray-50 text-sm text-gray-700 min-h-[44px] flex items-center">
+                    {activeSeason ? activeSeason.name : "Không có mùa vụ active"}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-semibold text-gray-700 mb-1 block">Ngày phát hiện bệnh</label>
+                <div className="relative">
+                  <CalendarDays size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="date"
+                    value={detectedDate}
+                    onChange={(e) => setDetectedDate(e.target.value)}
+                    className="w-full rounded-xl border border-gray-300 pl-9 pr-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-semibold text-gray-700">Chọn thửa ruộng</label>
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={selectAllPlots}
+                      onChange={(e) => {
+                        setSelectAllPlots(e.target.checked);
+                        if (e.target.checked) {
+                          setSelectedPlotIds([]);
+                        }
+                      }}
+                    />
+                    Tất cả các thửa
+                  </label>
+                </div>
+
+                <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-xl p-2 space-y-2 bg-gray-50">
+                  {plots.length === 0 && (
+                    <p className="text-sm text-gray-500 p-2">Cánh đồng này chưa có thửa ruộng.</p>
+                  )}
+
+                  {plots.map((plot) => (
+                    <label
+                      key={plot._id}
+                      className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-gray-100"
+                    >
+                      <span className="text-sm text-gray-700">{plot.name}</span>
+                      <input
+                        type="checkbox"
+                        checked={selectAllPlots ? true : selectedPlotIds.includes(plot._id)}
+                        disabled={selectAllPlots}
+                        onChange={() => togglePlotSelection(plot._id)}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                <p className="text-xs text-emerald-700 font-semibold uppercase tracking-wider">Chi tiết sẽ lưu</p>
+                <p className="text-sm text-emerald-900 mt-1">Danh mục: Bệnh</p>
+                <p className="text-sm text-emerald-900">Bệnh: {result?.disease || "-"}</p>
+                <p className="text-sm text-emerald-900">
+                  Độ tin cậy: {typeof result?.confidence === "number" ? `${(result.confidence * 100).toFixed(1)}%` : "-"}
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSaveDiary}
+                  disabled={saveLoading || !result}
+                  className={`px-4 py-2.5 rounded-xl font-semibold text-white ${
+                    saveLoading || !result ? "bg-gray-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+                  }`}
+                >
+                  {saveLoading ? "Đang lưu..." : "Xác nhận lưu nhật ký"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,33 +1,106 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { Send, Bot, User, Sparkles } from "lucide-react";
+import api from "../services/api";
+
+const CHAT_SESSION_STORAGE_KEY = "aiChatSessionId";
 
 const AIChat = () => {
   const location = useLocation();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [sessionId, setSessionId] = useState(() => localStorage.getItem(CHAT_SESSION_STORAGE_KEY) || "");
   const messagesEndRef = useRef(null);
 
-  // Initialize with prompt from AIScan if exists
-  useEffect(() => {
-    if (location.state?.result) {
-      const { disease, confidence } = location.state.result;
-      const initialPrompt = `Tôi vừa quét lá lúa và AI phát hiện bệnh: ${disease} (Độ tin cậy: ${(confidence * 100).toFixed(1)}%). Hãy tư vấn cho tôi cách phòng ngừa và điều trị bệnh này.`;
-      
-      setMessages([
-        { role: "user", content: initialPrompt },
-        { role: "assistant", content: `Chào bạn! Tính năng tư vấn AI đang được phát triển. Tương lai tôi sẽ gọi API backend để phản hồi về cách điều trị bệnh "${disease}" nhé!` }
-      ]);
-      
-      // Xoá state để không bị lặp lại nếu trang re-render
-      window.history.replaceState({}, document.title);
-    } else {
-      setMessages([
-        { role: "assistant", content: "Chào bạn! Tôi là trợ lý AI nông nghiệp. Tôi có thể giúp gì cho bạn hôm nay?" }
-      ]);
+  const formatDiagnosisPrompt = (diagnosisResult) => {
+    const disease = diagnosisResult?.disease || "Không xác định";
+    const confidence =
+      typeof diagnosisResult?.confidence === "number"
+        ? `${(diagnosisResult.confidence * 100).toFixed(1)}%`
+        : "Không xác định";
+
+    return `Tôi vừa quét lá lúa và hệ thống phát hiện bệnh: ${disease} (Độ tin cậy: ${confidence}). Hãy tư vấn cho tôi hướng xử lý, phòng ngừa và các bước theo dõi.`;
+  };
+
+  const sendMessageToBackend = async (message, diagnosisResult, forceNewSession = false) => {
+    const res = await api.post("/ai/chat", {
+      message,
+      sessionId: forceNewSession ? undefined : (sessionId || undefined),
+      diagnosisResult,
+    });
+
+    const responseData = res.data?.data;
+    if (responseData?.sessionId) {
+      setSessionId(responseData.sessionId);
+      localStorage.setItem(CHAT_SESSION_STORAGE_KEY, responseData.sessionId);
     }
-  }, [location.state]);
+
+    if (Array.isArray(responseData?.messages)) {
+      setMessages(responseData.messages);
+    }
+  };
+
+  const loadHistory = async (targetSessionId) => {
+    if (!targetSessionId) return false;
+
+    try {
+      const res = await api.get("/ai/chat/history", {
+        params: { sessionId: targetSessionId },
+      });
+
+      const historyMessages = res.data?.data?.messages || [];
+      if (historyMessages.length > 0) {
+        setMessages(historyMessages);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Lỗi khi tải lịch sử chat", error);
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    const initChat = async () => {
+      if (location.state?.result) {
+        // Khi đi từ trang chẩn đoán, luôn mở một phiên chat mới để ngữ cảnh không bị lẫn.
+        setSessionId("");
+        localStorage.removeItem(CHAT_SESSION_STORAGE_KEY);
+        setMessages([
+          {
+            role: "assistant",
+            content: "Đã nhận kết quả chẩn đoán. Tôi sẽ tư vấn dựa trên bệnh vừa quét.",
+          },
+        ]);
+
+        const prompt = formatDiagnosisPrompt(location.state.result);
+        setIsTyping(true);
+        try {
+          await sendMessageToBackend(prompt, location.state.result, true);
+        } catch (error) {
+          console.error("Lỗi khi gửi prompt chẩn đoán", error);
+        } finally {
+          setIsTyping(false);
+          window.history.replaceState({}, document.title);
+        }
+        return;
+      }
+
+      const hasHistory = await loadHistory(sessionId);
+
+      if (!hasHistory) {
+        setMessages([
+          {
+            role: "assistant",
+            content: "Chào bạn! Tôi là trợ lý AI nông nghiệp. Hãy gửi câu hỏi hoặc kết quả chẩn đoán để tôi tư vấn.",
+          },
+        ]);
+      }
+    };
+
+    initChat();
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -35,20 +108,24 @@ const AIChat = () => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-
-    const userMessage = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    const messageText = input.trim();
     setInput("");
     setIsTyping(true);
 
-    // Mock API call to AI
-    setTimeout(() => {
+    try {
+      await sendMessageToBackend(messageText);
+    } catch (error) {
+      console.error("Lỗi khi gửi chat AI", error);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Tính năng này đang trong quá trình phát triển. Bạn có thể kết nối API thực tế sau này." }
+        {
+          role: "assistant",
+          content: error?.response?.data?.message || "Không thể gửi câu hỏi tới AI. Vui lòng thử lại.",
+        },
       ]);
+    } finally {
       setIsTyping(false);
-    }, 1500);
+    }
   };
 
   const handleKeyDown = (e) => {

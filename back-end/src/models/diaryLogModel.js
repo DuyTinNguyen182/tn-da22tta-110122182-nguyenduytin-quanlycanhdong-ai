@@ -8,7 +8,7 @@ const diaryLogSchema = new mongoose.Schema({
   // Loại công việc (để sau này thống kê)
   type: { 
     type: String, 
-    enum: ["material", "labor", "harvest", "other"], 
+    enum: ["material", "labor", "harvest", "disease", "other"], 
     default: "other" 
   }, // material: vật tư, labor: nhân công...
 
