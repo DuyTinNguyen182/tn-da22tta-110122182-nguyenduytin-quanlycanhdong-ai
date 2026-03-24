@@ -18,8 +18,13 @@ const Login = () => {
     setError("");
 
     const result = await login(email, password);
+    console.log("Login result:", result.user.role); // Debug log
     if (result.success) {
-      navigate("/dashboard");
+      if (result.user.role === 'admin') {
+        navigate("/admin");
+      } else {
+        navigate("/dashboard");
+      }
     } else {
       setError(result.message);
     }

@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Tùy chỉnh Popup Leaflet */
+/* Popup Leaflet */
 .leaflet-popup-content-wrapper {
   border-radius: 12px !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
@@ -14,7 +14,7 @@
 .leaflet-popup-tip {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1) !important;
 }
-/* Ẩn nút close mặc định xấu xí nếu muốn, hoặc style lại nó */
+
 .leaflet-container a.leaflet-popup-close-button {
   top: 8px;
   right: 8px;
@@ -22,12 +22,10 @@
   font-size: 18px;
 }
 
-/* Fix lỗi hình ảnh bản đồ bị đè bởi Tailwind */
 .leaflet-pane img {
   max-width: none !important;
 }
 
-/* Tùy chỉnh Popup Leaflet cho đẹp */
 .leaflet-popup-content-wrapper {
   border-radius: 12px !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),

@@ -5,8 +5,11 @@ import { useAuth } from "../../context/AuthContext";
 const PublicRoute = () => {
   const { user } = useAuth();
 
-  // Nếu ĐÃ CÓ user (đã đăng nhập) -> Chuyển hướng thẳng vào Dashboard
+  // Nếu ĐÃ CÓ user (đã đăng nhập) -> Chuyển hướng thẳng vào Dashboard hoặc Admin
   if (user) {
+    if (user.role === "admin") {
+      return <Navigate to="/admin" replace />;
+    }
     return <Navigate to="/dashboard" replace />;
   }
 

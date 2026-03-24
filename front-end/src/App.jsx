@@ -12,6 +12,12 @@ import Dashboard from "./pages/Dashboard";
 import Fields from "./pages/Fields";
 import CropsPage from "./pages/Crops";
 import AIScan from "./pages/AIScan";
+import AIChat from "./pages/AIChat";
+import AdminLayout from "./components/Layout/AdminLayout";
+import AdminOverview from "./pages/Admin/AdminOverview";
+import AdminUsers from "./pages/Admin/AdminUsers";
+import AdminSeasons from "./pages/Admin/AdminSeasons";
+import AdminTasks from "./pages/Admin/AdminTasks";
 
 // Dummy Pages
 const ReportsPage = () => (
@@ -37,7 +43,15 @@ function App() {
             <Route path="/fields" element={<Fields />} />
             <Route path="/crops" element={<CropsPage />} />
             <Route path="/ai-scan" element={<AIScan />} />
-            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/ask-ai" element={<AIChat />} />
+          </Route>
+
+          {/* --- ADMIN ROUTES --- */}
+          <Route element={<AdminLayout />}>
+            <Route path="/admin" element={<AdminOverview />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/seasons" element={<AdminSeasons />} />
+            <Route path="/admin/tasks" element={<AdminTasks />} />
           </Route>
 
           {/* Mặc định chuyển về Login nếu sai đường dẫn */}

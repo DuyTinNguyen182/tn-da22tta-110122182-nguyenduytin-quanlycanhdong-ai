@@ -1,5 +1,7 @@
 import React, { useState } from "react";
-import { UploadCloud, ScanLine, AlertCircle, CheckCircle, Loader2, Sprout } from "lucide-react";
+import { UploadCloud, ScanLine, AlertCircle, CheckCircle, Loader2, Sprout, Save, MessageSquare, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import api from "../services/api";
 
 const AIScan = () => {
@@ -8,6 +10,38 @@ const AIScan = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
+  const [showModal, setShowModal] = useState(false);
+  const [fields, setFields] = useState([]);
+  const [selectedField, setSelectedField] = useState("");
+  const [selectedPlots, setSelectedPlots] = useState([]);
+  const [activeSeason, setActiveSeason] = useState("Đông Xuân 2023-2024");
+
+  useEffect(() => {
+    if (showModal) {
+      const fetchFields = async () => {
+        try {
+          const res = await api.get("/fields");
+          setFields(res.data);
+          if (res.data.length > 0) {
+            setSelectedField(res.data[0]._id);
+          }
+        } catch (error) {
+          console.error("Lỗi khi tải danh sách cánh đồng", error);
+        }
+      };
+      fetchFields();
+    }
+  }, [showModal]);
+
+  const handleAskAI = () => {
+    navigate("/ask-ai", { state: { result } });
+  };
+
+  const handleSaveDiary = async () => {
+    alert("Đã lưu kết quả bệnh vào nhật ký cánh đồng thành công!");
+    setShowModal(false);
+  };
 
   // Xử lý khi chọn file
   const handleImageChange = (e) => {
@@ -180,6 +214,23 @@ const AIScan = () => {
                     <p className="text-xs text-gray-400 mt-1 text-right">
                       Mức độ chính xác: {getConfidenceLevel(result.confidence).text}
                     </p>
+                  </div>
+
+                  
+                  {/* Khung gợi ý / Nút hành động */}
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      onClick={() => setShowModal(true)}
+                      className="flex-1 px-4 py-2.5 bg-white border-2 border-emerald-600 text-emerald-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-50 transition-colors"
+                    >
+                      <Save size={18} /> Lưu Nhật Ký
+                    </button>
+                    <button
+                      onClick={handleAskAI}
+                      className="flex-1 px-4 py-2.5 bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-200 transition-colors"
+                    >
+                      <MessageSquare size={18} /> Hỏi AI
+                    </button>
                   </div>
 
                   {/* Placeholder cho tính năng tư vấn sau này */}

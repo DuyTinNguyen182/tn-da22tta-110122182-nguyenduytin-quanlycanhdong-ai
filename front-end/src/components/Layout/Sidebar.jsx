@@ -15,7 +15,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { icon: Map, label: "Quản lý Ruộng", path: "/fields" },
     { icon: Sprout, label: "Nhật ký Mùa vụ", path: "/crops" },
     { icon: ScanLine, label: "AI Chẩn đoán", path: "/ai-scan" },
-    { icon: FileText, label: "Báo cáo & Giá", path: "/reports" },
+    { icon: FileText, label: "AI tư vấn", path: "/ask-ai" },
   ];
 
   return (

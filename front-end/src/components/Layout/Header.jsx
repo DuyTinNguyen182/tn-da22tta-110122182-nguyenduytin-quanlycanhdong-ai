@@ -37,14 +37,14 @@ const Header = () => {
               <div className="text-right hidden md:block leading-tight">
                 {/* Hiển thị tên thật lấy từ DB */}
                 <p className="text-sm font-bold text-gray-800">
-                  {user.fullName}
+                  {user.fullName || "Người dùng"}
                 </p>
                 <p className="text-[11px] text-gray-500">Chủ hộ canh tác</p>
               </div>
 
               <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center border border-emerald-200 text-emerald-700 font-bold">
                 {/* Lấy chữ cái đầu của tên làm Avatar */}
-                {user.fullName.charAt(0).toUpperCase()}
+                {user.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
               </div>
 
               {/* Nút đăng xuất nhỏ */}
