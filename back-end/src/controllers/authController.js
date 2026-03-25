@@ -1,4 +1,13 @@
 const authService = require("../services/authService");
+const jwtConfig = require("../config/jwt");
+
+const getCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax",
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+  path: "/",
+});
 
 const register = async (req, res) => {
   try {
@@ -15,9 +24,10 @@ const login = async (req, res) => {
     const data = await authService.loginUser(email, password);
     const { token, ...userData } = data;
 
+    res.cookie(jwtConfig.COOKIE_NAME, token, getCookieOptions());
+
     res.status(200).json({
       message: "Đăng nhập thành công!",
-      token: token,
       user: userData,
     });
   } catch (error) {
@@ -25,4 +35,27 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { register, login };
+const getMe = async (req, res) => {
+  try {
+    const user = await authService.getUserById(req.user.id);
+
+    res.status(200).json({
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Không thể lấy thông tin người dùng" });
+  }
+};
+
+const logout = async (req, res) => {
+  res.clearCookie(jwtConfig.COOKIE_NAME, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+
+  res.status(200).json({ message: "Đăng xuất thành công" });
+};
+
+module.exports = { register, login, getMe, logout };

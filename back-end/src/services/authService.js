@@ -1,6 +1,7 @@
 const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const jwtConfig = require("../config/jwt");
 
 // 1. Logic Đăng Ký
 const registerUser = async (data) => {
@@ -23,7 +24,12 @@ const registerUser = async (data) => {
     password: hashedPassword,
   });
 
-  return user;
+  return {
+    _id: user._id,
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+  };
 };
 
 // 2. Logic Đăng Nhập
@@ -43,8 +49,8 @@ const loginUser = async (email, password) => {
   // Tạo Token (Thẻ bài) có hạn dùng 30 ngày
   const token = jwt.sign(
     { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "30d" }
+    jwtConfig.SECRET_KEY,
+    { expiresIn: jwtConfig.EXPIRES_IN }
   );
 
   // Trả về thông tin user (trừ pass) và token
@@ -57,4 +63,13 @@ const loginUser = async (email, password) => {
   };
 };
 
-module.exports = { registerUser, loginUser };
+const getUserById = async (id) => {
+  const user = await User.findById(id).select("_id fullName email role");
+  if (!user) {
+    throw new Error("Không tìm thấy người dùng");
+  }
+
+  return user;
+};
+
+module.exports = { registerUser, loginUser, getUserById };

@@ -18,9 +18,8 @@ const Login = () => {
     setError("");
 
     const result = await login(email, password);
-    console.log("Login result:", result.user.role); // Debug log
     if (result.success) {
-      if (result.user.role === 'admin') {
+      if ((result.user?.role || "").toLowerCase() === "admin") {
         navigate("/admin");
       } else {
         navigate("/dashboard");

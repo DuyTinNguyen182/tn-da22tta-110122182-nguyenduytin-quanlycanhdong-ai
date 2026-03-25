@@ -7,24 +7,26 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Khi F5 trang web, kiểm tra xem có lưu user cũ không
+  // Khi F5 trang web, kiểm tra phiên đăng nhập hiện tại bằng cookie
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
-    const token = localStorage.getItem("token");
-    if (storedUser && token) {
-      setUser(JSON.parse(storedUser));
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      try {
+        const res = await api.get("/auth/me");
+        setUser(res.data.user || null);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
   // Hàm Đăng nhập
   const login = async (email, password) => {
     try {
       const res = await api.post("/auth/login", { email, password });
-
-      // Lưu vào LocalStorage
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
 
       setUser(res.data.user);
       return { success: true, user: res.data.user };
@@ -50,9 +52,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Hàm Đăng xuất
-  const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  const logout = async () => {
+    try {
+      await api.post("/auth/logout");
+    } catch (error) {
+      // Vẫn dọn state local để UI phản ánh đúng trạng thái đăng xuất.
+    }
+
     setUser(null);
   };
 
@@ -60,7 +66,6 @@ export const AuthProvider = ({ children }) => {
   const updateUser = (updatedUserData) => {
     const newUserData = { ...user, ...updatedUserData };
     setUser(newUserData);
-    localStorage.setItem("user", JSON.stringify(newUserData));
   };
 
   return (

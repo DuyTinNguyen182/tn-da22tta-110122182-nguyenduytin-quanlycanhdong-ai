@@ -1,34 +1,32 @@
 const jwt = require("jsonwebtoken");
+const jwtConfig = require("../config/jwt");
 
 const protect = (req, res, next) => {
-  let token;
-
-  // Kiểm tra header có dạng: "Bearer eyJhbGciOi..."
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith("Bearer")
-  ) {
-    try {
-      // Lấy token ra khỏi chuỗi "Bearer <token>"
-      token = req.headers.authorization.split(" ")[1];
-
-      // Giải mã token
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-      // Gán id user vào request để các bước sau dùng
-      req.user = decoded;
-
-      next(); // Cho phép đi tiếp
-    } catch (error) {
-      res.status(401).json({ message: "Token không hợp lệ hoặc đã hết hạn" });
-    }
-  }
+  const token = req.cookies?.[jwtConfig.COOKIE_NAME];
 
   if (!token) {
     res
       .status(401)
-      .json({ message: "Bạn chưa đăng nhập, không có quyền truy cập" });
+      .json({ message: "Unauthorized - No token provided" });
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, jwtConfig.SECRET_KEY);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ message: "Unauthorized - Invalid token" });
   }
 };
 
-module.exports = { protect };
+const isAdmin = (req, res, next) => {
+  const userRole = (req.user?.role || "").toLowerCase();
+  if (!req.user || userRole !== "admin") {
+    return res.status(403).json({ message: "Forbidden - Admin access required" });
+  }
+
+  next();
+};
+
+module.exports = { protect, isAdmin };

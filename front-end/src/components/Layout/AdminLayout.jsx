@@ -7,6 +7,7 @@ import AdminHeader from "./AdminHeader";
 const AdminLayout = () => {
   const { user } = useAuth();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const role = (user?.role || "").toLowerCase();
 
   // Nếu chưa có user -> Login
   if (!user) {
@@ -14,7 +15,7 @@ const AdminLayout = () => {
   }
 
   // Nếu có user mà không phải admin -> Về page user
-  if (user.role !== "admin") {
+  if (role !== "admin") {
       return <Navigate to="/dashboard" replace />;
   }
 
