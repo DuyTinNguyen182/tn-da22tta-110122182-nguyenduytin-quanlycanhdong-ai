@@ -24,18 +24,18 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 
-// --- CẤU HÌNH CÁC LOẠI CÔNG VIỆC ---
-const TASK_TYPES = [
-  { id: "lam_dat", label: "Làm đất", icon: Tractor, color: "text-orange-600", bg: "bg-orange-100", backendType: "labor" },
-  { id: "gieo_sa", label: "Gieo sạ", icon: Sprout, color: "text-emerald-600", bg: "bg-emerald-100", backendType: "material" },
-  { id: "dam_lua", label: "Dặm lúa", icon: Scissors, color: "text-teal-600", bg: "bg-teal-100", backendType: "labor" },
-  { id: "bom_nuoc", label: "Bơm nước", icon: Droplets, color: "text-blue-600", bg: "bg-blue-100", backendType: "other" },
-  { id: "bon_phan", label: "Bón phân", icon: Leaf, color: "text-green-600", bg: "bg-green-100", backendType: "material" },
-  { id: "phun_thuoc", label: "Phun thuốc", icon: SprayCan, color: "text-red-600", bg: "bg-red-100", backendType: "material" },
-  { id: "thu_hoach", label: "Thu hoạch", icon: Wheat, color: "text-yellow-600", bg: "bg-yellow-100", backendType: "harvest" },
-  // THÊM CÔNG VIỆC KHÁC
-  { id: "khac", label: "Khác", icon: MoreHorizontal, color: "text-gray-600", bg: "bg-gray-200", backendType: "other" },
-];
+const pickTaskIconByName = (taskName = "") => {
+  const normalized = taskName.toLowerCase();
+  if (normalized.includes("làm đất") || normalized.includes("lam dat")) return Tractor;
+  if (normalized.includes("gieo") || normalized.includes("sạ") || normalized.includes("sa")) return Sprout;
+  if (normalized.includes("dặm") || normalized.includes("dam")) return Scissors;
+  if (normalized.includes("nước") || normalized.includes("nuoc") || normalized.includes("tưới") || normalized.includes("tuoi")) return Droplets;
+  if (normalized.includes("phân") || normalized.includes("phan")) return Leaf;
+  if (normalized.includes("thuốc") || normalized.includes("thuoc") || normalized.includes("phun")) return SprayCan;
+  if (normalized.includes("thu hoạch") || normalized.includes("thu hoach")) return Wheat;
+  if (normalized.includes("bệnh") || normalized.includes("benh")) return MoreHorizontal;
+  return MoreHorizontal;
+};
 
 const Crops = () => {
   // --- STATE ---
@@ -44,6 +44,8 @@ const Crops = () => {
   
   const [seasons, setSeasons] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
+  const [seasonCatalogs, setSeasonCatalogs] = useState([]);
+  const [taskTypes, setTaskTypes] = useState([]);
   
   const [logs, setLogs] = useState([]);
   const [plots, setPlots] = useState([]); 
@@ -51,7 +53,7 @@ const Crops = () => {
 
   // Filter State
   const [filterPlotId, setFilterPlotId] = useState("");
-  const [filterTaskLabel, setFilterTaskLabel] = useState("");
+  const [filterTaskId, setFilterTaskId] = useState("");
 
   // Modal State
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
@@ -67,17 +69,48 @@ const Crops = () => {
     plotId: ""
   });
 
-  const [seasonForm, setSeasonForm] = useState({ name: "", startDate: new Date().toISOString().split('T')[0] });
+  const [seasonForm, setSeasonForm] = useState({ 
+    seasonId: "", 
+    startDate: new Date().toISOString().split('T')[0],
+    editingSeasonId: null 
+  });
+  const [editingSeasonName, setEditingSeasonName] = useState(false);
 
   // Xác định vụ hiện tại có đang active không
   const currentSeason = useMemo(() => seasons.find(s => s._id === selectedSeasonId), [seasons, selectedSeasonId]);
   const isSeasonActive = currentSeason?.status === 'active';
+  
+  // Kiểm tra xem có season active nào không
+  const hasActiveSeasons = useMemo(() => {
+    if (!selectedField) return false;
+    return seasons.some(s => s.status === 'active');
+  }, [seasons, selectedField]);
 
   // --- API CALLS ---
 
   useEffect(() => {
     fetchFields();
+    fetchSeasonCatalogs();
+    fetchTaskTypes();
   }, []);
+
+  const fetchTaskTypes = async () => {
+    try {
+      const res = await api.get("/tasks");
+      setTaskTypes(res.data || []);
+    } catch (err) {
+      console.error("Lỗi tải danh mục công việc:", err);
+    }
+  };
+
+  const fetchSeasonCatalogs = async () => {
+    try {
+      const res = await api.get("/seasons");
+      setSeasonCatalogs(res.data || []);
+    } catch (err) {
+      console.error("Lỗi tải danh mục mùa vụ:", err);
+    }
+  };
 
   const fetchFields = async () => {
     try {
@@ -98,10 +131,10 @@ const Crops = () => {
     setSelectedSeasonId("");
     // Reset filters
     setFilterPlotId("");
-    setFilterTaskLabel("");
+    setFilterTaskId("");
     
     try {
-      const seasonRes = await api.get(`/seasons`, { params: { fieldId: field._id } });
+      const seasonRes = await api.get(`/season-details`, { params: { fieldId: field._id } });
       setSeasons(seasonRes.data);
       if (seasonRes.data.length > 0) {
         setSelectedSeasonId(seasonRes.data[0]._id);
@@ -133,19 +166,57 @@ const Crops = () => {
 
   // --- HANDLERS: SEASON ---
   const handleCreateSeason = async () => {
-    if (!selectedField) return;
+    if (!selectedField || !seasonForm.seasonId) {
+      alert("Vui lòng chọn mùa vụ");
+      return;
+    }
+
     try {
-      const res = await api.post("/seasons", {
-        ...seasonForm,
+      const currentYear = new Date().getFullYear();
+      const payload = {
+        seasonId: seasonForm.seasonId,
+        year: currentYear,
         fieldId: selectedField._id,
+        startDate: seasonForm.startDate,
         status: "active"
-      });
-      setSeasons([res.data, ...seasons]);
-      setSelectedSeasonId(res.data._id);
+      };
+
+      if (seasonForm.editingSeasonId) {
+        // Cập nhật mùa vụ
+        const res = await api.put(`/season-details/${seasonForm.editingSeasonId}`, payload);
+        const updatedSeasons = seasons.map(s => s._id === seasonForm.editingSeasonId ? res.data : s);
+        setSeasons(updatedSeasons);
+        alert("Đã cập nhật mùa vụ thành công!");
+      } else {
+        // Tạo mùa vụ mới
+        const res = await api.post("/season-details", payload);
+        setSeasons([res.data, ...seasons]);
+        setSelectedSeasonId(res.data._id);
+        alert("Đã tạo vụ mới thành công!");
+      }
+
       setIsSeasonModalOpen(false);
-      setSeasonForm({ name: "", startDate: new Date().toISOString().split('T')[0] });
+      setSeasonForm({ 
+        seasonId: "", 
+        startDate: new Date().toISOString().split('T')[0],
+        editingSeasonId: null
+      });
+      setEditingSeasonName(false);
     } catch (err) {
-      alert(err.response?.data?.message || "Lỗi tạo vụ mới");
+      alert(err.response?.data?.message || "Lỗi tạo/cập nhật vụ mới");
+    }
+  };
+
+  // Mở modal sửa mùa vụ
+  const handleOpenEditSeasonModal = () => {
+    if (currentSeason) {
+      setSeasonForm({
+        seasonId: currentSeason.seasonId || currentSeason.season?._id || "",
+        startDate: currentSeason.startDate.split('T')[0],
+        editingSeasonId: currentSeason._id
+      });
+      setEditingSeasonName(true);
+      setIsSeasonModalOpen(true);
     }
   };
 
@@ -159,8 +230,7 @@ const Crops = () => {
 
     if (confirmEnd) {
       try {
-        // Gọi API cập nhật trạng thái (Giả sử backend hỗ trợ PUT /seasons/:id)
-        const res = await api.put(`/seasons/${selectedSeasonId}/finish`, { 
+        const res = await api.put(`/season-details/${selectedSeasonId}/finish`, {
           status: "completed",
           endDate: new Date()
         });
@@ -183,7 +253,10 @@ const Crops = () => {
     if (!isSeasonActive && !log) return; // Chặn mở form thêm mới nếu vụ đã đóng
 
     if (log) {
-      const foundTask = TASK_TYPES.find(t => t.label === log.title) || TASK_TYPES.find(t => t.id === 'khac');
+      const foundTask =
+        taskTypes.find((t) => t._id === log.taskId) ||
+        taskTypes.find((t) => (t.name || t.label || "") === (log.taskName || log.title || "")) ||
+        null;
       setEditingLog(log);
       setLogForm({
         taskType: foundTask,
@@ -212,8 +285,7 @@ const Crops = () => {
     }
 
     const payload = {
-      title: logForm.taskType.label,
-      type: logForm.taskType.backendType,
+      taskId: logForm.taskType._id,
       description: logForm.description,
       cost: Number(logForm.cost),
       date: logForm.date,
@@ -264,19 +336,26 @@ const Crops = () => {
         : true;
       
       // 2. Lọc theo Công việc (dựa trên Title/Label)
-      const matchTask = filterTaskLabel
-        ? log.title === filterTaskLabel
+      const matchTask = filterTaskId
+        ? log.taskId === filterTaskId
         : true;
 
       return matchPlot && matchTask;
     });
-  }, [logs, filterPlotId, filterTaskLabel]);
+  }, [logs, filterPlotId, filterTaskId]);
 
   const totalCost = filteredLogs.reduce((acc, curr) => acc + (curr.cost || 0), 0);
 
-  const getTaskIcon = (title) => {
-    const task = TASK_TYPES.find(t => t.label === title);
-    return task ? task : { icon: Sprout, color: "text-gray-600", bg: "bg-gray-100" };
+  const getTaskIcon = (log) => {
+    const task = taskTypes.find((t) => t._id === log.taskId) || null;
+    const taskName = task?.name || log.taskName || log.title || "";
+    const Icon = pickTaskIconByName(taskName) || Sprout;
+
+    return {
+      icon: Icon,
+      color: "text-gray-600",
+      bg: "bg-gray-100",
+    };
   };
 
   return (
@@ -352,14 +431,35 @@ const Crops = () => {
                             </div>
                         )}
 
-                        {/* Nút Tạo Vụ Mới */}
-                        <button 
-                            onClick={() => setIsSeasonModalOpen(true)}
+                        {/* Nút Tạo/Sửa Vụ Mới - Chỉ hiện khi không có active season */}
+                        {!hasActiveSeasons && (
+                          <button 
+                            onClick={() => {
+                              setSeasonForm({ 
+                                seasonId: "", 
+                                startDate: new Date().toISOString().split('T')[0],
+                                editingSeasonId: null
+                              });
+                              setEditingSeasonName(false);
+                              setIsSeasonModalOpen(true);
+                            }}
                             className="p-1.5 bg-gray-100 hover:bg-emerald-100 text-gray-500 hover:text-emerald-600 rounded-lg transition-colors"
                             title="Tạo vụ mới"
-                        >
+                          >
                             <Plus size={16} />
-                        </button>
+                          </button>
+                        )}
+
+                        {/* Nút Sửa Mùa Vụ - Hiện khi đã tạo xong một vụ */}
+                        {currentSeason && (
+                          <button 
+                            onClick={handleOpenEditSeasonModal}
+                            className="p-1.5 bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 rounded-lg transition-colors"
+                            title="Sửa tên mùa vụ"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                        )}
 
                         {/* NÚT KẾT THÚC VỤ (CHỈ HIỆN KHI ACTIVE) */}
                         {selectedSeasonId && isSeasonActive && (
@@ -412,12 +512,12 @@ const Crops = () => {
 
                             {/* Lọc theo Công việc */}
                             <select 
-                                value={filterTaskLabel}
-                                onChange={(e) => setFilterTaskLabel(e.target.value)}
+                                value={filterTaskId}
+                                onChange={(e) => setFilterTaskId(e.target.value)}
                                 className="bg-transparent outline-none font-medium text-gray-700 hover:text-emerald-600 cursor-pointer"
                             >
                                 <option value="">Tất cả công việc</option>
-                                {TASK_TYPES.map(t => <option key={t.id} value={t.label}>{t.label}</option>)}
+                              {taskTypes.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
                             </select>
                         </div>
                     </div>
@@ -451,7 +551,7 @@ const Crops = () => {
               ) : (
                 <div className="max-w-4xl mx-auto space-y-6">
                   {filteredLogs.map((log, index) => {
-                    const TaskInfo = getTaskIcon(log.title);
+                    const TaskInfo = getTaskIcon(log);
                     const LogIcon = TaskInfo.icon;
                     
                     return (
@@ -474,7 +574,7 @@ const Crops = () => {
                                 <LogIcon size={20} />
                               </div>
                               <div>
-                                <h3 className="font-bold text-gray-800 text-lg">{log.title}</h3>
+                                <h3 className="font-bold text-gray-800 text-lg">{log.taskName || log.title}</h3>
                                 <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
                                   <Calendar size={12} />
                                   {new Date(log.date).toLocaleDateString('vi-VN')}
@@ -546,12 +646,12 @@ const Crops = () => {
               {/* Chọn loại công việc */}
               <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Chọn công việc</label>
               <div className="grid grid-cols-4 gap-3 mb-6">
-                {TASK_TYPES.map((task) => {
-                  const Icon = task.icon;
-                  const isSelected = logForm.taskType?.id === task.id;
+                {taskTypes.map((task) => {
+                  const UiIcon = pickTaskIconByName(task.name);
+                  const isSelected = logForm.taskType?._id === task._id;
                   return (
                     <button
-                      key={task.id}
+                      key={task._id}
                       onClick={() => setLogForm({ ...logForm, taskType: task })}
                       className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${
                         isSelected
@@ -559,11 +659,11 @@ const Crops = () => {
                           : "bg-white border-gray-200 hover:border-emerald-300 hover:bg-gray-50"
                       }`}
                     >
-                      <div className={`mb-2 ${task.color}`}>
-                        <Icon size={24} />
+                      <div className="mb-2 text-gray-600">
+                        <UiIcon size={24} />
                       </div>
                       <span className={`text-[10px] font-bold text-center ${isSelected ? "text-emerald-700" : "text-gray-600"}`}>
-                        {task.label}
+                        {task.name}
                       </span>
                     </button>
                   );
@@ -634,41 +734,70 @@ const Crops = () => {
         </div>
       )}
 
-      {/* --- MODAL: TẠO VỤ MỚI --- */}
+      {/* --- MODAL: TẠO/SỬA VỤ MỚI --- */}
       {isSeasonModalOpen && (
         <div className="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
-              <h3 className="font-bold text-gray-800">Bắt Đầu Vụ Mùa Mới</h3>
+              <h3 className="font-bold text-gray-800">
+                {editingSeasonName ? "Sửa Mùa Vụ" : "Bắt Đầu Vụ Mùa Mới"}
+              </h3>
             </div>
             <div className="p-6 space-y-4">
                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Tên vụ mùa</label>
-                  <input
-                    type="text"
-                    value={seasonForm.name}
-                    onChange={(e) => setSeasonForm({...seasonForm, name: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-medium"
-                    placeholder="VD: Đông Xuân 2024"
-                    autoFocus
-                  />
+                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Chọn tên mùa vụ</label>
+                  <div className="relative">
+                    <select
+                      value={seasonForm.seasonId}
+                      onChange={(e) => setSeasonForm({...seasonForm, seasonId: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-medium appearance-none"
+                      autoFocus
+                    >
+                      <option value="">-- Chọn mùa vụ --</option>
+                      {seasonCatalogs.map((season) => (
+                        <option key={season._id} value={season._id}>{season.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-70 pointer-events-none" />
+                  </div>
+                  {seasonForm.seasonId && (
+                    <p className="text-xs text-emerald-600 mt-2 font-medium">
+                      Tên vụ: <strong>{(seasonCatalogs.find((s) => s._id === seasonForm.seasonId)?.name || "") + " " + new Date().getFullYear()}</strong>
+                    </p>
+                  )}
                </div>
                <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Ngày bắt đầu</label>
-                  <input
-                    type="date"
-                    value={seasonForm.startDate}
-                    onChange={(e) => setSeasonForm({...seasonForm, startDate: e.target.value})}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-medium"
-                  />
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={seasonForm.startDate}
+                      onChange={(e) => setSeasonForm({...seasonForm, startDate: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-medium"
+                    />
+                    <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                  </div>
                </div>
                <button
                 onClick={handleCreateSeason}
                 className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold mt-2 shadow-lg shadow-emerald-200"
                >
-                 Tạo Vụ Mới
+                 {editingSeasonName ? "Lưu Thay Đổi" : "Tạo Vụ Mới"}
                </button>
-               <button onClick={() => setIsSeasonModalOpen(false)} className="w-full py-2 text-gray-400 text-sm hover:text-gray-600 font-medium">Đóng</button>
+               <button 
+                onClick={() => {
+                  setIsSeasonModalOpen(false);
+                  setEditingSeasonName(false);
+                  setSeasonForm({ 
+                    seasonId: "", 
+                    startDate: new Date().toISOString().split('T')[0],
+                    editingSeasonId: null
+                  });
+                }} 
+                className="w-full py-2 text-gray-400 text-sm hover:text-gray-600 font-medium"
+               >
+                 Đóng
+               </button>
             </div>
           </div>
         </div>

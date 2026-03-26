@@ -9,7 +9,9 @@ const userRoutes = require("./src/routes/userRoute");
 const fieldRoutes = require("./src/routes/fieldRoute");
 const plotRoutes = require("./src/routes/plotRoute");
 const seasonRoutes = require("./src/routes/seasonRoute");
+const seasonDetailRoutes = require("./src/routes/seasonDetailRoute");
 const diaryLogRoutes = require("./src/routes/diaryLogRoute");
+const taskRoutes = require("./src/routes/taskRoute");
 const aiRoutes = require("./src/routes/aiRoute");
 
 const app = express();
@@ -34,7 +36,9 @@ app.use("/api/users", userRoutes);
 app.use("/api/fields", fieldRoutes);
 app.use("/api/plots", plotRoutes);
 app.use("/api/seasons", seasonRoutes);
+app.use("/api/season-details", seasonDetailRoutes);
 app.use("/api/diary-logs", diaryLogRoutes);
+app.use("/api/tasks", taskRoutes);
 app.use("/api/ai", aiRoutes);
 
 // --- Start Server ---

@@ -1,23 +1,20 @@
 const mongoose = require("mongoose");
 
 const diaryLogSchema = new mongoose.Schema({
-  title: { type: String, required: true }, // VD: Bón phân đợt 1
+  task: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Task",
+    required: true,
+  }, // Mã công việc
   description: { type: String }, // Chi tiết: Phân Ure 50kg...
   date: { type: Date, default: Date.now }, // Ngày thực hiện
-  
-  // Loại công việc (để sau này thống kê)
-  type: { 
-    type: String, 
-    enum: ["material", "labor", "harvest", "disease", "other"], 
-    default: "other" 
-  }, // material: vật tư, labor: nhân công...
 
   cost: { type: Number, default: 0 }, // Chi phí (VNĐ)
   
   // Quan trọng: Gắn với Vụ nào?
   season: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: "Season", 
+    ref: "SeasonDetail", 
     required: true 
   },
 
