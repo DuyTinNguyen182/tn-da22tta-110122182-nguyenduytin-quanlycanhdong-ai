@@ -2,7 +2,11 @@ const seasonService = require("../services/seasonService");
 
 exports.getSeasons = async (req, res) => {
   try {
-    const seasons = await seasonService.getSeasons();
+    const includeHidden =
+      String(req.query.includeHidden || "").toLowerCase() === "true" &&
+      (req.user?.role || "").toLowerCase() === "admin";
+
+    const seasons = await seasonService.getSeasons({ includeHidden });
     res.json(seasons);
   } catch (error) {
     res.status(500).json({ message: error.message });

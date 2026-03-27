@@ -5,8 +5,9 @@ const escapeRegExp = (input) => {
   return input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 };
 
-const getSeasons = async () => {
-  return await Season.find().sort({ name: 1 });
+const getSeasons = async ({ includeHidden = false } = {}) => {
+  const query = includeHidden ? {} : { isVisible: { $ne: false } };
+  return await Season.find(query).sort({ name: 1 });
 };
 
 const getSeasonById = async (id) => {
@@ -29,7 +30,7 @@ const createSeason = async (data) => {
     throw new Error("Tên mùa vụ đã tồn tại");
   }
 
-  return await Season.create({ name });
+  return await Season.create({ name, isVisible: data?.isVisible !== false });
 };
 
 const updateSeason = async (id, data) => {
@@ -55,6 +56,11 @@ const updateSeason = async (id, data) => {
   }
 
   season.name = name;
+
+  if (typeof data?.isVisible === "boolean") {
+    season.isVisible = data.isVisible;
+  }
+
   return await season.save();
 };
 
@@ -84,6 +90,9 @@ const resolveSeasonId = async ({ seasonId, seasonCode, seasonName }) => {
     if (!season) {
       throw new Error("Mã mùa vụ không hợp lệ");
     }
+    if (season.isVisible === false) {
+      throw new Error("Mùa vụ này đang bị ẩn");
+    }
     return String(season._id);
   }
 
@@ -91,6 +100,9 @@ const resolveSeasonId = async ({ seasonId, seasonCode, seasonName }) => {
     const season = await Season.findOne({ name: seasonName }).lean();
     if (!season) {
       throw new Error("Tên mùa vụ không hợp lệ");
+    }
+    if (season.isVisible === false) {
+      throw new Error("Mùa vụ này đang bị ẩn");
     }
     return String(season._id);
   }

@@ -1,12 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Sprout,
-  Tractor,
-  Droplets,
-  Scissors,
-  SprayCan,
-  Wheat,
-  Shovel,
   Calendar,
   DollarSign,
   Plus,
@@ -16,26 +10,11 @@ import {
   Edit2,
   Trash2,
   Layers,
-  Leaf,
   CalendarDays,
-  MoreHorizontal, // Icon cho công việc Khác
   CheckSquare,    // Icon kết thúc
   Filter          // Icon bộ lọc
 } from "lucide-react";
 import api from "../services/api";
-
-const pickTaskIconByName = (taskName = "") => {
-  const normalized = taskName.toLowerCase();
-  if (normalized.includes("làm đất") || normalized.includes("lam dat")) return Tractor;
-  if (normalized.includes("gieo") || normalized.includes("sạ") || normalized.includes("sa")) return Sprout;
-  if (normalized.includes("dặm") || normalized.includes("dam")) return Scissors;
-  if (normalized.includes("nước") || normalized.includes("nuoc") || normalized.includes("tưới") || normalized.includes("tuoi")) return Droplets;
-  if (normalized.includes("phân") || normalized.includes("phan")) return Leaf;
-  if (normalized.includes("thuốc") || normalized.includes("thuoc") || normalized.includes("phun")) return SprayCan;
-  if (normalized.includes("thu hoạch") || normalized.includes("thu hoach")) return Wheat;
-  if (normalized.includes("bệnh") || normalized.includes("benh")) return MoreHorizontal;
-  return MoreHorizontal;
-};
 
 const Crops = () => {
   // --- STATE ---
@@ -230,14 +209,15 @@ const Crops = () => {
 
     if (confirmEnd) {
       try {
+        const finishedAt = new Date();
         const res = await api.put(`/season-details/${selectedSeasonId}/finish`, {
           status: "completed",
-          endDate: new Date()
+          endDate: finishedAt
         });
 
         // Cập nhật state local
         const updatedSeasons = seasons.map(s => 
-          s._id === selectedSeasonId ? { ...s, status: "completed" } : s
+          s._id === selectedSeasonId ? { ...s, status: "completed", endDate: finishedAt.toISOString() } : s
         );
         setSeasons(updatedSeasons);
         alert("Đã kết thúc vụ mùa thành công!");
@@ -324,7 +304,7 @@ const Crops = () => {
   // --- FILTER LOGIC ---
   // --- FILTER LOGIC ---
   const filteredLogs = useMemo(() => {
-    return logs.filter(log => {
+    const filtered = logs.filter(log => {
       // 1. Lọc theo Thửa
       const matchPlot = filterPlotId 
         ? (
@@ -342,21 +322,24 @@ const Crops = () => {
 
       return matchPlot && matchTask;
     });
+
+    // Sắp xếp mới nhất lên đầu theo ngày nhật ký.
+    // Nếu cùng ngày thì ưu tiên nhật ký có createdAt mới hơn (giờ-phút-giây).
+    return filtered.sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+
+      if (dateB !== dateA) {
+        return dateB - dateA;
+      }
+
+      const createdA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+      const createdB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+      return createdB - createdA;
+    });
   }, [logs, filterPlotId, filterTaskId]);
 
   const totalCost = filteredLogs.reduce((acc, curr) => acc + (curr.cost || 0), 0);
-
-  const getTaskIcon = (log) => {
-    const task = taskTypes.find((t) => t._id === log.taskId) || null;
-    const taskName = task?.name || log.taskName || log.title || "";
-    const Icon = pickTaskIconByName(taskName) || Sprout;
-
-    return {
-      icon: Icon,
-      color: "text-gray-600",
-      bg: "bg-gray-100",
-    };
-  };
 
   return (
     <div className="flex h-[calc(100vh-80px)] bg-gray-50 overflow-hidden font-sans">
@@ -451,7 +434,7 @@ const Crops = () => {
                         )}
 
                         {/* Nút Sửa Mùa Vụ - Hiện khi đã tạo xong một vụ */}
-                        {currentSeason && (
+                        {currentSeason && isSeasonActive && (
                           <button 
                             onClick={handleOpenEditSeasonModal}
                             className="p-1.5 bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 rounded-lg transition-colors"
@@ -505,7 +488,7 @@ const Crops = () => {
                                 className="bg-transparent outline-none font-medium text-gray-700 hover:text-emerald-600 cursor-pointer"
                             >
                                 <option value="">Tất cả các thửa</option>
-                                {plots.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                                {plots.filter(p => p.status === "active").map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
                             </select>
                             
                             <span className="text-gray-300">|</span>
@@ -527,6 +510,12 @@ const Crops = () => {
                             <CalendarDays size={16} className="text-gray-400" />
                             <span>Bắt đầu: {currentSeason?.startDate ? new Date(currentSeason.startDate).toLocaleDateString('vi-VN') : 'N/A'}</span>
                         </div>
+                        {currentSeason?.status === "completed" && currentSeason?.endDate && (
+                          <div className="flex items-center gap-2">
+                            <CalendarDays size={16} className="text-gray-400" />
+                            <span>Kết thúc: {new Date(currentSeason.endDate).toLocaleDateString('vi-VN')}</span>
+                          </div>
+                        )}
                         <div className="flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
                             <span>Chi phí: <strong className="text-emerald-600">{totalCost.toLocaleString()} đ</strong></span>
@@ -551,9 +540,6 @@ const Crops = () => {
               ) : (
                 <div className="max-w-4xl mx-auto space-y-6">
                   {filteredLogs.map((log, index) => {
-                    const TaskInfo = getTaskIcon(log);
-                    const LogIcon = TaskInfo.icon;
-                    
                     return (
                       <div key={log._id} className="relative pl-8 group">
                         {/* Timeline Line */}
@@ -562,7 +548,7 @@ const Crops = () => {
                         )}
                         
                         {/* Dot Icon */}
-                        <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center z-10 ${TaskInfo.bg} ${TaskInfo.color}`}>
+                        <div className="absolute left-0 top-1 w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center z-10 bg-gray-100 text-gray-600">
                            <div className="w-2 h-2 rounded-full bg-current"></div>
                         </div>
 
@@ -570,9 +556,6 @@ const Crops = () => {
                         <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative">
                           <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-3">
-                              <div className={`p-2.5 rounded-xl ${TaskInfo.bg} ${TaskInfo.color}`}>
-                                <LogIcon size={20} />
-                              </div>
                               <div>
                                 <h3 className="font-bold text-gray-800 text-lg">{log.taskName || log.title}</h3>
                                 <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
@@ -647,7 +630,6 @@ const Crops = () => {
               <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Chọn công việc</label>
               <div className="grid grid-cols-4 gap-3 mb-6">
                 {taskTypes.map((task) => {
-                  const UiIcon = pickTaskIconByName(task.name);
                   const isSelected = logForm.taskType?._id === task._id;
                   return (
                     <button
@@ -659,9 +641,6 @@ const Crops = () => {
                           : "bg-white border-gray-200 hover:border-emerald-300 hover:bg-gray-50"
                       }`}
                     >
-                      <div className="mb-2 text-gray-600">
-                        <UiIcon size={24} />
-                      </div>
                       <span className={`text-[10px] font-bold text-center ${isSelected ? "text-emerald-700" : "text-gray-600"}`}>
                         {task.name}
                       </span>
@@ -705,7 +684,7 @@ const Crops = () => {
                       className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none text-sm font-medium"
                    >
                       <option value="">-- Toàn bộ cánh đồng --</option>
-                      {plots.map(p => (
+                      {plots.filter(p => p.status === "active").map(p => (
                         <option key={p._id} value={p._id}>{p.name} ({p.area} m²)</option>
                       ))}
                    </select>

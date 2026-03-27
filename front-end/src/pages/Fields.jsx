@@ -16,6 +16,8 @@ import {
 import api from "../services/api";
 import SeasonManager from "../components/Season/SeasonManager";
 
+const LOCATION_API_BASE = "https://provinces.open-api.vn/api";
+
 const Fields = () => {
   // --- STATE ---
   const [fields, setFields] = useState([]);
@@ -30,8 +32,83 @@ const Fields = () => {
   // Form State
   const [editingItem, setEditingItem] = useState(null);
   const [fieldForm, setFieldForm] = useState({ name: "", address: "" });
+  const [isCustomAddress, setIsCustomAddress] = useState(false);
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState("");
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState("");
+  const [selectedWardCode, setSelectedWardCode] = useState("");
+  const [loadingAddressData, setLoadingAddressData] = useState(false);
+  const [addressDataError, setAddressDataError] = useState("");
   const [plotForm, setPlotForm] = useState({ name: "", area: "", status: "active" });
   const [activeTab, setActiveTab] = useState("plots"); // 'plots' hoặc 'seasons'
+
+  const getSelectedProvince = () => provinces.find((p) => String(p.code) === String(selectedProvinceCode));
+  const getSelectedDistrict = () => districts.find((d) => String(d.code) === String(selectedDistrictCode));
+  const getSelectedWard = () => wards.find((w) => String(w.code) === String(selectedWardCode));
+
+  const composeAddress = (wardName, districtName, provinceName) => {
+    if (wardName && districtName && provinceName) return `${wardName}, ${districtName}, ${provinceName}`;
+    if (districtName && provinceName) return `${districtName}, ${provinceName}`;
+    if (provinceName) return provinceName;
+    return "";
+  };
+
+  const fetchProvinces = async () => {
+    try {
+      setLoadingAddressData(true);
+      setAddressDataError("");
+      const res = await fetch(`${LOCATION_API_BASE}/p/`);
+      if (!res.ok) throw new Error("Không tải được dữ liệu tỉnh/thành");
+      const data = await res.json();
+      setProvinces(data || []);
+    } catch (err) {
+      setAddressDataError(err.message || "Lỗi tải dữ liệu địa chỉ");
+    } finally {
+      setLoadingAddressData(false);
+    }
+  };
+
+  const fetchDistricts = async (provinceCode) => {
+    if (!provinceCode) {
+      setDistricts([]);
+      return;
+    }
+    try {
+      setLoadingAddressData(true);
+      setAddressDataError("");
+      const res = await fetch(`${LOCATION_API_BASE}/p/${provinceCode}?depth=2`);
+      if (!res.ok) throw new Error("Không tải được danh sách quận/huyện");
+      const data = await res.json();
+      setDistricts(data?.districts || []);
+    } catch (err) {
+      setAddressDataError(err.message || "Lỗi tải dữ liệu quận/huyện");
+      setDistricts([]);
+    } finally {
+      setLoadingAddressData(false);
+    }
+  };
+
+  const fetchWards = async (districtCode) => {
+    if (!districtCode) {
+      setWards([]);
+      return;
+    }
+    try {
+      setLoadingAddressData(true);
+      setAddressDataError("");
+      const res = await fetch(`${LOCATION_API_BASE}/d/${districtCode}?depth=2`);
+      if (!res.ok) throw new Error("Không tải được danh sách phường/xã");
+      const data = await res.json();
+      setWards(data?.wards || []);
+    } catch (err) {
+      setAddressDataError(err.message || "Lỗi tải dữ liệu phường/xã");
+      setWards([]);
+    } finally {
+      setLoadingAddressData(false);
+    }
+  };
 
   // --- 1. API: FIELDS ---
   const fetchFields = async () => {
@@ -59,6 +136,10 @@ const Fields = () => {
       setIsFieldModalOpen(false);
       fetchFields();
       setFieldForm({ name: "", address: "" });
+      setIsCustomAddress(false);
+      setSelectedProvinceCode("");
+      setSelectedDistrictCode("");
+      setSelectedWardCode("");
       setEditingItem(null);
     } catch (err) {
       alert(err.response?.data?.message || "Lỗi lưu thông tin ruộng");
@@ -134,11 +215,53 @@ const Fields = () => {
     fetchFields();
   }, []);
 
+  useEffect(() => {
+    if (isFieldModalOpen && provinces.length === 0) {
+      fetchProvinces();
+    }
+  }, [isFieldModalOpen, provinces.length]);
+
+  useEffect(() => {
+    const province = getSelectedProvince();
+    const district = getSelectedDistrict();
+    const ward = getSelectedWard();
+
+    if (isCustomAddress) return;
+
+    setFieldForm((prev) => ({
+      ...prev,
+      address: composeAddress(ward?.name, district?.name, province?.name),
+    }));
+  }, [selectedProvinceCode, selectedDistrictCode, selectedWardCode, isCustomAddress]);
+
   // --- HELPERS: OPEN MODALS ---
   const openFieldModal = (field = null) => {
     setEditingItem(field);
-    setFieldForm(field ? { name: field.name, address: field.address } : { name: "", address: "" });
+    const nextForm = field ? { name: field.name, address: field.address || "" } : { name: "", address: "" };
+    setFieldForm(nextForm);
+    setIsCustomAddress(Boolean(nextForm.address));
+    setSelectedProvinceCode("");
+    setSelectedDistrictCode("");
+    setSelectedWardCode("");
+    setDistricts([]);
+    setWards([]);
     setIsFieldModalOpen(true);
+  };
+
+  const handleProvinceChange = async (value) => {
+    setSelectedProvinceCode(value);
+    setSelectedDistrictCode("");
+    setSelectedWardCode("");
+    setDistricts([]);
+    setWards([]);
+    await fetchDistricts(value);
+  };
+
+  const handleDistrictChange = async (value) => {
+    setSelectedDistrictCode(value);
+    setSelectedWardCode("");
+    setWards([]);
+    await fetchWards(value);
   };
 
   const openPlotModal = (plot = null) => {
@@ -366,13 +489,82 @@ const Fields = () => {
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Địa chỉ / Khu vực</label>
-                <input
-                  type="text"
-                  value={fieldForm.address}
-                  onChange={(e) => setFieldForm({ ...fieldForm, address: e.target.value })}
+                <select
+                  value={isCustomAddress ? "__custom__" : "__structured__"}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "__custom__") {
+                      setIsCustomAddress(true);
+                      return;
+                    }
+                    setIsCustomAddress(false);
+                    setFieldForm({ ...fieldForm, address: "" });
+                  }}
                   className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium"
-                  placeholder="Ví dụ: Ấp 2, Xã Bình Hòa"
-                />
+                >
+                  <option value="__structured__">Chọn theo tỉnh/thành thật</option>
+                  <option value="__custom__">Nhập thủ công</option>
+                </select>
+
+                {!isCustomAddress && (
+                  <div className="mt-3 space-y-3">
+                    <select
+                      value={selectedProvinceCode}
+                      onChange={(e) => handleProvinceChange(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium"
+                    >
+                      <option value="">Chọn Tỉnh / Thành phố</option>
+                      {provinces.map((province) => (
+                        <option key={province.code} value={province.code}>{province.name}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={selectedDistrictCode}
+                      onChange={(e) => handleDistrictChange(e.target.value)}
+                      disabled={!selectedProvinceCode}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Chọn Quận / Huyện</option>
+                      {districts.map((district) => (
+                        <option key={district.code} value={district.code}>{district.name}</option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={selectedWardCode}
+                      onChange={(e) => setSelectedWardCode(e.target.value)}
+                      disabled={!selectedDistrictCode}
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      <option value="">Chọn Phường / Xã (tuỳ chọn)</option>
+                      {wards.map((ward) => (
+                        <option key={ward.code} value={ward.code}>{ward.name}</option>
+                      ))}
+                    </select>
+
+                    {loadingAddressData && (
+                      <p className="text-xs text-gray-500">Đang tải dữ liệu địa chỉ...</p>
+                    )}
+                    {addressDataError && (
+                      <p className="text-xs text-red-500">{addressDataError}</p>
+                    )}
+                    {fieldForm.address && (
+                      <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                        Địa chỉ đã chọn: {fieldForm.address}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {isCustomAddress && (
+                  <input
+                    type="text"
+                    value={fieldForm.address}
+                    onChange={(e) => setFieldForm({ ...fieldForm, address: e.target.value })}
+                    className="mt-3 w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium"
+                    placeholder="Nhập địa chỉ cụ thể"
+                  />
+                )}
               </div>
               <button
                 onClick={handleSaveField}

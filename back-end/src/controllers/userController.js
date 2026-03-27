@@ -27,7 +27,7 @@ const getUserById = async (req, res) => {
 // CREATE user (Admin tạo user mới)
 const createUser = async (req, res) => {
   try {
-    const { fullName, email, password, role } = req.body;
+    const { fullName, email, password, phone, address, role } = req.body;
 
     // Kiểm tra email tồn tại
     const userExists = await User.findOne({ email });
@@ -44,6 +44,8 @@ const createUser = async (req, res) => {
       fullName,
       email,
       password: hashedPassword,
+      phone: phone || "",
+      address: address || "",
       role: role || "farmer",
     });
 
@@ -53,6 +55,8 @@ const createUser = async (req, res) => {
         _id: user._id,
         fullName: user.fullName,
         email: user.email,
+        phone: user.phone,
+        address: user.address,
         role: user.role,
         createdAt: user.createdAt,
       },
@@ -65,7 +69,7 @@ const createUser = async (req, res) => {
 // UPDATE user
 const updateUser = async (req, res) => {
   try {
-    const { fullName, email, role } = req.body;
+    const { fullName, email, phone, address, role } = req.body;
     const userId = req.params.id;
 
     // Kiểm tra email trùng (nếu đổi email)
@@ -79,7 +83,7 @@ const updateUser = async (req, res) => {
     // Update user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { fullName, email, role },
+      { fullName, email, phone, address, role },
       { new: true, runValidators: true }
     ).select("-password");
 

@@ -92,7 +92,7 @@ const AdminTasks = () => {
     <div className="p-8 h-full bg-gray-50 overflow-y-auto">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Quản Lý Công Việc</h1>
-        <p className="text-gray-600 mt-1">Thêm mới, chỉnh sửa và xóa tên công việc.</p>
+        {/* <p className="text-gray-600 mt-1">Thêm mới, chỉnh sửa và xóa tên công việc.</p> */}
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">

@@ -6,8 +6,23 @@ import {
   Trash2,
   Save,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import api from "../../services/api";
+
+const sortSeasons = (items = []) => {
+  return [...items].sort((a, b) => {
+    const aVisible = a?.isVisible !== false;
+    const bVisible = b?.isVisible !== false;
+
+    if (aVisible !== bVisible) {
+      return aVisible ? -1 : 1;
+    }
+
+    return (a?.name || "").localeCompare(b?.name || "", "vi");
+  });
+};
 
 const AdminSeasons = () => {
   const [seasons, setSeasons] = useState([]);
@@ -24,8 +39,8 @@ const AdminSeasons = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const seasonRes = await api.get("/seasons");
-      setSeasons(seasonRes.data || []);
+      const seasonRes = await api.get("/seasons?includeHidden=true");
+      setSeasons(sortSeasons(seasonRes.data || []));
     } catch (err) {
       console.error("Lỗi tải dữ liệu mùa vụ admin:", err);
       alert(err.response?.data?.message || "Không thể tải dữ liệu mùa vụ");
@@ -43,7 +58,7 @@ const AdminSeasons = () => {
     setSubmitting(true);
     try {
       const res = await api.post("/seasons", { name: newSeasonName.trim() });
-      setSeasons((prev) => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name, "vi")));
+      setSeasons((prev) => sortSeasons([...prev, res.data]));
       setNewSeasonName("");
     } catch (err) {
       alert(err.response?.data?.message || "Không thể tạo mùa vụ");
@@ -71,10 +86,30 @@ const AdminSeasons = () => {
     setSubmitting(true);
     try {
       const res = await api.put(`/seasons/${id}`, { name: editingSeasonName.trim() });
-      setSeasons((prev) => prev.map((item) => (item._id === id ? res.data : item)));
+      setSeasons((prev) => sortSeasons(prev.map((item) => (item._id === id ? res.data : item))));
       cancelEdit();
     } catch (err) {
       alert(err.response?.data?.message || "Không thể cập nhật mùa vụ");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleVisibility = async (season) => {
+    const nextVisible = season.isVisible === false;
+    const actionLabel = nextVisible ? "hiển thị" : "ẩn";
+
+    if (!window.confirm(`Bạn có chắc muốn ${actionLabel} mùa vụ '${season.name}'?`)) return;
+
+    setSubmitting(true);
+    try {
+      const res = await api.put(`/seasons/${season._id}`, {
+        name: season.name,
+        isVisible: nextVisible,
+      });
+      setSeasons((prev) => sortSeasons(prev.map((item) => (item._id === season._id ? res.data : item))));
+    } catch (err) {
+      alert(err.response?.data?.message || "Không thể cập nhật trạng thái hiển thị");
     } finally {
       setSubmitting(false);
     }
@@ -98,7 +133,7 @@ const AdminSeasons = () => {
     <div className="p-8 h-full bg-gray-50 overflow-y-auto">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Quản Lý Mùa Vụ</h1>
-        <p className="text-gray-600 mt-1">Thêm mới, chỉnh sửa và xóa tên mùa vụ.</p>
+        {/* <p className="text-gray-600 mt-1">Thêm mới, chỉnh sửa và xóa tên mùa vụ.</p> */}
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
@@ -126,7 +161,9 @@ const AdminSeasons = () => {
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <h2 className="font-bold text-gray-800">Danh Mục Mùa Vụ</h2>
-          <span className="text-sm text-gray-500">Tổng: {seasons.length}</span>
+          <span className="text-sm text-gray-500">
+            Tổng: {seasons.length} | Hiển thị: {seasons.filter((item) => item.isVisible !== false).length} | Ẩn: {seasons.filter((item) => item.isVisible === false).length}
+          </span>
         </div>
 
         {loading ? (
@@ -141,6 +178,7 @@ const AdminSeasons = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tên mùa vụ</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Trạng thái</th>
                   <th className="px-5 py-3 text-right text-xs font-bold text-gray-500 uppercase">Thao tác</th>
                 </tr>
               </thead>
@@ -160,6 +198,17 @@ const AdminSeasons = () => {
                         ) : (
                           <span className="font-semibold text-gray-800">{season.name}</span>
                         )}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
+                            season.isVisible === false
+                              ? "bg-gray-100 text-gray-600"
+                              : "bg-emerald-100 text-emerald-700"
+                          }`}
+                        >
+                          {season.isVisible === false ? "Đang ẩn" : "Đang hiển thị"}
+                        </span>
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-2">
@@ -184,6 +233,18 @@ const AdminSeasons = () => {
                             </>
                           ) : (
                             <>
+                              <button
+                                disabled={submitting}
+                                onClick={() => handleToggleVisibility(season)}
+                                className={`p-2 rounded-lg ${
+                                  season.isVisible === false
+                                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                }`}
+                                title={season.isVisible === false ? "Hiện mùa vụ" : "Ẩn mùa vụ"}
+                              >
+                                {season.isVisible === false ? <Eye size={16} /> : <EyeOff size={16} />}
+                              </button>
                               <button
                                 disabled={submitting}
                                 onClick={() => startEdit(season)}

@@ -5,7 +5,7 @@ const jwtConfig = require("../config/jwt");
 
 // 1. Logic Đăng Ký
 const registerUser = async (data) => {
-  const { fullName, email, password } = data;
+  const { fullName, email, password, phone, address } = data;
 
   // Kiểm tra email tồn tại chưa
   const userExists = await User.findOne({ email });
@@ -22,12 +22,16 @@ const registerUser = async (data) => {
     fullName,
     email,
     password: hashedPassword,
+    phone: phone || "",
+    address: address || "",
   });
 
   return {
     _id: user._id,
     fullName: user.fullName,
     email: user.email,
+    phone: user.phone,
+    address: user.address,
     role: user.role,
   };
 };
@@ -58,13 +62,15 @@ const loginUser = async (email, password) => {
     _id: user._id,
     fullName: user.fullName,
     email: user.email,
+    phone: user.phone,
+    address: user.address,
     role: user.role,
     token: token,
   };
 };
 
 const getUserById = async (id) => {
-  const user = await User.findById(id).select("_id fullName email role");
+  const user = await User.findById(id).select("_id fullName email phone address role");
   if (!user) {
     throw new Error("Không tìm thấy người dùng");
   }
@@ -72,4 +78,52 @@ const getUserById = async (id) => {
   return user;
 };
 
-module.exports = { registerUser, loginUser, getUserById };
+const updateProfile = async (id, profileData) => {
+  const { fullName, email, phone, address } = profileData;
+
+  if (email) {
+    const existingUser = await User.findOne({ email, _id: { $ne: id } });
+    if (existingUser) {
+      throw new Error("Email này đã được sử dụng!");
+    }
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(
+    id,
+    {
+      fullName,
+      email,
+      phone: phone || "",
+      address: address || "",
+    },
+    { new: true, runValidators: true }
+  ).select("_id fullName email phone address role");
+
+  if (!updatedUser) {
+    throw new Error("Không tìm thấy người dùng");
+  }
+
+  return updatedUser;
+};
+
+const changePassword = async (id, currentPassword, newPassword) => {
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error("Mật khẩu mới phải ít nhất 6 ký tự");
+  }
+
+  const user = await User.findById(id);
+  if (!user) {
+    throw new Error("Không tìm thấy người dùng");
+  }
+
+  const isMatch = await bcrypt.compare(currentPassword, user.password);
+  if (!isMatch) {
+    throw new Error("Mật khẩu hiện tại không đúng");
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  user.password = await bcrypt.hash(newPassword, salt);
+  await user.save();
+};
+
+module.exports = { registerUser, loginUser, getUserById, updateProfile, changePassword };

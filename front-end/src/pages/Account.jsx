@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Eye, EyeOff, User, Mail, Phone, MapPin, Lock, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, User, Lock, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
@@ -18,6 +18,15 @@ const Account = () => {
     phone: user?.phone || "",
     address: user?.address || "",
   });
+
+  useEffect(() => {
+    setFormData({
+      fullName: user?.fullName || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      address: user?.address || "",
+    });
+  }, [user]);
 
   // Form đổi mật khẩu
   const [passwordForm, setPasswordForm] = useState({
@@ -40,10 +49,13 @@ const Account = () => {
 
     try {
       const response = await api.put("/auth/profile", formData);
-      if (response.data?.success) {
-        updateUser(response.data.data);
-        setMessage({ type: "success", text: "Cập nhật thông tin thành công!" });
+      if (response.data?.user) {
+        updateUser(response.data.user);
       }
+      setMessage({
+        type: "success",
+        text: response.data?.message || "Cập nhật thông tin thành công!",
+      });
     } catch (error) {
       setMessage({
         type: "error",
@@ -78,14 +90,15 @@ const Account = () => {
         newPassword: passwordForm.newPassword,
       });
 
-      if (response.data?.success) {
-        setMessage({ type: "success", text: "Đổi mật khẩu thành công!" });
-        setPasswordForm({
-          currentPassword: "",
-          newPassword: "",
-          confirmPassword: "",
-        });
-      }
+      setMessage({
+        type: "success",
+        text: response.data?.message || "Đổi mật khẩu thành công!",
+      });
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
     } catch (error) {
       setMessage({
         type: "error",
@@ -110,6 +123,17 @@ const Account = () => {
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
+  const hasProfileChanges =
+    (formData.fullName || "") !== (user?.fullName || "") ||
+    (formData.email || "") !== (user?.email || "") ||
+    (formData.phone || "") !== (user?.phone || "") ||
+    (formData.address || "") !== (user?.address || "");
+
+  const hasPasswordChanges =
+    passwordForm.currentPassword !== "" ||
+    passwordForm.newPassword !== "" ||
+    passwordForm.confirmPassword !== "";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
       <div className="max-w-2xl mx-auto">
@@ -124,7 +148,7 @@ const Account = () => {
           </button>
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Tài Khoản Của Tôi</h1>
-            <p className="text-sm text-gray-500">Quản lý thông tin cá nhân và bảo mật</p>
+            {/* <p className="text-sm text-gray-500">Quản lý thông tin cá nhân và bảo mật</p> */}
           </div>
         </div>
 
@@ -222,7 +246,7 @@ const Account = () => {
               {/* Address */}
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Địa CHỉ
+                  Địa Chỉ
                 </label>
                 <input
                   type="text"
@@ -236,8 +260,8 @@ const Account = () => {
 
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-md hover:shadow-lg active:scale-95"
+                disabled={isLoading || !hasProfileChanges}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-all shadow-md hover:shadow-lg active:scale-95"
               >
                 {isLoading ? "Đang cập nhật..." : "Lưu Thay Đổi"}
               </button>
@@ -323,8 +347,8 @@ const Account = () => {
 
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-md hover:shadow-lg active:scale-95"
+                disabled={isLoading || !hasPasswordChanges}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-all shadow-md hover:shadow-lg active:scale-95"
               >
                 {isLoading ? "Đang thay đổi..." : "Đổi Mật Khẩu"}
               </button>
