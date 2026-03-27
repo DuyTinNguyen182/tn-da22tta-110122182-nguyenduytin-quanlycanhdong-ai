@@ -1,11 +1,23 @@
 import React from "react";
-import { Bell, Search, User, LogOut, LogIn } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { LogOut, LogIn } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 const Header = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const pageTitleMap = {
+    "/dashboard": "Tổng quan nông trại",
+    "/fields": "Quản lý cánh đồng",
+    "/crops": "Nhật ký mùa vụ",
+    "/ai-scan": "AI chẩn đoán bệnh lúa",
+    "/ask-ai": "AI tư vấn canh tác",
+    "/account": "Tài khoản cá nhân",
+  };
+
+  const pageTitle = pageTitleMap[location.pathname] || "Nông nghiệp số";
 
   const handleLogout = async () => {
     await logout();
@@ -14,25 +26,14 @@ const Header = () => {
 
   return (
     <header className="h-20 bg-white/90 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-40 w-full">
-      {/* Search Bar */}
-      <div className="flex items-center bg-gray-100/80 px-4 py-2.5 rounded-xl w-96 border border-transparent focus-within:border-emerald-200 focus-within:bg-white transition-all">
-        <Search size={18} className="text-gray-400 mr-3" />
-        <input
-          type="text"
-          placeholder="Tìm kiếm thửa ruộng, giống lúa..."
-          className="bg-transparent border-none outline-none text-sm text-gray-700 w-full placeholder-gray-400"
-        />
+      <div className="min-w-0">
+        <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">{pageTitle}</h1>
       </div>
 
       <div className="flex items-center gap-4">
         {/* Nếu ĐÃ ĐĂNG NHẬP */}
         {user ? (
           <>
-            <button className="relative p-2 rounded-full hover:bg-gray-100 transition-colors">
-              <Bell size={20} className="text-gray-600" />
-              <span className="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
-            </button>
-
             <div 
               onClick={() => navigate("/account")}
               className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ml-1"
