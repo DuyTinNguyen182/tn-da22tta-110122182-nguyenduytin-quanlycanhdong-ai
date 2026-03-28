@@ -1,150 +1,178 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  MapPin,
-  Droplets,
-  AlertTriangle,
-  TrendingUp,
   ArrowRight,
-  Sun,
-  CloudRain,
+  LayoutGrid,
+  MapPin,
+  Sprout,
+  TrendingUp,
+  Waves,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import StatCard from "../components/Dashboard/StatCard";
+import api from "../services/api";
 
 const Dashboard = () => {
+  const navigate = useNavigate();
+  const [summary, setSummary] = useState(null);
+  const [fields, setFields] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const [summaryRes, fieldRes] = await Promise.all([
+          api.get("/fields/summary"),
+          api.get("/fields"),
+        ]);
+
+        setSummary(summaryRes.data);
+        setFields(fieldRes.data || []);
+      } catch (error) {
+        console.error("Lỗi tải tổng quan nông dân", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboard();
+  }, []);
+
+  const stats = summary?.stats || {};
+  const topFields = useMemo(() => fields.slice(0, 4), [fields]);
+
   return (
-    <div className="p-8 space-y-8 bg-gray-50 min-h-[calc(100vh-80px)]">
-      {/* 1. Phần Chào mừng & Quick Action (Nhắc nhở mùa vụ) */}
-      <div className="flex justify-between items-end">
+    <div className="min-h-[calc(100vh-80px)] space-y-8 bg-gray-50 p-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Tổng quan nông trại
-          </h2>
-          <p className="text-gray-500 mt-1">
-            Hôm nay, 21 Tháng 2, 2025 - Thời tiết nắng nhẹ ☀️
+          <h2 className="text-2xl font-bold text-gray-900">Không gian canh tác của bạn</h2>
+          <p className="mt-1 text-gray-500">
+            Theo dõi các cánh đồng của hợp tác xã và quản lý thửa ruộng bạn đang phụ trách.
           </p>
         </div>
+
+        <button
+          onClick={() => navigate("/fields")}
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700"
+        >
+          Vào quản lý thửa ruộng <ArrowRight size={16} />
+        </button>
       </div>
 
-      {/* 2. Cards Thống kê */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          title="Tổng diện tích"
-          value="12.5"
-          unit="ha"
-          icon={MapPin}
+          title="Cánh đồng khả dụng"
+          value={loading ? "--" : stats.availableFieldCount || 0}
+          unit="khu vực"
+          icon={LayoutGrid}
           color="blue"
         />
         <StatCard
-          title="Vụ đang chạy"
-          value="Đông Xuân"
-          unit="2025"
-          icon={Sun}
+          title="Thửa ruộng của tôi"
+          value={loading ? "--" : stats.plotCount || 0}
+          unit="thửa"
+          icon={Sprout}
           color="emerald"
         />
         <StatCard
-          title="Cảnh báo bệnh"
-          value="03"
-          unit="vị trí"
-          icon={AlertTriangle}
+          title="Tổng diện tích"
+          value={loading ? "--" : Number(stats.totalArea || 0).toLocaleString()}
+          unit="m2"
+          icon={MapPin}
           color="orange"
-          trend={+12}
         />
         <StatCard
-          title="Dự báo sản lượng"
-          value="85"
-          unit="tấn"
+          title="Vụ đang hoạt động"
+          value={loading ? "--" : stats.activeSeasonCount || 0}
+          unit="vụ"
           icon={TrendingUp}
           color="purple"
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 h-[500px]">
-        {/* 3. Bản đồ nhanh (Chiếm 2/3) */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 p-6 flex flex-col shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2">
-              <MapPin size={20} className="text-emerald-600" /> Bản đồ canh tác
-            </h3>
-            <button className="text-sm text-emerald-600 font-medium hover:underline flex items-center">
-              Mở bản đồ lớn <ArrowRight size={16} className="ml-1" />
-            </button>
-          </div>
-
-          {/* Placeholder cho Leaflet Map */}
-          <div className="flex-1 bg-emerald-50/50 rounded-xl border-2 border-dashed border-emerald-100 flex items-center justify-center relative overflow-hidden group cursor-pointer">
-            <div className="text-center z-10">
-              <MapPin size={40} className="mx-auto text-emerald-300 mb-2" />
-              <p className="text-emerald-800 font-medium">
-                Khu vực hiển thị Bản đồ Leaflet
-              </p>
-              <p className="text-emerald-600 text-sm">
-                Click để xem chi tiết từng thửa
+      <div className="grid grid-cols-1 gap-8 xl:grid-cols-[1.6fr_1fr]">
+        <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">Cánh đồng hợp tác xã</h3>
+              <p className="text-sm text-gray-500">
+                Các khu vực do admin cấu hình để bạn gắn thửa ruộng và ghi nhật ký mùa vụ.
               </p>
             </div>
-            {/* Giả lập hiệu ứng map */}
-            <div className="absolute inset-0 bg-[url('https://img.freepik.com/free-vector/suburban-map-concept_23-2148609594.jpg')] opacity-10 bg-cover bg-center group-hover:opacity-20 transition-opacity"></div>
           </div>
-        </div>
 
-        {/* 4. "Smart Suggestion" - Sidebar bên phải (Chiếm 1/3) */}
-        <div className="space-y-6">
-          {/* Widget 1: Nhắc nhở mùa vụ (Quan trọng) */}
-          <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-6 text-white shadow-lg shadow-emerald-200">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-2 bg-white/20 rounded-lg backdrop-blur-sm">
-                <Droplets size={24} className="text-white" />
+          <div className="grid gap-4 md:grid-cols-2">
+            {topFields.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500 md:col-span-2">
+                Chưa có cánh đồng nào được tạo. Hãy nhờ admin hợp tác xã cấu hình trước.
               </div>
-              <span className="text-xs bg-white/20 px-2 py-1 rounded text-white/90">
-                Sắp tới
-              </span>
+            ) : (
+              topFields.map((field) => (
+                <article
+                  key={field._id}
+                  className="rounded-2xl border border-gray-100 bg-gradient-to-br from-white to-emerald-50/40 p-5 shadow-sm"
+                >
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <h4 className="font-bold text-gray-800">{field.name}</h4>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {field.address || "Admin chưa cập nhật địa bàn"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700">
+                      <MapPin size={18} />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                    <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
+                      {field.plotCount || 0} thửa
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
+                      {Number(field.totalArea || 0).toLocaleString()} m2
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
+                      {field.activeSeasonCount || 0} vụ active
+                    </span>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="space-y-6">
+          <div className="rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-700 p-6 text-white shadow-lg shadow-emerald-200">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/15">
+              <Waves size={22} />
             </div>
-            <h3 className="text-lg font-bold mb-1">Chuẩn bị Vụ Hè Thu</h3>
-            <p className="text-emerald-100 text-sm mb-4">
-              Đã đến thời điểm làm đất. Bạn có muốn tạo kế hoạch vụ mới cho{" "}
-              <strong>Thửa Bờ Kênh</strong> không?
+            <h3 className="text-lg font-bold">Luồng làm việc mới</h3>
+            <p className="mt-2 text-sm text-emerald-50">
+              Admin quản lý cánh đồng chung của hợp tác xã, còn bạn chỉ cần thêm thửa ruộng của
+              mình và ghi nhật ký theo từng vụ.
             </p>
-            <button className="w-full py-2.5 bg-white text-emerald-700 font-semibold rounded-lg text-sm hover:bg-emerald-50 transition-colors">
-              + Tạo vụ mùa mới
+            <button
+              onClick={() => navigate("/crops")}
+              className="mt-5 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+            >
+              Mở nhật ký mùa vụ
             </button>
           </div>
 
-          {/* Widget 2: Cảnh báo gần đây */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex-1">
-            <h3 className="font-bold text-gray-800 mb-4">Cảnh báo cần xử lý</h3>
-            <div className="space-y-4">
-              <div className="flex gap-4 items-start pb-4 border-b border-gray-50 last:border-0 last:pb-0">
-                <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle size={18} className="text-red-500" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-800">
-                    Phát hiện Đạo ôn lá
-                  </h4>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Thửa A2 • Mức độ: Nghiêm trọng
-                  </p>
-                  <button className="text-xs text-red-600 font-medium mt-2 hover:underline">
-                    Xem hướng xử lý AI &rarr;
-                  </button>
-                </div>
+          <div className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-800">Việc cần làm</h3>
+            <div className="mt-4 space-y-3 text-sm text-gray-600">
+              <div className="rounded-2xl bg-gray-50 p-4">
+                1. Chọn cánh đồng do hợp tác xã đã tạo trong trang quản lý thửa ruộng.
               </div>
-
-              <div className="flex gap-4 items-start">
-                <div className="w-10 h-10 rounded-full bg-yellow-50 flex items-center justify-center flex-shrink-0">
-                  <CloudRain size={18} className="text-yellow-600" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-800">
-                    Cảnh báo mưa lớn
-                  </h4>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Chiều nay có thể mưa dông. Hạn chế phun thuốc.
-                  </p>
-                </div>
+              <div className="rounded-2xl bg-gray-50 p-4">
+                2. Tạo thửa ruộng của bạn, thêm diện tích và địa chỉ chi tiết nếu cần.
+              </div>
+              <div className="rounded-2xl bg-gray-50 p-4">
+                3. Bắt đầu vụ mới và ghi nhật ký theo từng thửa để AI hỗ trợ tốt hơn.
               </div>
             </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

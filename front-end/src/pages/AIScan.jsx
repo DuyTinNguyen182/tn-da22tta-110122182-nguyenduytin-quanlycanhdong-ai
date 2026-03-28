@@ -65,14 +65,11 @@ const AIScan = () => {
 
     const fetchFieldData = async () => {
       try {
-        const [plotsRes, seasonsRes] = await Promise.all([
-          api.get("/plots", { params: { fieldId: selectedField } }),
-          api.get("/seasons", { params: { fieldId: selectedField } }),
-        ]);
+        const seasonsRes = await api.get("/season-details", { params: { fieldId: selectedField } });
 
-        const plotList = plotsRes.data || [];
         const seasonList = seasonsRes.data || [];
         const active = seasonList.find((season) => season.status === "active");
+        const plotList = active?.loggablePlots || [];
 
         setPlots(plotList);
         setSeasons(seasonList);

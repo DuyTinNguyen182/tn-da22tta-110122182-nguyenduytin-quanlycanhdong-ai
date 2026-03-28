@@ -20,7 +20,7 @@ exports.getSeasonDetailsByField = async (req, res) => {
 
 exports.createSeasonDetail = async (req, res) => {
   try {
-    const { seasonName, seasonId, seasonCode, fieldId, startDate } = req.body;
+    const { seasonName, seasonId, seasonCode, fieldId, startDate, plotIds } = req.body;
 
     if ((!seasonName && !seasonId && !seasonCode) || !fieldId) {
       return res.status(400).json({ message: "Vui lòng cung cấp seasonId (hoặc seasonName) và fieldId" });
@@ -33,6 +33,7 @@ exports.createSeasonDetail = async (req, res) => {
       year: parseInt(req.body.year) || new Date().getFullYear(),
       fieldId,
       startDate,
+      plotIds,
       status: req.body.status || "active",
     };
 

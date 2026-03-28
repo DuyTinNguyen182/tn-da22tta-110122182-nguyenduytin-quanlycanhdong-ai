@@ -1,36 +1,71 @@
 const Plot = require("../models/plotModel");
 const Field = require("../models/fieldModel");
 
-const getPlotsByField = async (fieldId, userId) => {
-  const field = await Field.findOne({ _id: fieldId, user: userId });
-  if (!field) throw new Error("Cánh đồng không tồn tại hoặc không có quyền truy cập");
+const isAdminUser = (user) => (user?.role || "").toLowerCase() === "admin";
 
-  return await Plot.find({ field: fieldId }).sort({ createdAt: 1 });
+const ensureFieldExists = async (fieldId) => {
+  const field = await Field.findById(fieldId);
+  if (!field) {
+    throw new Error("Cánh đồng không tồn tại");
+  }
+
+  return field;
+};
+
+const getPlotsByField = async (fieldId, currentUser) => {
+  await ensureFieldExists(fieldId);
+
+  const query = { field: fieldId };
+  if (!isAdminUser(currentUser)) {
+    query.user = currentUser.id;
+  }
+
+  return await Plot.find(query)
+    .populate("field", "name address")
+    .sort({ createdAt: 1 });
 };
 
 const createPlot = async (data, userId) => {
-  const newPlot = await Plot.create({
-    name: data.name,
+  await ensureFieldExists(data.fieldId);
+
+  return await Plot.create({
+    name: (data.name || "").trim(),
     area: data.area,
+    status: data.status || "active",
+    addressDetail: (data.addressDetail || "").trim(),
     field: data.fieldId,
     user: userId,
   });
-  return newPlot;
 };
 
-const updatePlot = async (id, data, userId) => {
-  const plot = await Plot.findOneAndUpdate(
-    { _id: id, user: userId },
-    { name: data.name, area: data.area, status: data.status },
-    { new: true }
+const updatePlot = async (id, data, currentUser) => {
+  const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
+  const updateData = {
+    name: (data.name || "").trim(),
+    area: data.area,
+    status: data.status,
+    addressDetail: (data.addressDetail || "").trim(),
+  };
+
+  const plot = await Plot.findOneAndUpdate(query, updateData, { new: true }).populate(
+    "field",
+    "name address"
   );
-  if (!plot) throw new Error("Không tìm thấy thửa ruộng!");
+
+  if (!plot) {
+    throw new Error("Không tìm thấy thửa ruộng");
+  }
+
   return plot;
 };
 
-const deletePlot = async (id, userId) => {
-  const plot = await Plot.findOneAndDelete({ _id: id, user: userId });
-  if (!plot) throw new Error("Không tìm thấy thửa ruộng!");
+const deletePlot = async (id, currentUser) => {
+  const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
+  const plot = await Plot.findOneAndDelete(query);
+  if (!plot) {
+    throw new Error("Không tìm thấy thửa ruộng");
+  }
+
   return plot;
 };
 

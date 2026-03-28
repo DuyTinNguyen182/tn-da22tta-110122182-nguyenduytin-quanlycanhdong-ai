@@ -1,5 +1,5 @@
 import React from "react";
-import { LogOut, LogIn } from "lucide-react";
+import { LogIn, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
@@ -9,8 +9,8 @@ const Header = () => {
   const location = useLocation();
 
   const pageTitleMap = {
-    "/dashboard": "Tổng quan nông trại",
-    "/fields": "Quản lý cánh đồng",
+    "/dashboard": "Tổng quan hợp tác xã",
+    "/fields": "Thửa ruộng của tôi",
     "/crops": "Nhật ký mùa vụ",
     "/ai-scan": "AI chẩn đoán bệnh lúa",
     "/ask-ai": "AI tư vấn canh tác",
@@ -25,54 +25,55 @@ const Header = () => {
   };
 
   return (
-    <header className="h-20 bg-white/90 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-40 w-full">
+    <header className="sticky top-0 z-40 flex h-20 w-full items-center justify-between border-b border-gray-200 bg-white/90 px-8 backdrop-blur-sm">
       <div className="min-w-0">
-        <h1 className="text-lg md:text-xl font-bold text-gray-900 truncate">{pageTitle}</h1>
+        <h1 className="truncate text-lg font-bold text-gray-900 md:text-xl">
+          {pageTitle}
+        </h1>
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Nếu ĐÃ ĐĂNG NHẬP */}
         {user ? (
           <>
-            <div 
+            <div
               onClick={() => navigate("/account")}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors ml-1"
+              className="ml-1 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
             >
-              <div className="text-right hidden md:block leading-tight">
-                {/* Hiển thị tên thật lấy từ DB */}
+              <div className="hidden text-right leading-tight md:block">
                 <p className="text-sm font-bold text-gray-800">
                   {user.fullName || "Người dùng"}
                 </p>
-                <p className="text-[11px] text-gray-500">Chủ hộ canh tác</p>
+                <p className="text-[11px] text-gray-500">
+                  {(user.role || "").toLowerCase() === "admin"
+                    ? "Ban quản lý hợp tác xã"
+                    : "Nông dân thành viên"}
+                </p>
               </div>
 
-              <div className="w-9 h-9 bg-emerald-100 rounded-full flex items-center justify-center border border-emerald-200 text-emerald-700 font-bold">
-                {/* Lấy chữ cái đầu của tên làm Avatar */}
+              <div className="flex h-9 w-9 items-center justify-center rounded-full border border-emerald-200 bg-emerald-100 font-bold text-emerald-700">
                 {user.fullName ? user.fullName.charAt(0).toUpperCase() : "U"}
               </div>
             </div>
 
-            {/* Nút đăng xuất */}
             <button
               onClick={handleLogout}
-              className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
               title="Đăng xuất"
             >
               <LogOut size={18} />
             </button>
           </>
         ) : (
-          /* Nếu CHƯA ĐĂNG NHẬP */
           <div className="flex items-center gap-3">
             <Link
               to="/login"
-              className="text-sm font-semibold text-gray-600 hover:text-emerald-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50 hover:text-emerald-600"
             >
               Đăng nhập
             </Link>
             <Link
               to="/register"
-              className="flex items-center gap-2 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-200 transition-all active:scale-95"
+              className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-95"
             >
               <LogIn size={16} /> Đăng ký ngay
             </Link>

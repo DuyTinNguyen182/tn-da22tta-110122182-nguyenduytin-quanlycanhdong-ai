@@ -1,276 +1,390 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Sprout,
+  AlertCircle,
   Calendar,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
   DollarSign,
+  Edit2,
+  Filter,
+  Layers,
+  MapPin,
+  PlayCircle,
   Plus,
   Search,
-  MapPin,
-  ChevronDown,
-  Edit2,
+  Sprout,
   Trash2,
-  Layers,
-  CalendarDays,
-  CheckSquare,    // Icon kết thúc
-  Filter          // Icon bộ lọc
 } from "lucide-react";
 import api from "../services/api";
 
+const getToday = () => new Date().toISOString().split("T")[0];
+
+const emptyLogForm = {
+  taskType: null,
+  description: "",
+  cost: "",
+  date: getToday(),
+  plotId: "",
+};
+
+const emptySeasonForm = {
+  seasonId: "",
+  year: new Date().getFullYear(),
+  startDate: getToday(),
+  plotIds: [],
+  editingSeasonId: null,
+};
+
+const sortSeasons = (items = []) =>
+  [...items].sort((a, b) => {
+    if (a.status === "active" && b.status !== "active") return -1;
+    if (a.status !== "active" && b.status === "active") return 1;
+    return new Date(b.startDate || b.createdAt || 0) - new Date(a.startDate || a.createdAt || 0);
+  });
+
 const Crops = () => {
-  // --- STATE ---
   const [fields, setFields] = useState([]);
   const [selectedField, setSelectedField] = useState(null);
-  
+  const [fieldKeyword, setFieldKeyword] = useState("");
   const [seasons, setSeasons] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
+  const [plots, setPlots] = useState([]);
+  const [logs, setLogs] = useState([]);
   const [seasonCatalogs, setSeasonCatalogs] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
-  
-  const [logs, setLogs] = useState([]);
-  const [plots, setPlots] = useState([]); 
-  const [loading, setLoading] = useState(false);
-
-  // Filter State
+  const [loadingFieldDetail, setLoadingFieldDetail] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
   const [filterPlotId, setFilterPlotId] = useState("");
   const [filterTaskId, setFilterTaskId] = useState("");
-
-  // Modal State
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
-  
-  // Form State
+  const [showAssignedPlots, setShowAssignedPlots] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
-  const [logForm, setLogForm] = useState({
-    taskType: null,
-    description: "",
-    cost: "",
-    date: new Date().toISOString().split('T')[0],
-    plotId: ""
-  });
+  const [logForm, setLogForm] = useState(emptyLogForm);
+  const [seasonForm, setSeasonForm] = useState(emptySeasonForm);
 
-  const [seasonForm, setSeasonForm] = useState({ 
-    seasonId: "", 
-    startDate: new Date().toISOString().split('T')[0],
-    editingSeasonId: null 
-  });
-  const [editingSeasonName, setEditingSeasonName] = useState(false);
+  const activePlots = useMemo(() => plots.filter((plot) => plot.status === "active"), [plots]);
+  const inactivePlots = useMemo(() => plots.filter((plot) => plot.status !== "active"), [plots]);
+  const filteredFields = useMemo(() => {
+    const keyword = fieldKeyword.trim().toLowerCase();
+    if (!keyword) return fields;
 
-  // Xác định vụ hiện tại có đang active không
-  const currentSeason = useMemo(() => seasons.find(s => s._id === selectedSeasonId), [seasons, selectedSeasonId]);
-  const isSeasonActive = currentSeason?.status === 'active';
-  
-  // Kiểm tra xem có season active nào không
-  const hasActiveSeasons = useMemo(() => {
-    if (!selectedField) return false;
-    return seasons.some(s => s.status === 'active');
-  }, [seasons, selectedField]);
+    return fields.filter((field) => {
+      return (
+        field.name?.toLowerCase().includes(keyword) ||
+        field.address?.toLowerCase().includes(keyword)
+      );
+    });
+  }, [fieldKeyword, fields]);
 
-  // --- API CALLS ---
+  const sortedSeasons = useMemo(() => sortSeasons(seasons), [seasons]);
+  const currentSeason = useMemo(
+    () => sortedSeasons.find((season) => season._id === selectedSeasonId) || null,
+    [sortedSeasons, selectedSeasonId]
+  );
+  const isSeasonActive = currentSeason?.status === "active";
+  const hasActiveSeason = sortedSeasons.some((season) => season.status === "active");
+  const seasonAssignedPlots = currentSeason?.assignedPlots || [];
+  const seasonLoggablePlots = currentSeason?.loggablePlots || [];
+
+  const seasonSelectablePlots = useMemo(() => {
+    const selectedIds = new Set(seasonForm.plotIds || []);
+
+    return plots.map((plot) => {
+      const isSelected = selectedIds.has(plot._id);
+      const canSelect = plot.status === "active" || isSelected;
+
+      return {
+        ...plot,
+        isSelected,
+        canSelect,
+        helperText:
+          plot.status === "active"
+            ? "Sẵn sàng tham gia vụ"
+            : "Thửa đang tạm ngưng, không thể thêm mới vào vụ",
+      };
+    });
+  }, [plots, seasonForm.plotIds]);
+
+  const filterPlotOptions = useMemo(() => {
+    const optionMap = new Map();
+    seasonAssignedPlots.forEach((plot) => optionMap.set(plot._id, plot));
+    logs.forEach((log) => {
+      if (log.plot?._id) {
+        optionMap.set(log.plot._id, log.plot);
+      }
+    });
+    return Array.from(optionMap.values());
+  }, [logs, seasonAssignedPlots]);
+
+  const filteredLogs = useMemo(() => {
+    const nextLogs = logs.filter((log) => {
+      const matchesTask = filterTaskId ? log.taskId === filterTaskId : true;
+      const matchesPlot = filterPlotId
+        ? log.plot?._id === filterPlotId || log.plot === filterPlotId || !log.plot
+        : true;
+
+      return matchesTask && matchesPlot;
+    });
+
+    return nextLogs.sort((a, b) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      if (dateB !== dateA) return dateB - dateA;
+
+      return (
+        new Date(b.createdAt || b.updatedAt || 0).getTime() -
+        new Date(a.createdAt || a.updatedAt || 0).getTime()
+      );
+    });
+  }, [filterPlotId, filterTaskId, logs]);
+
+  const totalCost = useMemo(
+    () => filteredLogs.reduce((sum, log) => sum + Number(log.cost || 0), 0),
+    [filteredLogs]
+  );
 
   useEffect(() => {
-    fetchFields();
-    fetchSeasonCatalogs();
-    fetchTaskTypes();
+    const loadBootstrap = async () => {
+      try {
+        const [fieldRes, seasonRes, taskRes] = await Promise.all([
+          api.get("/fields"),
+          api.get("/seasons"),
+          api.get("/tasks"),
+        ]);
+
+        const nextFields = (fieldRes.data || []).filter(
+          (field) => Number(field.myPlotCount || 0) > 0
+        );
+        setFields(nextFields);
+        setSeasonCatalogs(seasonRes.data || []);
+        setTaskTypes(taskRes.data || []);
+
+        if (nextFields.length > 0) {
+          setSelectedField(nextFields[0]);
+        }
+      } catch (error) {
+        console.error("Lỗi tải dữ liệu mùa vụ", error);
+      }
+    };
+
+    loadBootstrap();
   }, []);
 
-  const fetchTaskTypes = async () => {
-    try {
-      const res = await api.get("/tasks");
-      setTaskTypes(res.data || []);
-    } catch (err) {
-      console.error("Lỗi tải danh mục công việc:", err);
-    }
-  };
-
-  const fetchSeasonCatalogs = async () => {
-    try {
-      const res = await api.get("/seasons");
-      setSeasonCatalogs(res.data || []);
-    } catch (err) {
-      console.error("Lỗi tải danh mục mùa vụ:", err);
-    }
-  };
-
-  const fetchFields = async () => {
-    try {
-      const res = await api.get("/fields");
-      setFields(res.data);
-      if (res.data.length > 0 && !selectedField) {
-        handleSelectField(res.data[0]);
-      }
-    } catch (err) {
-      console.error("Lỗi lấy danh sách ruộng:", err);
-    }
-  };
-
-  const handleSelectField = async (field) => {
-    setSelectedField(field);
-    setLogs([]);
-    setSeasons([]);
-    setSelectedSeasonId("");
-    // Reset filters
-    setFilterPlotId("");
-    setFilterTaskId("");
-    
-    try {
-      const seasonRes = await api.get(`/season-details`, { params: { fieldId: field._id } });
-      setSeasons(seasonRes.data);
-      if (seasonRes.data.length > 0) {
-        setSelectedSeasonId(seasonRes.data[0]._id);
-      }
-      const plotRes = await api.get(`/plots`, { params: { fieldId: field._id } });
-      setPlots(plotRes.data);
-    } catch (err) {
-      console.error("Lỗi tải dữ liệu chi tiết:", err);
-    }
-  };
-
   useEffect(() => {
-    if (selectedSeasonId) {
-      fetchLogs(selectedSeasonId);
-    }
-  }, [selectedSeasonId]);
-
-  const fetchLogs = async (seasonId) => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/diary-logs`, { params: { seasonId } });
-      setLogs(res.data);
-    } catch (err) {
-      console.error("Lỗi tải nhật ký:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- HANDLERS: SEASON ---
-  const handleCreateSeason = async () => {
-    if (!selectedField || !seasonForm.seasonId) {
-      alert("Vui lòng chọn mùa vụ");
+    if (!selectedField?._id) {
+      setSeasons([]);
+      setPlots([]);
+      setSelectedSeasonId("");
+      setLogs([]);
       return;
     }
 
-    try {
-      const currentYear = new Date().getFullYear();
-      const payload = {
-        seasonId: seasonForm.seasonId,
-        year: currentYear,
-        fieldId: selectedField._id,
-        startDate: seasonForm.startDate,
-        status: "active"
-      };
+    const loadFieldDetail = async () => {
+      try {
+        setLoadingFieldDetail(true);
+        setFilterPlotId("");
+        setFilterTaskId("");
+        setLogs([]);
 
+        const [seasonRes, plotRes] = await Promise.all([
+          api.get("/season-details", { params: { fieldId: selectedField._id } }),
+          api.get("/plots", { params: { fieldId: selectedField._id } }),
+        ]);
+
+        const nextSeasons = seasonRes.data || [];
+        setSeasons(nextSeasons);
+        setPlots(plotRes.data || []);
+        setSelectedSeasonId(sortSeasons(nextSeasons)[0]?._id || "");
+      } catch (error) {
+        console.error("Lỗi tải chi tiết cánh đồng", error);
+      } finally {
+        setLoadingFieldDetail(false);
+      }
+    };
+
+    loadFieldDetail();
+  }, [selectedField]);
+
+  useEffect(() => {
+    if (!selectedSeasonId) {
+      setLogs([]);
+      return;
+    }
+
+    const loadLogs = async () => {
+      try {
+        setLoadingLogs(true);
+        const res = await api.get("/diary-logs", { params: { seasonId: selectedSeasonId } });
+        setLogs(res.data || []);
+      } catch (error) {
+        console.error("Lỗi tải nhật ký mùa vụ", error);
+      } finally {
+        setLoadingLogs(false);
+      }
+    };
+
+    loadLogs();
+  }, [selectedSeasonId]);
+
+  useEffect(() => {
+    setShowAssignedPlots(false);
+  }, [selectedSeasonId]);
+
+  const reloadCurrentField = async (preferredSeasonId) => {
+    if (!selectedField?._id) return;
+
+    const [seasonRes, plotRes] = await Promise.all([
+      api.get("/season-details", { params: { fieldId: selectedField._id } }),
+      api.get("/plots", { params: { fieldId: selectedField._id } }),
+    ]);
+
+    const nextSeasons = seasonRes.data || [];
+    setSeasons(nextSeasons);
+    setPlots(plotRes.data || []);
+    setSelectedSeasonId(preferredSeasonId || sortSeasons(nextSeasons)[0]?._id || "");
+  };
+
+  const toggleSeasonPlot = (plotId) => {
+    setSeasonForm((prev) => {
+      const hasPlot = prev.plotIds.includes(plotId);
+      return {
+        ...prev,
+        plotIds: hasPlot
+          ? prev.plotIds.filter((id) => id !== plotId)
+          : [...prev.plotIds, plotId],
+      };
+    });
+  };
+
+  const openCreateSeasonModal = () => {
+    setSeasonForm({
+      seasonId: "",
+      year: new Date().getFullYear(),
+      startDate: getToday(),
+      plotIds: activePlots.map((plot) => plot._id),
+      editingSeasonId: null,
+    });
+    setIsSeasonModalOpen(true);
+  };
+
+  const openEditSeasonModal = () => {
+    if (!currentSeason) return;
+
+    setSeasonForm({
+      seasonId: currentSeason.seasonId || currentSeason.season?._id || "",
+      year: currentSeason.year || new Date().getFullYear(),
+      startDate: currentSeason.startDate?.split("T")[0] || getToday(),
+      plotIds: currentSeason.assignedPlotIds || [],
+      editingSeasonId: currentSeason._id,
+    });
+    setIsSeasonModalOpen(true);
+  };
+
+  const handleSaveSeason = async () => {
+    if (!selectedField?._id) {
+      alert("Vui lòng chọn cánh đồng.");
+      return;
+    }
+    if (!seasonForm.seasonId) {
+      alert("Vui lòng chọn mùa vụ.");
+      return;
+    }
+    if ((seasonForm.plotIds || []).length === 0) {
+      alert("Cần chọn ít nhất 1 thửa tham gia vụ mùa.");
+      return;
+    }
+
+    const payload = {
+      seasonId: seasonForm.seasonId,
+      year: Number(seasonForm.year),
+      fieldId: selectedField._id,
+      startDate: seasonForm.startDate,
+      plotIds: seasonForm.plotIds,
+      status: "active",
+    };
+
+    try {
       if (seasonForm.editingSeasonId) {
-        // Cập nhật mùa vụ
         const res = await api.put(`/season-details/${seasonForm.editingSeasonId}`, payload);
-        const updatedSeasons = seasons.map(s => s._id === seasonForm.editingSeasonId ? res.data : s);
-        setSeasons(updatedSeasons);
-        alert("Đã cập nhật mùa vụ thành công!");
+        await reloadCurrentField(res.data?._id || seasonForm.editingSeasonId);
       } else {
-        // Tạo mùa vụ mới
         const res = await api.post("/season-details", payload);
-        setSeasons([res.data, ...seasons]);
-        setSelectedSeasonId(res.data._id);
-        alert("Đã tạo vụ mới thành công!");
+        await reloadCurrentField(res.data?._id);
       }
 
       setIsSeasonModalOpen(false);
-      setSeasonForm({ 
-        seasonId: "", 
-        startDate: new Date().toISOString().split('T')[0],
-        editingSeasonId: null
-      });
-      setEditingSeasonName(false);
-    } catch (err) {
-      alert(err.response?.data?.message || "Lỗi tạo/cập nhật vụ mới");
+    } catch (error) {
+      alert(error.response?.data?.message || "Không thể lưu mùa vụ.");
     }
   };
 
-  // Mở modal sửa mùa vụ
-  const handleOpenEditSeasonModal = () => {
-    if (currentSeason) {
-      setSeasonForm({
-        seasonId: currentSeason.seasonId || currentSeason.season?._id || "",
-        startDate: currentSeason.startDate.split('T')[0],
-        editingSeasonId: currentSeason._id
-      });
-      setEditingSeasonName(true);
-      setIsSeasonModalOpen(true);
-    }
-  };
+  const handleFinishSeason = async () => {
+    if (!currentSeason) return;
 
-  // XỬ LÝ KẾT THÚC VỤ
-  const handleEndSeason = async () => {
-    if (!selectedSeasonId) return;
-    
-    const confirmEnd = window.confirm(
-      "Bạn có chắc chắn muốn kết thúc vụ mùa này không?\n\nSau khi kết thúc, trạng thái sẽ chuyển sang 'Đã thu hoạch' và bạn KHÔNG THỂ thêm nhật ký mới."
+    const confirmed = window.confirm(
+      "Kết thúc vụ này? Sau khi kết thúc, bạn chỉ có thể xem lại lịch sử và không thêm nhật ký mới."
     );
+    if (!confirmed) return;
 
-    if (confirmEnd) {
-      try {
-        const finishedAt = new Date();
-        const res = await api.put(`/season-details/${selectedSeasonId}/finish`, {
-          status: "completed",
-          endDate: finishedAt
-        });
-
-        // Cập nhật state local
-        const updatedSeasons = seasons.map(s => 
-          s._id === selectedSeasonId ? { ...s, status: "completed", endDate: finishedAt.toISOString() } : s
-        );
-        setSeasons(updatedSeasons);
-        alert("Đã kết thúc vụ mùa thành công!");
-      } catch (err) {
-        console.error(err);
-        alert("Lỗi khi kết thúc vụ mùa.");
-      }
+    try {
+      const res = await api.put(`/season-details/${currentSeason._id}/finish`);
+      await reloadCurrentField(res.data?._id || currentSeason._id);
+    } catch (error) {
+      alert(error.response?.data?.message || "Không thể kết thúc vụ mùa.");
     }
   };
 
-  // --- HANDLERS: LOGS (CRUD) ---
-  const openLogModal = (log = null) => {
-    if (!isSeasonActive && !log) return; // Chặn mở form thêm mới nếu vụ đã đóng
+  const openCreateLogModal = () => {
+    if (!isSeasonActive) return;
 
-    if (log) {
-      const foundTask =
-        taskTypes.find((t) => t._id === log.taskId) ||
-        taskTypes.find((t) => (t.name || t.label || "") === (log.taskName || log.title || "")) ||
-        null;
-      setEditingLog(log);
-      setLogForm({
-        taskType: foundTask,
-        description: log.description,
-        cost: log.cost,
-        date: log.date ? log.date.split('T')[0] : new Date().toISOString().split('T')[0],
-        plotId: log.plot?._id || log.plot || ""
-      });
-    } else {
-      setEditingLog(null);
-      setLogForm({
-        taskType: null,
-        description: "",
-        cost: "",
-        date: new Date().toISOString().split('T')[0],
-        plotId: ""
-      });
-    }
+    setEditingLog(null);
+    setLogForm({
+      taskType: null,
+      description: "",
+      cost: "",
+      date: getToday(),
+      plotId: "",
+    });
     setIsLogModalOpen(true);
   };
 
+  const openEditLogModal = (log) => {
+    const foundTask =
+      taskTypes.find((task) => task._id === log.taskId) ||
+      taskTypes.find((task) => task.name === log.taskName) ||
+      null;
+
+    setEditingLog(log);
+    setLogForm({
+      taskType: foundTask,
+      description: log.description || "",
+      cost: log.cost || "",
+      date: log.date ? log.date.split("T")[0] : getToday(),
+      plotId: log.plot?._id || log.plot || "",
+    });
+    setIsLogModalOpen(true);
+  };
+
+  const refreshLogs = async (seasonId) => {
+    const res = await api.get("/diary-logs", { params: { seasonId } });
+    setLogs(res.data || []);
+  };
+
   const handleSaveLog = async () => {
-    if (!selectedSeasonId || !logForm.taskType) {
-      alert("Vui lòng chọn loại công việc!");
+    if (!currentSeason?._id || !logForm.taskType?._id) {
+      alert("Vui lòng chọn công việc.");
       return;
     }
 
     const payload = {
       taskId: logForm.taskType._id,
       description: logForm.description,
-      cost: Number(logForm.cost),
+      cost: Number(logForm.cost || 0),
       date: logForm.date,
-      seasonId: selectedSeasonId,
-      plotId: logForm.plotId || null
+      seasonId: currentSeason._id,
+      plotId: logForm.plotId || null,
     };
 
     try {
@@ -279,369 +393,445 @@ const Crops = () => {
       } else {
         await api.post("/diary-logs", payload);
       }
+
       setIsLogModalOpen(false);
-      fetchLogs(selectedSeasonId);
-    } catch (err) {
-      console.error(err);
-      alert("Lỗi lưu nhật ký");
+      await refreshLogs(currentSeason._id);
+    } catch (error) {
+      alert(error.response?.data?.message || "Không thể lưu nhật ký.");
     }
   };
 
-  const handleDeleteLog = async (id) => {
-    if (!isSeasonActive) {
-        alert("Không thể xóa nhật ký của vụ đã kết thúc.");
-        return;
-    }
-    if (!window.confirm("Bạn chắc chắn muốn xóa nhật ký này?")) return;
+  const handleDeleteLog = async (logId) => {
+    if (!window.confirm("Bạn có chắc muốn xóa nhật ký này?")) return;
+
     try {
-      await api.delete(`/diary-logs/${id}`);
-      fetchLogs(selectedSeasonId);
-    } catch (err) {
-      alert("Lỗi xóa nhật ký");
+      await api.delete(`/diary-logs/${logId}`);
+      await refreshLogs(currentSeason._id);
+    } catch (error) {
+      alert(error.response?.data?.message || "Không thể xóa nhật ký.");
     }
   };
 
-  // --- FILTER LOGIC ---
-  // --- FILTER LOGIC ---
-  const filteredLogs = useMemo(() => {
-    const filtered = logs.filter(log => {
-      // 1. Lọc theo Thửa
-      const matchPlot = filterPlotId 
-        ? (
-            // Trường hợp 1: Nhật ký thuộc đúng thửa đang chọn
-            (log.plot?._id === filterPlotId || log.plot === filterPlotId) || 
-            // Trường hợp 2: Nhật ký không thuộc thửa nào (áp dụng toàn cánh đồng) -> Vẫn hiện
-            !log.plot 
-          )
-        : true;
-      
-      // 2. Lọc theo Công việc (dựa trên Title/Label)
-      const matchTask = filterTaskId
-        ? log.taskId === filterTaskId
-        : true;
-
-      return matchPlot && matchTask;
-    });
-
-    // Sắp xếp mới nhất lên đầu theo ngày nhật ký.
-    // Nếu cùng ngày thì ưu tiên nhật ký có createdAt mới hơn (giờ-phút-giây).
-    return filtered.sort((a, b) => {
-      const dateA = new Date(a.date || 0).getTime();
-      const dateB = new Date(b.date || 0).getTime();
-
-      if (dateB !== dateA) {
-        return dateB - dateA;
-      }
-
-      const createdA = new Date(a.createdAt || a.updatedAt || 0).getTime();
-      const createdB = new Date(b.createdAt || b.updatedAt || 0).getTime();
-      return createdB - createdA;
-    });
-  }, [logs, filterPlotId, filterTaskId]);
-
-  const totalCost = filteredLogs.reduce((acc, curr) => acc + (curr.cost || 0), 0);
+  const selectedSeasonCatalog = seasonCatalogs.find((item) => item._id === seasonForm.seasonId);
 
   return (
-    <div className="flex h-[calc(100vh-80px)] bg-gray-50 overflow-hidden font-sans">
-      
-      {/* --- LEFT: DANH SÁCH RUỘNG --- */}
-      <div className="w-[320px] bg-white border-r border-gray-200 flex flex-col shadow-lg z-10">
-        <div className="p-5 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-800 mb-1">Chọn Cánh Đồng</h2>
+    <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-gray-50 font-sans">
+      <aside className="z-10 flex w-[290px] xl:w-[310px] flex-col border-r border-gray-200 bg-white shadow-lg">
+        <div className="border-b border-gray-100 p-5">
+          <h2 className="mb-1 text-lg font-bold text-gray-800">Chọn cánh đồng</h2>
+          <p className="text-sm text-gray-500">
+            Chỉ hiển thị những cánh đồng bạn đang có thửa ruộng.
+          </p>
           <div className="relative mt-4">
             <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
             <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              className="w-full bg-gray-50 pl-10 pr-4 py-2 rounded-xl border border-transparent focus:bg-white focus:border-emerald-200 outline-none text-sm transition-all"
+              value={fieldKeyword}
+              onChange={(event) => setFieldKeyword(event.target.value)}
+              placeholder="Tìm theo tên hoặc địa bàn..."
+              className="w-full rounded-xl border border-transparent bg-gray-50 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:border-emerald-200 focus:bg-white"
             />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
-          {fields.map((field) => (
-            <div
+
+        <div className="flex-1 space-y-2 overflow-y-auto p-3">
+          {filteredFields.map((field) => (
+            <button
               key={field._id}
-              onClick={() => handleSelectField(field)}
-              className={`p-3 rounded-xl cursor-pointer border transition-all ${
+              onClick={() => setSelectedField(field)}
+              className={`w-full rounded-xl border p-3 text-left transition-all ${
                 selectedField?._id === field._id
-                  ? "bg-emerald-50 border-emerald-200 shadow-sm"
-                  : "bg-white border-transparent hover:bg-gray-50"
+                  ? "border-emerald-200 bg-emerald-50 shadow-sm"
+                  : "border-transparent bg-white hover:bg-gray-50"
               }`}
             >
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${selectedField?._id === field._id ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'}`}>
+                <div
+                  className={`rounded-lg p-2 ${
+                    selectedField?._id === field._id
+                      ? "bg-emerald-100 text-emerald-600"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
                   <MapPin size={18} />
                 </div>
-                <div>
-                  <h3 className={`text-sm font-bold ${selectedField?._id === field._id ? 'text-emerald-800' : 'text-gray-700'}`}>
+                <div className="min-w-0">
+                  <h3
+                    className={`truncate text-sm font-bold ${
+                      selectedField?._id === field._id ? "text-emerald-800" : "text-gray-700"
+                    }`}
+                  >
                     {field.name}
                   </h3>
-                  <p className="text-xs text-gray-400 truncate max-w-[180px]">{field.address}</p>
+                  <p className="truncate text-xs text-gray-400">{field.address}</p>
                 </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
-      </div>
+      </aside>
 
-      {/* --- RIGHT: NHẬT KÝ MÙA VỤ --- */}
-      <div className="flex-1 flex flex-col bg-gray-50/50 relative">
+      <section className="relative flex flex-1 flex-col bg-gray-50/60">
         {selectedField ? (
           <>
-            {/* HEADER */}
-            <div className="bg-white px-8 py-5 border-b border-gray-200 shadow-sm z-10">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold text-gray-800">{selectedField.name}</h1>
-                        
-                        {/* Dropdown Chọn Vụ */}
-                        {seasons.length > 0 && (
-                            <div className="relative group">
-                            <select
-                                value={selectedSeasonId}
-                                onChange={(e) => setSelectedSeasonId(e.target.value)}
-                                className={`appearance-none border text-sm font-bold py-1.5 pl-4 pr-8 rounded-lg cursor-pointer outline-none focus:ring-2 ${
-                                    isSeasonActive 
-                                    ? "bg-emerald-50 border-emerald-200 text-emerald-800 focus:ring-emerald-500/20"
-                                    : "bg-gray-100 border-gray-300 text-gray-600 focus:ring-gray-500/20"
-                                }`}
-                            >
-                                {seasons.map(s => (
-                                <option key={s._id} value={s._id}>{s.name} ({s.status === 'active' ? 'Đang canh tác' : 'Đã kết thúc'})</option>
-                                ))}
-                            </select>
-                            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 opacity-70 pointer-events-none" />
-                            </div>
-                        )}
-
-                        {/* Nút Tạo/Sửa Vụ Mới - Chỉ hiện khi không có active season */}
-                        {!hasActiveSeasons && (
-                          <button 
-                            onClick={() => {
-                              setSeasonForm({ 
-                                seasonId: "", 
-                                startDate: new Date().toISOString().split('T')[0],
-                                editingSeasonId: null
-                              });
-                              setEditingSeasonName(false);
-                              setIsSeasonModalOpen(true);
-                            }}
-                            className="p-1.5 bg-gray-100 hover:bg-emerald-100 text-gray-500 hover:text-emerald-600 rounded-lg transition-colors"
-                            title="Tạo vụ mới"
-                          >
-                            <Plus size={16} />
-                          </button>
-                        )}
-
-                        {/* Nút Sửa Mùa Vụ - Hiện khi đã tạo xong một vụ */}
-                        {currentSeason && isSeasonActive && (
-                          <button 
-                            onClick={handleOpenEditSeasonModal}
-                            className="p-1.5 bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 rounded-lg transition-colors"
-                            title="Sửa tên mùa vụ"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                        )}
-
-                        {/* NÚT KẾT THÚC VỤ (CHỈ HIỆN KHI ACTIVE) */}
-                        {selectedSeasonId && isSeasonActive && (
-                            <button
-                                onClick={handleEndSeason}
-                                className="ml-2 flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 rounded-lg text-xs font-bold transition-all"
-                                title="Kết thúc vụ mùa hiện tại"
-                            >
-                                <CheckSquare size={14} />
-                                Kết thúc vụ
-                            </button>
-                        )}
-                    </div>
-
-                    {/* NÚT GHI NHẬT KÝ (CHỈ HIỆN KHI ACTIVE) */}
-                    {selectedSeasonId && isSeasonActive ? (
-                        <button
-                        onClick={() => openLogModal()}
-                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-1 rounded-lg font-bold shadow-lg shadow-emerald-200 active:scale-95 transition-all"
-                        >
-                        <Plus size={20} /> Ghi Nhật Ký
-                        </button>
-                    ) : (
-                        selectedSeasonId && (
-                            <div className="px-4 py-1 bg-gray-100 text-gray-500 font-bold rounded-lg border border-gray-200 text-sm flex items-center gap-2">
-                                <CheckSquare size={16} /> Vụ đã kết thúc
-                            </div>
-                        )
-                    )}
+            <div className="z-10 border-b border-gray-200 bg-white px-6 py-3 shadow-sm lg:px-8">
+              <div className="mb-2 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
+                    <h1 className="text-2xl font-bold text-gray-800">{selectedField.name}</h1>
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                      {activePlots.length} thửa đang canh tác
+                    </span>
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+                      {inactivePlots.length} thửa tạm ngưng
+                    </span>
+                  </div>
+                  <p className="flex items-center gap-2 text-sm text-gray-500">
+                    <MapPin size={15} className="text-gray-400" />
+                    {selectedField.address || "Chưa cập nhật địa bàn"}
+                  </p>
                 </div>
 
-                {/* FILTER BAR & INFO */}
-                <div className="flex items-center justify-between gap-4 mt-2">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
-                            <Filter size={14} />
-                            <span className="font-semibold text-xs uppercase text-gray-400">Lọc:</span>
-                            
-                            {/* Lọc theo Thửa */}
-                            <select 
-                                value={filterPlotId}
-                                onChange={(e) => setFilterPlotId(e.target.value)}
-                                className="bg-transparent outline-none font-medium text-gray-700 hover:text-emerald-600 cursor-pointer"
-                            >
-                                <option value="">Tất cả các thửa</option>
-                                {plots.filter(p => p.status === "active").map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
-                            </select>
-                            
-                            <span className="text-gray-300">|</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  {!hasActiveSeason && (
+                    <button
+                      onClick={openCreateSeasonModal}
+                      disabled={activePlots.length === 0}
+                      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
+                        activePlots.length === 0
+                          ? "cursor-not-allowed bg-gray-200 text-gray-500"
+                          : "bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700"
+                      }`}
+                    >
+                      <PlayCircle size={17} /> Bắt đầu vụ mới
+                    </button>
+                  )}
 
-                            {/* Lọc theo Công việc */}
-                            <select 
-                                value={filterTaskId}
-                                onChange={(e) => setFilterTaskId(e.target.value)}
-                                className="bg-transparent outline-none font-medium text-gray-700 hover:text-emerald-600 cursor-pointer"
-                            >
-                                <option value="">Tất cả công việc</option>
-                              {taskTypes.map(t => <option key={t._id} value={t._id}>{t.name}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-6 text-sm text-gray-500">
-                        <div className="flex items-center gap-2">
-                            <CalendarDays size={16} className="text-gray-400" />
-                            <span>Bắt đầu: {currentSeason?.startDate ? new Date(currentSeason.startDate).toLocaleDateString('vi-VN') : 'N/A'}</span>
-                        </div>
-                        {currentSeason?.status === "completed" && currentSeason?.endDate && (
-                          <div className="flex items-center gap-2">
-                            <CalendarDays size={16} className="text-gray-400" />
-                            <span>Kết thúc: {new Date(currentSeason.endDate).toLocaleDateString('vi-VN')}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-2">
-                            <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                            <span>Chi phí: <strong className="text-emerald-600">{totalCost.toLocaleString()} đ</strong></span>
-                        </div>
-                    </div>
+                  {currentSeason && isSeasonActive && (
+                    <>
+                      <button
+                        onClick={openEditSeasonModal}
+                        className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
+                      >
+                        Chỉnh sửa vụ
+                      </button>
+                      <button
+                        onClick={handleFinishSeason}
+                        className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-semibold text-orange-600 transition-all hover:bg-orange-100"
+                      >
+                        Kết thúc vụ
+                      </button>
+                      <button
+                        onClick={openCreateLogModal}
+                        className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700"
+                      >
+                        <Plus size={17} /> Ghi nhật ký
+                      </button>
+                    </>
+                  )}
                 </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-1 flex-wrap items-center gap-2.5">
+                  {sortedSeasons.length > 0 ? (
+                    <div className="relative min-w-[250px]">
+                      <select
+                        value={selectedSeasonId}
+                        onChange={(event) => setSelectedSeasonId(event.target.value)}
+                        className={`appearance-none rounded-xl border py-2 pl-4 pr-9 text-sm font-semibold outline-none ${
+                          isSeasonActive
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                            : "border-gray-200 bg-gray-50 text-gray-700"
+                        }`}
+                      >
+                        {sortedSeasons.map((season) => (
+                          <option key={season._id} value={season._id}>
+                            {season.name} - {season.status === "active" ? "Đang canh tác" : "Đã kết thúc"}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        size={14}
+                        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      />
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500">
+                      Cánh đồng này chưa có vụ nào.
+                    </div>
+                  )}
+
+                  {currentSeason && (
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${
+                        isSeasonActive
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {isSeasonActive ? <CheckCircle2 size={12} /> : <AlertCircle size={12} />}
+                      {currentSeason.loggablePlotCount || 0}/{currentSeason.activePlotCount || 0} thửa sẵn sàng ghi nhật ký
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-2.5 text-sm text-gray-500">
+                  <span className="flex items-center gap-1.5">
+                    <CalendarDays size={16} className="text-gray-400" />
+                    Bắt đầu:{" "}
+                    {currentSeason?.startDate
+                      ? new Date(currentSeason.startDate).toLocaleDateString("vi-VN")
+                      : "Chưa có"}
+                  </span>
+                  {currentSeason?.endDate && (
+                    <span className="flex items-center gap-1.5">
+                      <CalendarDays size={16} className="text-gray-400" />
+                      Kết thúc: {new Date(currentSeason.endDate).toLocaleDateString("vi-VN")}
+                    </span>
+                  )}
+                  <span>
+                    Chi phí: <strong className="text-emerald-600">{totalCost.toLocaleString()} đ</strong>
+                  </span>
+                </div>
+              </div>
+
+              {currentSeason && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAssignedPlots((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:border-emerald-200 hover:text-emerald-700"
+                  >
+                    {showAssignedPlots
+                      ? "Ẩn danh sách thửa tham gia"
+                      : `Xem ${seasonAssignedPlots.length} thửa tham gia vụ`}
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform ${showAssignedPlots ? "rotate-180" : ""}`}
+                    />
+                  </button>
+
+                  {showAssignedPlots && <div className="mt-2 flex flex-wrap gap-2">
+                  {seasonAssignedPlots.map((plot) => (
+                    <span
+                      key={plot._id}
+                      className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        plot.status === "active"
+                          ? "bg-white text-gray-700 ring-1 ring-gray-200"
+                          : "bg-orange-50 text-orange-700 ring-1 ring-orange-200"
+                      }`}
+                    >
+                      {plot.name} {plot.status !== "active" ? "(đang tạm ngưng)" : ""}
+                    </span>
+                  ))}
+                  </div>}
+                </div>
+              )}
+
+              <div className="mt-2 flex flex-wrap items-center gap-2.5">
+                <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                  <Filter size={14} />
+                  <select
+                    value={filterPlotId}
+                    onChange={(event) => setFilterPlotId(event.target.value)}
+                    className="bg-transparent font-medium outline-none"
+                  >
+                    <option value="">Tất cả thửa</option>
+                    {filterPlotOptions.map((plot) => (
+                      <option key={plot._id} value={plot._id}>
+                        {plot.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center gap-2 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-600">
+                  <Filter size={14} />
+                  <select
+                    value={filterTaskId}
+                    onChange={(event) => setFilterTaskId(event.target.value)}
+                    className="bg-transparent font-medium outline-none"
+                  >
+                    <option value="">Tất cả công việc</option>
+                    {taskTypes.map((task) => (
+                      <option key={task._id} value={task._id}>
+                        {task.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterPlotId("");
+                    setFilterTaskId("");
+                  }}
+                  disabled={!filterPlotId && !filterTaskId}
+                  className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
+                    !filterPlotId && !filterTaskId
+                      ? "cursor-not-allowed bg-gray-100 text-gray-400"
+                      : "border border-gray-200 bg-white text-gray-600 hover:border-emerald-200 hover:text-emerald-700"
+                  }`}
+                >
+                  Đặt lại bộ lọc
+                </button>
+              </div>
             </div>
 
-            {/* CONTENT: Danh sách Nhật ký (Timeline) */}
-            <div className="flex-1 p-8 overflow-y-auto">
-              {loading ? (
-                <div className="text-center py-10 text-gray-400">Đang tải nhật ký...</div>
-              ) : !selectedSeasonId ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <div className="flex-1 overflow-y-auto px-6 py-6 lg:px-8">
+              {loadingFieldDetail || loadingLogs ? (
+                <div className="py-10 text-center text-gray-400">Đang tải dữ liệu mùa vụ...</div>
+              ) : !currentSeason ? (
+                <div className="flex h-full flex-col items-center justify-center text-center text-gray-400">
                   <Sprout size={48} className="mb-4 text-gray-300" />
-                  <p>Vui lòng tạo hoặc chọn một vụ mùa.</p>
+                  <p className="font-medium text-gray-600">Chưa có vụ nào cho cánh đồng này.</p>
+                  <p className="mt-2 max-w-md text-sm">
+                    Hãy bắt đầu một vụ mới từ danh mục mùa vụ do admin đã cấu hình.
+                  </p>
                 </div>
               ) : filteredLogs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                  <p>{logs.length === 0 ? "Chưa có nhật ký nào cho vụ này." : "Không tìm thấy nhật ký phù hợp bộ lọc."}</p>
+                <div className="flex h-64 flex-col items-center justify-center rounded-3xl border border-dashed border-gray-200 bg-white text-center text-gray-400">
+                  <p className="font-medium text-gray-600">
+                    {logs.length === 0
+                      ? "Chưa có nhật ký nào cho vụ này."
+                      : "Không tìm thấy nhật ký phù hợp với bộ lọc."}
+                  </p>
+                  {isSeasonActive && (
+                    <button
+                      onClick={openCreateLogModal}
+                      className="mt-3 text-sm font-semibold text-emerald-600 hover:underline"
+                    >
+                      Ghi nhật ký đầu tiên
+                    </button>
+                  )}
                 </div>
               ) : (
-                <div className="max-w-4xl mx-auto space-y-6">
-                  {filteredLogs.map((log, index) => {
-                    return (
-                      <div key={log._id} className="relative pl-8 group">
-                        {/* Timeline Line */}
-                        {index !== filteredLogs.length - 1 && (
-                          <div className="absolute left-[11px] top-8 bottom-[-24px] w-[2px] bg-gray-200 group-last:hidden"></div>
-                        )}
-                        
-                        {/* Dot Icon */}
-                        <div className="absolute left-0 top-1 w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center z-10 bg-gray-100 text-gray-600">
-                           <div className="w-2 h-2 rounded-full bg-current"></div>
-                        </div>
+                <div className="space-y-4">
+                  {filteredLogs.map((log, index) => (
+                    <div key={log._id} className="group relative pl-8">
+                      {index !== filteredLogs.length - 1 && (
+                        <div className="absolute bottom-[-16px] left-[12px] top-8 w-[2px] bg-gray-200"></div>
+                      )}
 
-                        {/* Card Content */}
-                        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow relative">
-                          <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-3">
-                              <div>
-                                <h3 className="font-bold text-gray-800 text-lg">{log.taskName || log.title}</h3>
-                                <div className="flex items-center gap-2 text-xs text-gray-500 mt-0.5">
-                                  <Calendar size={12} />
-                                  {new Date(log.date).toLocaleDateString('vi-VN')}
-                                  {log.plot && (
-                                    <>
-                                      <span className="w-1 h-1 rounded-full bg-gray-300"></span>
-                                      <span className="text-emerald-600 font-medium flex items-center gap-1">
-                                        <Layers size={12} /> {log.plot.name}
-                                      </span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-3">
-                               <div className="text-right">
-                                  <div className="text-sm font-bold text-gray-800 flex items-center justify-end gap-1">
-                                    {log.cost?.toLocaleString()} <span className="text-xs text-gray-400 font-normal">VNĐ</span>
-                                  </div>
-                               </div>
-                               {/* Actions - Chỉ hiện nếu Vụ đang Active */}
-                               {isSeasonActive && (
-                                 <div className="flex gap-1 ml-2">
-                                    <button onClick={() => openLogModal(log)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                                      <Edit2 size={16} />
-                                    </button>
-                                    <button onClick={() => handleDeleteLog(log._id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                                      <Trash2 size={16} />
-                                    </button>
-                                 </div>
-                               )}
+                      <div className="absolute left-0 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-gray-100 text-gray-600 shadow-sm">
+                        <div className="h-2 w-2 rounded-full bg-current"></div>
+                      </div>
+
+                      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+                        <div className="mb-1.5 flex items-start justify-between gap-3">
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-800">
+                              {log.taskName || log.title}
+                            </h3>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                              <span className="flex items-center gap-1">
+                                <Calendar size={12} />
+                                {new Date(log.date).toLocaleDateString("vi-VN")}
+                              </span>
+                              {log.plot ? (
+                                <>
+                                  <span className="h-1 w-1 rounded-full bg-gray-300"></span>
+                                  <span className="flex items-center gap-1 font-medium text-emerald-600">
+                                    <Layers size={12} />
+                                    {log.plot.name}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="h-1 w-1 rounded-full bg-gray-300"></span>
+                                  <span className="font-medium text-gray-500">Áp dụng toàn cánh đồng</span>
+                                </>
+                              )}
                             </div>
                           </div>
-                          
-                          {log.description && (
-                            <p className="text-gray-600 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
-                              {log.description}
-                            </p>
-                          )}
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <div className="flex items-center justify-end gap-1 text-base font-bold text-gray-800">
+                                {Number(log.cost || 0).toLocaleString()}
+                                <span className="text-xs font-normal text-gray-400">đ</span>
+                              </div>
+                            </div>
+                            {isSeasonActive && (
+                              <div className="ml-2 flex gap-1">
+                                <button
+                                  onClick={() => openEditLogModal(log)}
+                                  className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteLog(log._id)}
+                                  className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
+
+                        {log.description && (
+                          <p className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+                            {log.description}
+                          </p>
+                        )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </>
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 bg-gray-50/50">
-            <Sprout size={64} className="text-gray-300 mb-4" />
-            <h3 className="text-xl font-bold text-gray-600">Chọn Cánh Đồng</h3>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-50/50 text-gray-400">
+            <Sprout size={64} className="mb-4 text-gray-300" />
+            <h3 className="text-xl font-bold text-gray-600">Chọn cánh đồng</h3>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* --- MODAL: THÊM / SỬA NHẬT KÝ --- */}
       {isLogModalOpen && (
-        <div className="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-              <h3 className="font-bold text-gray-800 text-lg">
-                {editingLog ? "Cập nhật Nhật Ký" : "Ghi Nhật Ký Mới"}
-              </h3>
-              <button onClick={() => setIsLogModalOpen(false)} className="text-gray-400 hover:text-gray-600">&times;</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-800">
+                  {editingLog ? "Cập nhật nhật ký" : "Ghi nhật ký mới"}
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsLogModalOpen(false)}
+                className="text-2xl text-gray-400 hover:text-gray-600"
+              >
+                &times;
+              </button>
             </div>
-            
-            <div className="p-6 overflow-y-auto custom-scrollbar">
-              {/* Chọn loại công việc */}
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-3">Chọn công việc</label>
-              <div className="grid grid-cols-4 gap-3 mb-6">
+
+            <div className="overflow-y-auto p-6">
+              <label className="mb-3 block text-xs font-bold uppercase text-gray-500">
+                Chọn công việc
+              </label>
+              <div className="mb-6 grid grid-cols-4 gap-3">
                 {taskTypes.map((task) => {
                   const isSelected = logForm.taskType?._id === task._id;
                   return (
                     <button
                       key={task._id}
-                      onClick={() => setLogForm({ ...logForm, taskType: task })}
-                      className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${
+                      type="button"
+                      onClick={() => setLogForm((prev) => ({ ...prev, taskType: task }))}
+                      className={`rounded-xl border p-3 transition-all ${
                         isSelected
-                          ? `bg-emerald-50 border-emerald-500 ring-2 ring-emerald-200`
-                          : "bg-white border-gray-200 hover:border-emerald-300 hover:bg-gray-50"
+                          ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                          : "border-gray-200 bg-white hover:border-emerald-300 hover:bg-gray-50"
                       }`}
                     >
-                      <span className={`text-[10px] font-bold text-center ${isSelected ? "text-emerald-700" : "text-gray-600"}`}>
+                      <span
+                        className={`text-[10px] font-bold ${
+                          isSelected ? "text-emerald-700" : "text-gray-600"
+                        }`}
+                      >
                         {task.name}
                       </span>
                     </button>
@@ -649,134 +839,227 @@ const Crops = () => {
                 })}
               </div>
 
-              {/* Form chi tiết */}
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Ngày thực hiện</label>
+                    <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                      Ngày thực hiện
+                    </label>
                     <input
                       type="date"
                       value={logForm.date}
-                      onChange={(e) => setLogForm({ ...logForm, date: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none text-sm font-medium"
+                      onChange={(event) =>
+                        setLogForm((prev) => ({ ...prev, date: event.target.value }))
+                      }
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 font-medium outline-none focus:border-emerald-500 focus:bg-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Chi phí (VNĐ)</label>
+                    <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                      Chi phí
+                    </label>
                     <div className="relative">
                       <input
                         type="number"
                         value={logForm.cost}
-                        onChange={(e) => setLogForm({ ...logForm, cost: e.target.value })}
-                        className="w-full pl-8 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none text-sm font-medium"
+                        onChange={(event) =>
+                          setLogForm((prev) => ({ ...prev, cost: event.target.value }))
+                        }
+                        className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2 pl-8 pr-4 font-medium outline-none focus:border-emerald-500 focus:bg-white"
                         placeholder="0"
                       />
-                      <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <DollarSign
+                        size={14}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      />
                     </div>
                   </div>
                 </div>
 
                 <div>
-                   <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Áp dụng cho thửa (Tuỳ chọn)</label>
-                   <select
-                      value={logForm.plotId}
-                      onChange={(e) => setLogForm({ ...logForm, plotId: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none text-sm font-medium"
-                   >
-                      <option value="">-- Toàn bộ cánh đồng --</option>
-                      {plots.filter(p => p.status === "active").map(p => (
-                        <option key={p._id} value={p._id}>{p.name} ({p.area} m²)</option>
-                      ))}
-                   </select>
+                  <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                    Áp dụng cho thửa
+                  </label>
+                  <select
+                    value={logForm.plotId}
+                    onChange={(event) =>
+                      setLogForm((prev) => ({ ...prev, plotId: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 font-medium outline-none focus:border-emerald-500 focus:bg-white"
+                  >
+                    <option value="">-- Toàn bộ cánh đồng --</option>
+                    {seasonLoggablePlots.map((plot) => (
+                      <option key={plot._id} value={plot._id}>
+                        {plot.name} ({Number(plot.area || 0).toLocaleString()} m2)
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Mô tả chi tiết</label>
+                  <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                    Mô tả chi tiết
+                  </label>
                   <textarea
                     rows={3}
                     value={logForm.description}
-                    onChange={(e) => setLogForm({ ...logForm, description: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none text-sm font-medium resize-none"
+                    onChange={(event) =>
+                      setLogForm((prev) => ({ ...prev, description: event.target.value }))
+                    }
+                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 font-medium outline-none focus:border-emerald-500 focus:bg-white"
                     placeholder="Chi tiết công việc..."
                   />
                 </div>
               </div>
             </div>
 
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex gap-3">
-              <button onClick={() => setIsLogModalOpen(false)} className="flex-1 py-2.5 rounded-xl font-bold text-gray-600 hover:bg-gray-200 transition-colors">Hủy</button>
-              <button onClick={handleSaveLog} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-200 transition-all">
-                {editingLog ? "Lưu Thay Đổi" : "Tạo Nhật Ký"}
+            <div className="flex gap-3 border-t border-gray-100 bg-gray-50 p-4">
+              <button
+                onClick={() => setIsLogModalOpen(false)}
+                className="flex-1 rounded-xl py-2.5 font-bold text-gray-600 transition-colors hover:bg-gray-200"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSaveLog}
+                className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-bold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700"
+              >
+                {editingLog ? "Lưu thay đổi" : "Tạo nhật ký"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* --- MODAL: TẠO/SỬA VỤ MỚI --- */}
       {isSeasonModalOpen && (
-        <div className="fixed inset-0 z-50 bg-gray-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-xl">
+            <div className="border-b border-gray-100 bg-gray-50 px-6 py-4">
               <h3 className="font-bold text-gray-800">
-                {editingSeasonName ? "Sửa Mùa Vụ" : "Bắt Đầu Vụ Mùa Mới"}
+                {seasonForm.editingSeasonId ? "Chỉnh sửa vụ mùa" : "Bắt đầu vụ mới"}
               </h3>
             </div>
-            <div className="p-6 space-y-4">
-               <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Chọn tên mùa vụ</label>
+
+            <div className="space-y-5 p-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                    Mùa vụ
+                  </label>
                   <div className="relative">
                     <select
                       value={seasonForm.seasonId}
-                      onChange={(e) => setSeasonForm({...seasonForm, seasonId: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-medium appearance-none"
-                      autoFocus
+                      onChange={(event) =>
+                        setSeasonForm((prev) => ({ ...prev, seasonId: event.target.value }))
+                      }
+                      className="w-full appearance-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-medium outline-none focus:border-emerald-500 focus:bg-white"
                     >
-                      <option value="">-- Chọn mùa vụ --</option>
+                      <option value="">-- Chọn mùa vụ chuẩn --</option>
                       {seasonCatalogs.map((season) => (
-                        <option key={season._id} value={season._id}>{season.name}</option>
+                        <option key={season._id} value={season._id}>
+                          {season.name}
+                        </option>
                       ))}
                     </select>
-                    <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-70 pointer-events-none" />
-                  </div>
-                  {seasonForm.seasonId && (
-                    <p className="text-xs text-emerald-600 mt-2 font-medium">
-                      Tên vụ: <strong>{(seasonCatalogs.find((s) => s._id === seasonForm.seasonId)?.name || "") + " " + new Date().getFullYear()}</strong>
-                    </p>
-                  )}
-               </div>
-               <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase mb-1.5">Ngày bắt đầu</label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      value={seasonForm.startDate}
-                      onChange={(e) => setSeasonForm({...seasonForm, startDate: e.target.value})}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-emerald-500 outline-none font-medium"
+                    <ChevronDown
+                      size={14}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
                     />
-                    <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
-               </div>
-               <button
-                onClick={handleCreateSeason}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold mt-2 shadow-lg shadow-emerald-200"
-               >
-                 {editingSeasonName ? "Lưu Thay Đổi" : "Tạo Vụ Mới"}
-               </button>
-               <button 
-                onClick={() => {
-                  setIsSeasonModalOpen(false);
-                  setEditingSeasonName(false);
-                  setSeasonForm({ 
-                    seasonId: "", 
-                    startDate: new Date().toISOString().split('T')[0],
-                    editingSeasonId: null
-                  });
-                }} 
-                className="w-full py-2 text-gray-400 text-sm hover:text-gray-600 font-medium"
-               >
-                 Đóng
-               </button>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                    Năm vụ
+                  </label>
+                  <input
+                    type="number"
+                    value={seasonForm.year}
+                    onChange={(event) =>
+                      setSeasonForm((prev) => ({ ...prev, year: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-medium outline-none focus:border-emerald-500 focus:bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                    Ngày bắt đầu
+                  </label>
+                  <input
+                    type="date"
+                    value={seasonForm.startDate}
+                    onChange={(event) =>
+                      setSeasonForm((prev) => ({ ...prev, startDate: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-medium outline-none focus:border-emerald-500 focus:bg-white"
+                  />
+                </div>
+              </div>
+
+              {selectedSeasonCatalog && (
+                <p className="text-xs font-medium text-emerald-600">
+                  Vụ sẽ hiển thị là:{" "}
+                  <strong>
+                    {selectedSeasonCatalog.name} {seasonForm.year}
+                  </strong>
+                </p>
+              )}
+
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-gray-800">Chọn thửa tham gia vụ</h4>
+                  </div>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                    {seasonForm.plotIds.length} thửa được chọn
+                  </span>
+                </div>
+
+                <div className="grid max-h-[280px] gap-3 overflow-y-auto rounded-2xl border border-gray-100 bg-gray-50 p-3 md:grid-cols-2">
+                  {seasonSelectablePlots.map((plot) => (
+                    <label
+                      key={plot._id}
+                      className={`rounded-2xl border p-4 transition-all ${
+                        plot.isSelected
+                          ? "border-emerald-300 bg-white shadow-sm"
+                          : "border-gray-200 bg-white"
+                      } ${!plot.canSelect ? "opacity-60" : ""}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold text-gray-800">{plot.name}</p>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Diện tích: {Number(plot.area || 0).toLocaleString()} m²
+                          </p>
+                          <p className="mt-2 text-xs text-gray-400">{plot.helperText}</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={plot.isSelected}
+                          disabled={!plot.canSelect}
+                          onChange={() => toggleSeasonPlot(plot._id)}
+                        />
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setIsSeasonModalOpen(false)}
+                  className="flex-1 rounded-xl bg-gray-200 py-2.5 font-medium text-gray-800 transition-all hover:bg-gray-300"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleSaveSeason}
+                  className="flex-1 rounded-xl bg-emerald-600 py-2.5 font-medium text-white transition-all hover:bg-emerald-700"
+                >
+                  {seasonForm.editingSeasonId ? "Cập nhật vụ" : "Bắt đầu vụ"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
