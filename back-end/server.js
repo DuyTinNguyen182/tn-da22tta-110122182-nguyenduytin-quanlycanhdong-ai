@@ -13,6 +13,7 @@ const seasonDetailRoutes = require("./src/routes/seasonDetailRoute");
 const diaryLogRoutes = require("./src/routes/diaryLogRoute");
 const taskRoutes = require("./src/routes/taskRoute");
 const aiRoutes = require("./src/routes/aiRoute");
+const adminOverviewRoutes = require("./src/routes/adminOverviewRoute");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -40,6 +41,7 @@ app.use("/api/season-details", seasonDetailRoutes);
 app.use("/api/diary-logs", diaryLogRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/admin", adminOverviewRoutes);
 
 // --- Start Server ---
 app.listen(PORT, () => {
