@@ -139,7 +139,7 @@ const AIChat = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50">
       {/* Header */}
-      <div className="bg-white px-4 md:px-5 py-2.5 md:py-3 border-b border-gray-100 flex items-center gap-2.5 shadow-sm z-10">
+      {/* <div className="bg-white px-4 md:px-5 py-2.5 md:py-3 border-b border-gray-100 flex items-center gap-2.5 shadow-sm z-10">
         <div className="w-8 h-8 bg-emerald-100 rounded-lg flex flex-shrink-0 items-center justify-center shadow-inner">
           <Sparkles className="text-emerald-600" size={18} />
         </div>
@@ -147,7 +147,7 @@ const AIChat = () => {
           <h1 className="text-base md:text-lg font-bold text-gray-800">AI Tư Vấn Nông Nghiệp</h1>
           <p className="text-[11px] md:text-xs text-emerald-600 font-medium">Trợ lý ảo 24/7</p>
         </div>
-      </div>
+      </div> */}
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto px-3 md:px-4 py-2 md:py-3 space-y-3">

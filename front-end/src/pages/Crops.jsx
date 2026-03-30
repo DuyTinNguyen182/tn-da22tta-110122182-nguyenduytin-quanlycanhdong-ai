@@ -25,7 +25,7 @@ const emptyLogForm = {
   description: "",
   cost: "",
   date: getToday(),
-  plotId: "",
+  selectedPlotIds: [],
 };
 
 const emptySeasonForm = {
@@ -42,6 +42,31 @@ const sortSeasons = (items = []) =>
     if (a.status !== "active" && b.status === "active") return 1;
     return new Date(b.startDate || b.createdAt || 0) - new Date(a.startDate || a.createdAt || 0);
   });
+
+const getLogPlots = (log) => {
+  if (Array.isArray(log?.plots) && log.plots.length > 0) {
+    return log.plots.filter(Boolean);
+  }
+
+  if (log?.plot) {
+    return [log.plot];
+  }
+
+  return [];
+};
+
+const getLogScopeLabel = (log) => {
+  if (log?.scope === "all_plots") {
+    return "Tất cả thửa tham gia vụ";
+  }
+
+  const plots = getLogPlots(log);
+  if (plots.length <= 1) {
+    return plots[0]?.name || "Một thửa";
+  }
+
+  return `${plots.length} thửa được chọn`;
+};
 
 const Crops = () => {
   const [fields, setFields] = useState([]);
@@ -111,9 +136,11 @@ const Crops = () => {
     const optionMap = new Map();
     seasonAssignedPlots.forEach((plot) => optionMap.set(plot._id, plot));
     logs.forEach((log) => {
-      if (log.plot?._id) {
-        optionMap.set(log.plot._id, log.plot);
-      }
+      getLogPlots(log).forEach((plot) => {
+        if (plot?._id) {
+          optionMap.set(plot._id, plot);
+        }
+      });
     });
     return Array.from(optionMap.values());
   }, [logs, seasonAssignedPlots]);
@@ -122,7 +149,9 @@ const Crops = () => {
     const nextLogs = logs.filter((log) => {
       const matchesTask = filterTaskId ? log.taskId === filterTaskId : true;
       const matchesPlot = filterPlotId
-        ? log.plot?._id === filterPlotId || log.plot === filterPlotId || !log.plot
+        ? getLogPlots(log).some(
+            (plot) => plot?._id === filterPlotId || plot === filterPlotId
+          )
         : true;
 
       return matchesTask && matchesPlot;
@@ -258,6 +287,27 @@ const Crops = () => {
     });
   };
 
+  const toggleLogPlot = (plotId) => {
+    setLogForm((prev) => {
+      const hasPlot = prev.selectedPlotIds.includes(plotId);
+      return {
+        ...prev,
+        selectedPlotIds: hasPlot
+          ? prev.selectedPlotIds.filter((id) => id !== plotId)
+          : [...prev.selectedPlotIds, plotId],
+      };
+    });
+  };
+
+  const handleSelectAllLogPlots = () => {
+    const allPlotIds = seasonLoggablePlots.map((plot) => plot._id);
+    setLogForm((prev) => ({
+      ...prev,
+      selectedPlotIds:
+        prev.selectedPlotIds.length === allPlotIds.length ? [] : allPlotIds,
+    }));
+  };
+
   const openCreateSeasonModal = () => {
     setSeasonForm({
       seasonId: "",
@@ -345,7 +395,7 @@ const Crops = () => {
       description: "",
       cost: "",
       date: getToday(),
-      plotId: "",
+      selectedPlotIds: seasonLoggablePlots.map((plot) => plot._id),
     });
     setIsLogModalOpen(true);
   };
@@ -362,7 +412,9 @@ const Crops = () => {
       description: log.description || "",
       cost: log.cost || "",
       date: log.date ? log.date.split("T")[0] : getToday(),
-      plotId: log.plot?._id || log.plot || "",
+      selectedPlotIds: getLogPlots(log)
+        .map((plot) => plot?._id || plot)
+        .filter(Boolean),
     });
     setIsLogModalOpen(true);
   };
@@ -378,13 +430,32 @@ const Crops = () => {
       return;
     }
 
+    if (logForm.selectedPlotIds.length === 0) {
+      alert("Vui lòng chọn ít nhất 1 thửa áp dụng.");
+      return;
+    }
+
+    const allPlotIds = seasonLoggablePlots.map((plot) => plot._id);
+    const isAllSelected =
+      allPlotIds.length > 0 &&
+      logForm.selectedPlotIds.length === allPlotIds.length &&
+      allPlotIds.every((id) => logForm.selectedPlotIds.includes(id));
+
+    const scope = isAllSelected
+      ? "all_plots"
+      : logForm.selectedPlotIds.length === 1
+        ? "single_plot"
+        : "selected_plots";
+
     const payload = {
       taskId: logForm.taskType._id,
       description: logForm.description,
       cost: Number(logForm.cost || 0),
       date: logForm.date,
       seasonId: currentSeason._id,
-      plotId: logForm.plotId || null,
+      scope,
+      plotId: scope === "single_plot" ? logForm.selectedPlotIds[0] : null,
+      plotIds: scope === "all_plots" ? allPlotIds : logForm.selectedPlotIds,
     };
 
     try {
@@ -729,20 +800,11 @@ const Crops = () => {
                                 <Calendar size={12} />
                                 {new Date(log.date).toLocaleDateString("vi-VN")}
                               </span>
-                              {log.plot ? (
-                                <>
-                                  <span className="h-1 w-1 rounded-full bg-gray-300"></span>
-                                  <span className="flex items-center gap-1 font-medium text-emerald-600">
-                                    <Layers size={12} />
-                                    {log.plot.name}
-                                  </span>
-                                </>
-                              ) : (
-                                <>
-                                  <span className="h-1 w-1 rounded-full bg-gray-300"></span>
-                                  <span className="font-medium text-gray-500">Áp dụng toàn cánh đồng</span>
-                                </>
-                              )}
+                              <span className="h-1 w-1 rounded-full bg-gray-300"></span>
+                              <span className="flex items-center gap-1 font-medium text-emerald-600">
+                                <Layers size={12} />
+                                {getLogScopeLabel(log)}
+                              </span>
                             </div>
                           </div>
 
@@ -776,6 +838,19 @@ const Crops = () => {
                           <p className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
                             {log.description}
                           </p>
+                        )}
+
+                        {getLogPlots(log).length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {getLogPlots(log).map((plot) => (
+                              <span
+                                key={plot?._id || plot}
+                                className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600"
+                              >
+                                {plot?.name || "Thửa đã chọn"}
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -877,23 +952,50 @@ const Crops = () => {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
-                    Áp dụng cho thửa
-                  </label>
-                  <select
-                    value={logForm.plotId}
-                    onChange={(event) =>
-                      setLogForm((prev) => ({ ...prev, plotId: event.target.value }))
-                    }
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 font-medium outline-none focus:border-emerald-500 focus:bg-white"
-                  >
-                    <option value="">-- Toàn bộ cánh đồng --</option>
-                    {seasonLoggablePlots.map((plot) => (
-                      <option key={plot._id} value={plot._id}>
-                        {plot.name} ({Number(plot.area || 0).toLocaleString()} m2)
-                      </option>
-                    ))}
-                  </select>
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <label className="block text-xs font-bold uppercase text-gray-500">
+                      Áp dụng cho các thửa
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleSelectAllLogPlots}
+                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700"
+                    >
+                      {logForm.selectedPlotIds.length === seasonLoggablePlots.length
+                        ? "Bỏ chọn tất cả"
+                        : "Chọn tất cả"}
+                    </button>
+                  </div>
+
+                  <div className="grid max-h-64 gap-3 overflow-y-auto rounded-2xl border border-gray-100 bg-gray-50 p-3 md:grid-cols-2">
+                    {seasonLoggablePlots.map((plot) => {
+                      const checked = logForm.selectedPlotIds.includes(plot._id);
+                      return (
+                        <label
+                          key={plot._id}
+                          className={`rounded-2xl border p-4 transition-all ${
+                            checked
+                              ? "border-emerald-300 bg-white shadow-sm"
+                              : "border-gray-200 bg-white"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-gray-800">{plot.name}</p>
+                              <p className="mt-1 text-xs text-gray-500">
+                                {Number(plot.area || 0).toLocaleString()} m²
+                              </p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleLogPlot(plot._id)}
+                            />
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div>

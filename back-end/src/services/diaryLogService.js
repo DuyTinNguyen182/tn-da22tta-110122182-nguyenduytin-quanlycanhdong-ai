@@ -4,17 +4,12 @@ const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const { resolveTaskId } = require("./taskService");
 
-const mapLogOutput = (logDoc) => {
-  const log = logDoc.toObject ? logDoc.toObject() : { ...logDoc };
-  const task = log.task || null;
-  const taskName = task?.name || task?.label || "Khác";
+const normalizePlotIds = (plotIds = []) => {
+  if (!Array.isArray(plotIds)) {
+    return [];
+  }
 
-  return {
-    ...log,
-    taskId: task?._id ? String(task._id) : typeof task === "string" ? task : null,
-    taskName,
-    title: taskName,
-  };
+  return Array.from(new Set(plotIds.filter(Boolean).map((item) => String(item))));
 };
 
 const getSeasonForUser = async (seasonId, userId) => {
@@ -26,43 +21,113 @@ const getSeasonForUser = async (seasonId, userId) => {
   return season;
 };
 
-const validateSeasonAssignment = async ({ plotId, season, userId }) => {
-  const activeAssignments = await SeasonPlotAssignment.find({
-    seasonDetail: season._id,
+const getActiveSeasonPlots = async (seasonId, userId) => {
+  const assignments = await SeasonPlotAssignment.find({
+    seasonDetail: seasonId,
     user: userId,
     status: "active",
-  }).lean();
+  })
+    .populate("plot", "name area status field user")
+    .lean();
 
-  if (activeAssignments.length === 0) {
-    throw new Error("Vụ mùa này chưa có thửa nào tham gia canh tác.");
+  const plots = assignments
+    .map((item) => item.plot)
+    .filter((plot) => plot && plot.status === "active");
+
+  if (plots.length === 0) {
+    throw new Error("Vụ mùa này chưa có thửa nào sẵn sàng ghi nhật ký.");
   }
 
-  if (!plotId) {
-    return null;
+  return plots;
+};
+
+const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds }) => {
+  const activePlots = await getActiveSeasonPlots(season._id, userId);
+  const activePlotMap = new Map(activePlots.map((plot) => [String(plot._id), plot]));
+
+  if (scope === "all_plots") {
+    return {
+      scope: "all_plots",
+      plots: activePlots,
+    };
   }
 
-  const plot = await Plot.findOne({ _id: plotId, user: userId });
-  if (!plot) {
-    throw new Error("Không tìm thấy thửa ruộng");
+  const normalizedIds =
+    scope === "single_plot"
+      ? normalizePlotIds([plotId])
+      : normalizePlotIds(plotIds);
+
+  if (normalizedIds.length === 0) {
+    throw new Error("Cần chọn ít nhất 1 thửa để lưu nhật ký.");
   }
 
-  if (String(plot.field) !== String(season.field)) {
-    throw new Error("Thửa ruộng không thuộc cánh đồng của vụ mùa này");
+  const invalidPlotId = normalizedIds.find((id) => !activePlotMap.has(id));
+  if (invalidPlotId) {
+    throw new Error("Có thửa không hợp lệ hoặc không tham gia vụ mùa đang chọn.");
   }
 
-  const assignment = activeAssignments.find(
-    (item) => String(item.plot) === String(plotId)
-  );
+  return {
+    scope: normalizedIds.length === 1 ? "single_plot" : "selected_plots",
+    plots: normalizedIds.map((id) => activePlotMap.get(id)),
+  };
+};
 
-  if (!assignment) {
-    throw new Error("Thửa ruộng này không tham gia vụ mùa đang chọn");
+const buildPlotSnapshot = (plots) =>
+  plots.map((plot) => ({
+    plotId: plot._id,
+    name: plot.name || "",
+    area: Number(plot.area || 0),
+    status: plot.status || "",
+  }));
+
+const normalizeExistingPlots = (log) => {
+  if (Array.isArray(log.plots) && log.plots.length > 0) {
+    return log.plots.map((item) => (item?._id ? String(item._id) : String(item)));
   }
 
-  if (plot.status !== "active") {
-    throw new Error("Chỉ có thể ghi nhật ký cho các thửa đang active");
+  if (log.plot) {
+    return [log.plot?._id ? String(log.plot._id) : String(log.plot)];
   }
 
-  return plot;
+  return [];
+};
+
+const mapLogOutput = (logDoc) => {
+  const log = logDoc.toObject ? logDoc.toObject() : { ...logDoc };
+  const task = log.task || null;
+  const scope =
+    log.scope ||
+    (Array.isArray(log.plots) && log.plots.length > 1
+      ? "selected_plots"
+      : Array.isArray(log.plots) && log.plots.length === 1
+        ? "single_plot"
+        : log.plot
+          ? "single_plot"
+          : "all_plots");
+
+  const normalizedPlots =
+    Array.isArray(log.plots) && log.plots.length > 0
+      ? log.plots
+      : log.plot
+        ? [log.plot]
+        : [];
+
+  return {
+    ...log,
+    taskId: task?._id ? String(task._id) : typeof task === "string" ? task : null,
+    taskName: task?.name || task?.label || "Khác",
+    title: task?.name || task?.label || "Nhật ký mùa vụ",
+    scope,
+    plots: normalizedPlots,
+    plotCount: normalizedPlots.length,
+    appliesToAllPlots: scope === "all_plots",
+    plotLabel:
+      scope === "all_plots"
+        ? "Tất cả thửa tham gia vụ"
+        : normalizedPlots.length === 1
+          ? normalizedPlots[0]?.name || "1 thửa"
+          : `${normalizedPlots.length} thửa được chọn`,
+  };
 };
 
 const getLogsBySeason = async (seasonId, userId) => {
@@ -70,7 +135,8 @@ const getLogsBySeason = async (seasonId, userId) => {
 
   const logs = await DiaryLog.find({ season: seasonId, user: userId })
     .populate("task", "name")
-    .populate("plot", "name status")
+    .populate("plot", "name area status")
+    .populate("plots", "name area status")
     .sort({ date: -1, createdAt: -1 });
 
   return logs.map(mapLogOutput);
@@ -78,8 +144,6 @@ const getLogsBySeason = async (seasonId, userId) => {
 
 const createLog = async (data, userId) => {
   const seasonValue = data.seasonId || data.season;
-  const plotInput = data.plotId !== undefined ? data.plotId : data.plot;
-  const plotValue = plotInput && plotInput !== "" ? plotInput : null;
   const taskId = await resolveTaskId({
     taskId: data.taskId || data.task,
     title: data.title,
@@ -91,7 +155,22 @@ const createLog = async (data, userId) => {
     throw new Error("Chỉ có thể thêm nhật ký cho vụ đang active");
   }
 
-  await validateSeasonAssignment({ plotId: plotValue, season, userId });
+  const requestedScope =
+    data.scope === "selected_plots"
+      ? "selected_plots"
+      : data.scope === "single_plot"
+        ? "single_plot"
+        : data.plotId
+          ? "single_plot"
+          : "all_plots";
+
+  const resolved = await resolveLogPlots({
+    season,
+    userId,
+    scope: requestedScope,
+    plotId: data.plotId || data.plot || null,
+    plotIds: data.plotIds,
+  });
 
   const created = await DiaryLog.create({
     task: taskId,
@@ -99,19 +178,26 @@ const createLog = async (data, userId) => {
     date: data.date,
     cost: data.cost,
     season: seasonValue,
-    plot: plotValue,
+    plot: resolved.scope === "single_plot" ? resolved.plots[0]._id : null,
+    scope: resolved.scope,
+    plots: resolved.plots.map((plot) => plot._id),
+    plotSnapshot: buildPlotSnapshot(resolved.plots),
     user: userId,
   });
 
   const log = await DiaryLog.findById(created._id)
     .populate("task", "name")
-    .populate("plot", "name status");
+    .populate("plot", "name area status")
+    .populate("plots", "name area status");
 
   return mapLogOutput(log);
 };
 
 const updateLog = async (id, data, userId) => {
-  const existingLog = await DiaryLog.findOne({ _id: id, user: userId });
+  const existingLog = await DiaryLog.findOne({ _id: id, user: userId })
+    .populate("plot", "name area status")
+    .populate("plots", "name area status");
+
   if (!existingLog) {
     throw new Error("Không tìm thấy nhật ký");
   }
@@ -126,13 +212,32 @@ const updateLog = async (id, data, userId) => {
     throw new Error("Không thể chuyển nhật ký sang vụ khác");
   }
 
-  const plotCandidate =
-    updateData.plotId === "" || updateData.plot === ""
-      ? null
-      : updateData.plotId || updateData.plot || existingLog.plot;
+  let scope =
+    updateData.scope ||
+    existingLog.scope ||
+    (normalizeExistingPlots(existingLog).length > 1 ? "selected_plots" : "single_plot");
 
-  await validateSeasonAssignment({ plotId: plotCandidate, season, userId });
-  updateData.plot = plotCandidate;
+  if (updateData.scope === "all_plots") {
+    scope = "all_plots";
+  } else if (updateData.plotId !== undefined) {
+    scope = updateData.plotId ? "single_plot" : "all_plots";
+  } else if (updateData.plotIds) {
+    scope = normalizePlotIds(updateData.plotIds).length <= 1 ? "single_plot" : "selected_plots";
+  }
+
+  const resolved = await resolveLogPlots({
+    season,
+    userId,
+    scope,
+    plotId:
+      updateData.plotId !== undefined
+        ? updateData.plotId
+        : normalizeExistingPlots(existingLog)[0] || null,
+    plotIds:
+      updateData.plotIds !== undefined
+        ? updateData.plotIds
+        : normalizeExistingPlots(existingLog),
+  });
 
   if (updateData.taskId || updateData.task || updateData.title || updateData.taskName) {
     updateData.task = await resolveTaskId({
@@ -144,11 +249,17 @@ const updateLog = async (id, data, userId) => {
 
   delete updateData.seasonId;
   delete updateData.plotId;
+  delete updateData.plotIds;
   delete updateData.taskId;
   delete updateData.taskCode;
   delete updateData.taskName;
   delete updateData.title;
   delete updateData.type;
+
+  updateData.plot = resolved.scope === "single_plot" ? resolved.plots[0]._id : null;
+  updateData.scope = resolved.scope;
+  updateData.plots = resolved.plots.map((plot) => plot._id);
+  updateData.plotSnapshot = buildPlotSnapshot(resolved.plots);
 
   const updated = await DiaryLog.findOneAndUpdate(
     { _id: id, user: userId },
@@ -156,7 +267,8 @@ const updateLog = async (id, data, userId) => {
     { new: true }
   )
     .populate("task", "name")
-    .populate("plot", "name status");
+    .populate("plot", "name area status")
+    .populate("plots", "name area status");
 
   return updated ? mapLogOutput(updated) : null;
 };
