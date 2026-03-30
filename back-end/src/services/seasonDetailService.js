@@ -3,6 +3,7 @@ const Plot = require("../models/plotModel");
 const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const DiaryLog = require("../models/diaryLogModel");
+const DiseaseLog = require("../models/diseaseLogModel");
 const {
   getSeasonMap,
   resolveSeasonId,
@@ -419,6 +420,7 @@ const deleteSeasonDetail = async (id, userId) => {
   if (season) {
     await Promise.all([
       DiaryLog.deleteMany({ season: id }),
+      DiseaseLog.deleteMany({ season: id }),
       SeasonPlotAssignment.deleteMany({ seasonDetail: id }),
     ]);
   }

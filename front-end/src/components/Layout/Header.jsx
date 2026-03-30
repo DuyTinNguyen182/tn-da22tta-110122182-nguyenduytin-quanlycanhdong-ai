@@ -12,6 +12,7 @@ const Header = () => {
     "/dashboard": "Tổng quan hợp tác xã",
     "/fields": "Thửa ruộng của tôi",
     "/crops": "Nhật ký mùa vụ",
+    "/disease-logs": "Nhật ký bệnh",
     "/ai-scan": "AI chẩn đoán bệnh lúa",
     "/ask-ai": "AI tư vấn canh tác",
     "/account": "Tài khoản cá nhân",

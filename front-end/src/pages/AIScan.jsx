@@ -37,7 +37,9 @@ const AIScan = () => {
       const fetchFields = async () => {
         try {
           const res = await api.get("/fields");
-          const fieldList = res.data || [];
+          const fieldList = (res.data || []).filter(
+            (field) => Number(field.myPlotCount || 0) > 0
+          );
           setFields(fieldList);
           if (fieldList.length > 0) {
             setSelectedField(fieldList[0]._id);
@@ -107,7 +109,7 @@ const AIScan = () => {
     ].join("\n");
   };
 
-  const handleSaveDiary = async () => {
+  const handleSaveDiseaseLog = async () => {
     if (!result) return;
 
     if (!selectedField) {
@@ -125,33 +127,23 @@ const AIScan = () => {
       return;
     }
 
-    const payloadBase = {
+    const payload = {
+      diseaseName: result.disease || "Không xác định",
+      confidence: result.confidence,
       title: `Phát hiện bệnh: ${result.disease || "Không xác định"}`,
       description: buildDiagnosisDescription(),
       type: "disease",
       seasonId: selectedSeason,
       date: new Date(detectedDate),
+      scope: selectAllPlots ? "all_plots" : "selected_plots",
+      plotIds: selectAllPlots ? [] : selectedPlotIds,
+      imageName: selectedImage?.name || "",
+      source: "ai_scan",
     };
 
     try {
       setSaveLoading(true);
-      if (selectAllPlots) {
-        if (plots.length === 0) {
-          await api.post("/diary-logs", { ...payloadBase, plotId: null });
-        } else {
-          await Promise.all(
-            plots.map((plot) =>
-              api.post("/diary-logs", { ...payloadBase, plotId: plot._id })
-            )
-          );
-        }
-      } else {
-        await Promise.all(
-          selectedPlotIds.map((plotId) =>
-            api.post("/diary-logs", { ...payloadBase, plotId })
-          )
-        );
-      }
+      await api.post("/disease-logs", payload);
 
       alert("Đã lưu nhật ký bệnh thành công.");
       setShowModal(false);
@@ -488,7 +480,7 @@ const AIScan = () => {
                   Hủy
                 </button>
                 <button
-                  onClick={handleSaveDiary}
+                  onClick={handleSaveDiseaseLog}
                   disabled={saveLoading || !result}
                   className={`px-4 py-2.5 rounded-xl font-semibold text-white ${
                     saveLoading || !result ? "bg-gray-300 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"

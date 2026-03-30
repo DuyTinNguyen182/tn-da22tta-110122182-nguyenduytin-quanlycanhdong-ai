@@ -3,6 +3,7 @@ const Field = require("../models/fieldModel");
 const Plot = require("../models/plotModel");
 const SeasonDetail = require("../models/seasonDetailModel");
 const DiaryLog = require("../models/diaryLogModel");
+const DiseaseLog = require("../models/diseaseLogModel");
 const User = require("../models/userModel");
 
 const isAdminUser = (user) => (user?.role || "").toLowerCase() === "admin";
@@ -190,6 +191,9 @@ const deleteField = async (id, currentUser) => {
     Plot.deleteMany({ field: id }),
     SeasonDetail.deleteMany({ field: id }),
     seasonIds.length > 0 ? DiaryLog.deleteMany({ season: { $in: seasonIds } }) : Promise.resolve(),
+    DiseaseLog.deleteMany({
+      $or: [{ field: id }, ...(seasonIds.length > 0 ? [{ season: { $in: seasonIds } }] : [])],
+    }),
   ]);
 
   return field;

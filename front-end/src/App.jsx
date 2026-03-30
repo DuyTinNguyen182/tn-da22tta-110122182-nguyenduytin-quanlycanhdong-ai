@@ -12,6 +12,7 @@ import Register from "./pages/Auth/Register";
 import Dashboard from "./pages/Dashboard";
 import Fields from "./pages/Fields";
 import CropsPage from "./pages/Crops";
+import DiseaseLogs from "./pages/DiseaseLogs";
 import AIScan from "./pages/AIScan";
 import AIChat from "./pages/AIChat";
 import Account from "./pages/Account";
@@ -36,6 +37,7 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/fields" element={<Fields />} />
             <Route path="/crops" element={<CropsPage />} />
+            <Route path="/disease-logs" element={<DiseaseLogs />} />
             <Route path="/ai-scan" element={<AIScan />} />
             <Route path="/ask-ai" element={<AIChat />} />
             <Route path="/account" element={<Account />} />
