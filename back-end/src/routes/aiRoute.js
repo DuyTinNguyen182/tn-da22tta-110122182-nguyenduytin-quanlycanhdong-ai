@@ -13,6 +13,7 @@ router.use(protect);
 // Route: POST /api/ai/diagnose
 router.post("/diagnose", upload.single("image"), aiController.diagnoseDisease);
 router.post("/chat", aiController.chat);
+router.post("/chat/reset", aiController.resetChatSession);
 router.get("/chat/history", aiController.getChatHistory);
 
 module.exports = router;

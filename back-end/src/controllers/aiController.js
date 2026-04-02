@@ -1,6 +1,6 @@
 const axios = require("axios");
 const FormData = require("form-data");
-const mongoose = require("mongoose");
+const { randomUUID } = require("crypto");
 const OpenAI = require("openai");
 const aiChatService = require("../services/aiChatService");
 
@@ -94,7 +94,7 @@ exports.chat = async (req, res) => {
     const resolvedSessionId =
       sessionId && String(sessionId).trim()
         ? String(sessionId).trim()
-        : new mongoose.Types.ObjectId().toString();
+        : randomUUID();
 
     await aiChatService.saveMessage({
       userId: req.user.id,
@@ -104,7 +104,11 @@ exports.chat = async (req, res) => {
       diagnosisSnapshot: diagnosisResult || undefined,
     });
 
-    const recentMessages = await aiChatService.getSessionMessages(req.user.id, resolvedSessionId, 20);
+    const recentMessages = await aiChatService.getSessionMessages(
+      req.user.id,
+      resolvedSessionId,
+      aiChatService.MAX_SESSION_MESSAGES
+    );
 
     if (!openaiClient) {
       return res.status(500).json({
@@ -137,7 +141,11 @@ exports.chat = async (req, res) => {
       content: assistantReply,
     });
 
-    const messages = await aiChatService.getSessionMessages(req.user.id, resolvedSessionId, 200);
+    const messages = await aiChatService.getSessionMessages(
+      req.user.id,
+      resolvedSessionId,
+      aiChatService.MAX_SESSION_MESSAGES
+    );
 
     res.json({
       success: true,
@@ -164,7 +172,11 @@ exports.getChatHistory = async (req, res) => {
       return res.status(400).json({ message: "Thiếu sessionId" });
     }
 
-    const messages = await aiChatService.getSessionMessages(req.user.id, sessionId, 200);
+    const messages = await aiChatService.getSessionMessages(
+      req.user.id,
+      sessionId,
+      aiChatService.MAX_SESSION_MESSAGES
+    );
 
     res.json({
       success: true,
@@ -176,5 +188,25 @@ exports.getChatHistory = async (req, res) => {
   } catch (error) {
     console.error("Get AI chat history error:", error.message);
     res.status(500).json({ message: "Không thể lấy lịch sử chat" });
+  }
+};
+
+exports.resetChatSession = async (req, res) => {
+  try {
+    const sessionId = req.body?.sessionId?.trim();
+
+    if (!sessionId) {
+      return res.status(400).json({ message: "Thiếu sessionId" });
+    }
+
+    await aiChatService.clearSessionMessages(req.user.id, sessionId);
+
+    res.json({
+      success: true,
+      message: "Đã reset phiên chat tạm",
+    });
+  } catch (error) {
+    console.error("Reset AI chat session error:", error.message);
+    res.status(500).json({ message: "Không thể reset phiên chat" });
   }
 };
