@@ -4,6 +4,7 @@ const Plot = require("../models/plotModel");
 const SeasonDetail = require("../models/seasonDetailModel");
 const DiaryLog = require("../models/diaryLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
+const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const User = require("../models/userModel");
 
 const isAdminUser = (user) => (user?.role || "").toLowerCase() === "admin";
@@ -174,29 +175,41 @@ const updateField = async (id, data, currentUser) => {
   return enrichedField;
 };
 
+const deleteFieldCascadeById = async (fieldId) => {
+  const field = await Field.findById(fieldId);
+  if (!field) {
+    throw new Error("Không tìm thấy cánh đồng");
+  }
+
+  const seasonDetails = await SeasonDetail.find({ field: fieldId }).select("_id").lean();
+  const seasonIds = seasonDetails.map((item) => item._id);
+
+  if (seasonIds.length > 0) {
+    await SeasonPlotAssignment.deleteMany({ seasonDetail: { $in: seasonIds } });
+  }
+
+  await Promise.all([
+    Plot.deleteMany({ field: fieldId }),
+    seasonIds.length > 0 ? DiaryLog.deleteMany({ season: { $in: seasonIds } }) : Promise.resolve(),
+    DiseaseLog.deleteMany({
+      $or: [
+        { field: fieldId },
+        ...(seasonIds.length > 0 ? [{ season: { $in: seasonIds } }] : []),
+      ],
+    }),
+    SeasonDetail.deleteMany({ field: fieldId }),
+  ]);
+
+  await Field.deleteOne({ _id: fieldId });
+  return field;
+};
+
 const deleteField = async (id, currentUser) => {
   if (!isAdminUser(currentUser)) {
     throw new Error("Chỉ admin mới được xóa cánh đồng");
   }
 
-  const field = await Field.findByIdAndDelete(id);
-  if (!field) {
-    throw new Error("Không tìm thấy cánh đồng");
-  }
-
-  const seasonDetails = await SeasonDetail.find({ field: id }).select("_id").lean();
-  const seasonIds = seasonDetails.map((item) => item._id);
-
-  await Promise.all([
-    Plot.deleteMany({ field: id }),
-    SeasonDetail.deleteMany({ field: id }),
-    seasonIds.length > 0 ? DiaryLog.deleteMany({ season: { $in: seasonIds } }) : Promise.resolve(),
-    DiseaseLog.deleteMany({
-      $or: [{ field: id }, ...(seasonIds.length > 0 ? [{ season: { $in: seasonIds } }] : [])],
-    }),
-  ]);
-
-  return field;
+  return await deleteFieldCascadeById(id);
 };
 
 const getFieldSummary = async (currentUser) => {
@@ -273,5 +286,6 @@ module.exports = {
   getAllFields,
   updateField,
   deleteField,
+  deleteFieldCascadeById,
   getFieldSummary,
 };

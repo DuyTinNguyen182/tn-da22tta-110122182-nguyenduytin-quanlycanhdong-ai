@@ -1,11 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const seasonDetailController = require("../controllers/seasonDetailController");
-const { protect } = require("../middlewares/authMiddleware");
+const { protect, isAdmin } = require("../middlewares/authMiddleware");
 
 router.use(protect);
 
-router.get("/admin/all", seasonDetailController.getAllSeasonDetails);
+router.get("/admin/all", isAdmin, seasonDetailController.getAllSeasonDetails);
 router.get("/", seasonDetailController.getSeasonDetailsByField); // ?fieldId=...
 router.post("/", seasonDetailController.createSeasonDetail);
 router.put("/:id", seasonDetailController.updateSeasonDetail);

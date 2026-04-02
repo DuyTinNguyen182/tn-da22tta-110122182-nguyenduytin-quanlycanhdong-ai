@@ -2,6 +2,7 @@ const axios = require("axios");
 const FormData = require("form-data");
 const { randomUUID } = require("crypto");
 const OpenAI = require("openai");
+const { PYTHON_AI_SERVICE_URL } = require("../config/env");
 const aiChatService = require("../services/aiChatService");
 
 const openaiClient = process.env.OPENAI_API_KEY
@@ -24,9 +25,7 @@ exports.diagnoseDisease = async (req, res) => {
       contentType: req.file.mimetype,
     });
 
-    // Gọi sang Python Flask Service (Port 5000)
-    const pythonServiceUrl = "http://127.0.0.1:5000/predict";
-    const response = await axios.post(pythonServiceUrl, formData, {
+    const response = await axios.post(PYTHON_AI_SERVICE_URL, formData, {
       headers: {
         ...formData.getHeaders(),
       },

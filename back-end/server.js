@@ -1,7 +1,7 @@
+const { PORT, FRONTEND_URL } = require("./src/config/env");
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-require("dotenv").config();
 const connectDB = require("./src/config/db");
 
 const authRoutes = require("./src/routes/authRoute");
@@ -17,14 +17,13 @@ const aiRoutes = require("./src/routes/aiRoute");
 const adminOverviewRoutes = require("./src/routes/adminOverviewRoute");
 
 const app = express();
-const PORT = process.env.PORT || 4000;
 
 // --- Middlewares ---
 app.use(express.json());
 app.use(cookieParser());
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: FRONTEND_URL,
     credentials: true,
   })
 );

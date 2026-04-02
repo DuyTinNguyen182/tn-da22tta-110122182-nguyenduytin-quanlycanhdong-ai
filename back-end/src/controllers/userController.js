@@ -1,5 +1,6 @@
 const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
+const userService = require("../services/userService");
 
 // GET tất cả user
 const getAllUsers = async (req, res) => {
@@ -100,27 +101,25 @@ const updateUser = async (req, res) => {
   }
 };
 
-// DELETE user
+// DELETE user — cascade thửa/vụ/nhật ký; cánh đồng chỉ khi user là người tạo Field (admin), khớp quyền CRUD cánh đồng
 const deleteUser = async (req, res) => {
   try {
     const userId = req.params.id;
 
-    // Không cho xóa chính mình
     if (req.user.id === userId) {
       return res.status(403).json({ message: "Không thể xóa tài khoản của chính mình" });
     }
 
-    const deletedUser = await User.findByIdAndDelete(userId);
-
-    if (!deletedUser) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" });
-    }
+    const deletedUser = await userService.deleteUserCascade(userId);
 
     res.status(200).json({
       message: "Xóa người dùng thành công!",
       user: deletedUser,
     });
   } catch (error) {
+    if (error.message === "Không tìm thấy người dùng") {
+      return res.status(404).json({ message: error.message });
+    }
     res.status(500).json({ message: error.message });
   }
 };

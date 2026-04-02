@@ -1,3 +1,4 @@
+// Lưu tạm trong RAM theo phiên (TTL); không ghi DB — mất khi restart hoặc hết hạn.
 const MAX_SESSION_MESSAGES = 5;
 const SESSION_TTL_MS = 30 * 60 * 1000;
 const sessionStore = new Map();
