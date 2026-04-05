@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import { useFeedback } from "../../hooks/useFeedback";
 
 const emptyForm = {
   fullName: "",
@@ -51,6 +52,7 @@ const formatDate = (value) =>
 
 const AdminUsers = () => {
   const { user: currentUser } = useAuth();
+  const { confirm } = useFeedback();
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -221,7 +223,14 @@ const AdminUsers = () => {
   };
 
   const handleDeleteUser = async (user) => {
-    if (!window.confirm(`Xóa người dùng "${user.fullName}"?`)) {
+    const confirmed = await confirm({
+      title: "Xóa người dùng?",
+      message: `Bạn có chắc muốn xóa người dùng "${user.fullName}"?`,
+      confirmText: "Xóa người dùng",
+      tone: "danger",
+    });
+
+    if (!confirmed) {
       return;
     }
 

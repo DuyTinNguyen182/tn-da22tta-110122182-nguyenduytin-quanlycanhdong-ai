@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import api from "../services/api";
+import { useFeedback } from "../hooks/useFeedback";
 
 const getToday = () => new Date().toISOString().split("T")[0];
 
@@ -69,6 +70,7 @@ const getLogScopeLabel = (log) => {
 };
 
 const Crops = () => {
+  const { toast, confirm } = useFeedback();
   const [fields, setFields] = useState([]);
   const [selectedField, setSelectedField] = useState(null);
   const [fieldKeyword, setFieldKeyword] = useState("");
@@ -334,15 +336,15 @@ const Crops = () => {
 
   const handleSaveSeason = async () => {
     if (!selectedField?._id) {
-      alert("Vui lòng chọn cánh đồng.");
+      toast.warning("Vui lòng chọn cánh đồng.");
       return;
     }
     if (!seasonForm.seasonId) {
-      alert("Vui lòng chọn mùa vụ.");
+      toast.warning("Vui lòng chọn mùa vụ.");
       return;
     }
     if ((seasonForm.plotIds || []).length === 0) {
-      alert("Cần chọn ít nhất 1 thửa tham gia vụ mùa.");
+      toast.warning("Cần chọn ít nhất 1 thửa tham gia vụ mùa.");
       return;
     }
 
@@ -365,24 +367,30 @@ const Crops = () => {
       }
 
       setIsSeasonModalOpen(false);
+      toast.success(seasonForm.editingSeasonId ? "Đã cập nhật vụ mùa." : "Đã bắt đầu vụ mới.");
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể lưu mùa vụ.");
+      toast.error(error.response?.data?.message || "Không thể lưu mùa vụ.");
     }
   };
 
   const handleFinishSeason = async () => {
     if (!currentSeason) return;
 
-    const confirmed = window.confirm(
-      "Kết thúc vụ này? Sau khi kết thúc, bạn chỉ có thể xem lại lịch sử và không thêm nhật ký mới."
-    );
+    const confirmed = await confirm({
+      title: "Kết thúc vụ này?",
+      message:
+        "Sau khi kết thúc, bạn chỉ có thể xem lại lịch sử và không thêm nhật ký mới.",
+      confirmText: "Kết thúc vụ",
+      tone: "danger",
+    });
     if (!confirmed) return;
 
     try {
       const res = await api.put(`/season-details/${currentSeason._id}/finish`);
+      toast.success("Đã kết thúc vụ mùa.");
       await reloadCurrentField(res.data?._id || currentSeason._id);
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể kết thúc vụ mùa.");
+      toast.error(error.response?.data?.message || "Không thể kết thúc vụ mùa.");
     }
   };
 
@@ -426,12 +434,12 @@ const Crops = () => {
 
   const handleSaveLog = async () => {
     if (!currentSeason?._id || !logForm.taskType?._id) {
-      alert("Vui lòng chọn công việc.");
+      toast.warning("Vui lòng chọn công việc.");
       return;
     }
 
     if (logForm.selectedPlotIds.length === 0) {
-      alert("Vui lòng chọn ít nhất 1 thửa áp dụng.");
+      toast.warning("Vui lòng chọn ít nhất 1 thửa áp dụng.");
       return;
     }
 
@@ -466,20 +474,28 @@ const Crops = () => {
       }
 
       setIsLogModalOpen(false);
+      toast.success(editingLog ? "Đã cập nhật nhật ký." : "Đã tạo nhật ký.");
       await refreshLogs(currentSeason._id);
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể lưu nhật ký.");
+      toast.error(error.response?.data?.message || "Không thể lưu nhật ký.");
     }
   };
 
   const handleDeleteLog = async (logId) => {
-    if (!window.confirm("Bạn có chắc muốn xóa nhật ký này?")) return;
+    const confirmed = await confirm({
+      title: "Xóa nhật ký?",
+      message: "Thao tác này sẽ xóa nhật ký hiện tại khỏi vụ mùa đang chọn.",
+      confirmText: "Xóa nhật ký",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     try {
       await api.delete(`/diary-logs/${logId}`);
+      toast.success("Đã xóa nhật ký.");
       await refreshLogs(currentSeason._id);
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể xóa nhật ký.");
+      toast.error(error.response?.data?.message || "Không thể xóa nhật ký.");
     }
   };
 

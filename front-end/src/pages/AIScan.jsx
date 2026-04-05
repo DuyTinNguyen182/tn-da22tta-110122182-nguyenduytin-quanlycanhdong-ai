@@ -13,8 +13,10 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import { useFeedback } from "../hooks/useFeedback";
 
 const AIScan = () => {
+  const { toast } = useFeedback();
   const [selectedImage, setSelectedImage] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -113,17 +115,17 @@ const AIScan = () => {
     if (!result) return;
 
     if (!selectedField) {
-      alert("Vui lòng chọn cánh đồng.");
+      toast.warning("Vui lòng chọn cánh đồng.");
       return;
     }
 
     if (!selectedSeason) {
-      alert("Không tìm thấy mùa vụ đang canh tác cho cánh đồng này.");
+      toast.warning("Không tìm thấy mùa vụ đang canh tác cho cánh đồng này.");
       return;
     }
 
     if (!selectAllPlots && selectedPlotIds.length === 0) {
-      alert("Vui lòng chọn ít nhất 1 thửa hoặc chọn tất cả các thửa.");
+      toast.warning("Vui lòng chọn ít nhất 1 thửa hoặc chọn tất cả các thửa.");
       return;
     }
 
@@ -145,11 +147,11 @@ const AIScan = () => {
       setSaveLoading(true);
       await api.post("/disease-logs", payload);
 
-      alert("Đã lưu nhật ký bệnh thành công.");
+      toast.success("Đã lưu nhật ký bệnh thành công.");
       setShowModal(false);
     } catch (saveError) {
       console.error("Lỗi khi lưu nhật ký bệnh", saveError);
-      alert(saveError?.response?.data?.message || "Không thể lưu nhật ký. Vui lòng thử lại.");
+      toast.error(saveError?.response?.data?.message || "Không thể lưu nhật ký. Vui lòng thử lại.");
     } finally {
       setSaveLoading(false);
     }

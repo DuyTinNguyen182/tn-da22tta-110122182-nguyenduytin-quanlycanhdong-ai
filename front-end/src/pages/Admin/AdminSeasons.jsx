@@ -10,6 +10,7 @@ import {
   EyeOff,
 } from "lucide-react";
 import api from "../../services/api";
+import { useFeedback } from "../../hooks/useFeedback";
 
 const sortSeasons = (items = []) => {
   return [...items].sort((a, b) => {
@@ -25,6 +26,7 @@ const sortSeasons = (items = []) => {
 };
 
 const AdminSeasons = () => {
+  const { toast, confirm } = useFeedback();
   const [seasons, setSeasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -43,7 +45,7 @@ const AdminSeasons = () => {
       setSeasons(sortSeasons(seasonRes.data || []));
     } catch (err) {
       console.error("Lỗi tải dữ liệu mùa vụ admin:", err);
-      alert(err.response?.data?.message || "Không thể tải dữ liệu mùa vụ");
+      toast.error(err.response?.data?.message || "Không thể tải dữ liệu mùa vụ");
     } finally {
       setLoading(false);
     }
@@ -51,7 +53,7 @@ const AdminSeasons = () => {
 
   const handleCreateSeason = async () => {
     if (!newSeasonName.trim()) {
-      alert("Vui lòng nhập tên mùa vụ");
+      toast.warning("Vui lòng nhập tên mùa vụ");
       return;
     }
 
@@ -60,8 +62,9 @@ const AdminSeasons = () => {
       const res = await api.post("/seasons", { name: newSeasonName.trim() });
       setSeasons((prev) => sortSeasons([...prev, res.data]));
       setNewSeasonName("");
+      toast.success("Đã tạo mùa vụ mới.");
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể tạo mùa vụ");
+      toast.error(err.response?.data?.message || "Không thể tạo mùa vụ");
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +82,7 @@ const AdminSeasons = () => {
 
   const handleSaveEdit = async (id) => {
     if (!editingSeasonName.trim()) {
-      alert("Tên mùa vụ không được để trống");
+      toast.warning("Tên mùa vụ không được để trống");
       return;
     }
 
@@ -88,8 +91,9 @@ const AdminSeasons = () => {
       const res = await api.put(`/seasons/${id}`, { name: editingSeasonName.trim() });
       setSeasons((prev) => sortSeasons(prev.map((item) => (item._id === id ? res.data : item))));
       cancelEdit();
+      toast.success("Đã cập nhật mùa vụ.");
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể cập nhật mùa vụ");
+      toast.error(err.response?.data?.message || "Không thể cập nhật mùa vụ");
     } finally {
       setSubmitting(false);
     }
@@ -99,7 +103,13 @@ const AdminSeasons = () => {
     const nextVisible = season.isVisible === false;
     const actionLabel = nextVisible ? "hiển thị" : "ẩn";
 
-    if (!window.confirm(`Bạn có chắc muốn ${actionLabel} mùa vụ '${season.name}'?`)) return;
+    const confirmed = await confirm({
+      title: `${nextVisible ? "Hiển thị" : "Ẩn"} mùa vụ?`,
+      message: `Bạn có chắc muốn ${actionLabel} mùa vụ '${season.name}'?`,
+      confirmText: nextVisible ? "Hiển thị" : "Ẩn mùa vụ",
+      tone: "primary",
+    });
+    if (!confirmed) return;
 
     setSubmitting(true);
     try {
@@ -108,22 +118,30 @@ const AdminSeasons = () => {
         isVisible: nextVisible,
       });
       setSeasons((prev) => sortSeasons(prev.map((item) => (item._id === season._id ? res.data : item))));
+      toast.success(`Đã ${actionLabel} mùa vụ.`);
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể cập nhật trạng thái hiển thị");
+      toast.error(err.response?.data?.message || "Không thể cập nhật trạng thái hiển thị");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (season) => {
-    if (!window.confirm(`Xóa mùa vụ '${season.name}'?`)) return;
+    const confirmed = await confirm({
+      title: "Xóa mùa vụ?",
+      message: `Bạn có chắc muốn xóa mùa vụ '${season.name}'?`,
+      confirmText: "Xóa mùa vụ",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setSubmitting(true);
     try {
       await api.delete(`/seasons/${season._id}`);
       setSeasons((prev) => prev.filter((item) => item._id !== season._id));
+      toast.success("Đã xóa mùa vụ.");
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể xóa mùa vụ");
+      toast.error(err.response?.data?.message || "Không thể xóa mùa vụ");
     } finally {
       setSubmitting(false);
     }

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from "react";
 import { Plus, Calendar, Leaf, ArrowRight } from "lucide-react";
 import api from "../../services/api";
 import DiaryTimeline from "./DiaryTimeline";
+import { useFeedback } from "../../hooks/useFeedback";
 
 const SeasonManager = ({ field }) => {
+  const { toast } = useFeedback();
   const [seasons, setSeasons] = useState([]);
   const [selectedSeason, setSelectedSeason] = useState(null); // Vụ đang chọn để xem nhật ký
   const [isCreating, setIsCreating] = useState(false);
@@ -37,7 +39,7 @@ const SeasonManager = ({ field }) => {
       setNewSeasonName("");
       fetchSeasons();
     } catch (err) {
-      alert("Lỗi tạo mùa vụ");
+      toast.error("Lỗi tạo mùa vụ");
     }
   };
 

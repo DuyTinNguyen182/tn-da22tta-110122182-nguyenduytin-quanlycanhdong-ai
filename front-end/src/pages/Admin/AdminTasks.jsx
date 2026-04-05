@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Loader, Plus, Pencil, Trash2, Save, X } from "lucide-react";
 import api from "../../services/api";
+import { useFeedback } from "../../hooks/useFeedback";
 
 const AdminTasks = () => {
+  const { toast, confirm } = useFeedback();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +22,7 @@ const AdminTasks = () => {
       const res = await api.get("/tasks");
       setTasks(res.data || []);
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể tải danh sách công việc");
+      toast.error(err.response?.data?.message || "Không thể tải danh sách công việc");
     } finally {
       setLoading(false);
     }
@@ -29,7 +31,7 @@ const AdminTasks = () => {
   const handleCreateTask = async () => {
     const name = newTaskName.trim();
     if (!name) {
-      alert("Vui lòng nhập tên công việc");
+      toast.warning("Vui lòng nhập tên công việc");
       return;
     }
 
@@ -38,8 +40,9 @@ const AdminTasks = () => {
       const res = await api.post("/tasks", { name });
       setTasks((prev) => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name, "vi")));
       setNewTaskName("");
+      toast.success("Đã tạo công việc mới.");
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể tạo công việc");
+      toast.error(err.response?.data?.message || "Không thể tạo công việc");
     } finally {
       setSubmitting(false);
     }
@@ -58,7 +61,7 @@ const AdminTasks = () => {
   const handleUpdate = async (id) => {
     const name = editingTaskName.trim();
     if (!name) {
-      alert("Tên công việc không được để trống");
+      toast.warning("Tên công việc không được để trống");
       return;
     }
 
@@ -67,22 +70,30 @@ const AdminTasks = () => {
       const res = await api.put(`/tasks/${id}`, { name });
       setTasks((prev) => prev.map((item) => (item._id === id ? res.data : item)));
       cancelEdit();
+      toast.success("Đã cập nhật công việc.");
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể cập nhật công việc");
+      toast.error(err.response?.data?.message || "Không thể cập nhật công việc");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (task) => {
-    if (!window.confirm(`Xóa công việc '${task.name}'?`)) return;
+    const confirmed = await confirm({
+      title: "Xóa công việc?",
+      message: `Bạn có chắc muốn xóa công việc '${task.name}'?`,
+      confirmText: "Xóa công việc",
+      tone: "danger",
+    });
+    if (!confirmed) return;
 
     setSubmitting(true);
     try {
       await api.delete(`/tasks/${task._id}`);
       setTasks((prev) => prev.filter((item) => item._id !== task._id));
+      toast.success("Đã xóa công việc.");
     } catch (err) {
-      alert(err.response?.data?.message || "Không thể xóa công việc");
+      toast.error(err.response?.data?.message || "Không thể xóa công việc");
     } finally {
       setSubmitting(false);
     }

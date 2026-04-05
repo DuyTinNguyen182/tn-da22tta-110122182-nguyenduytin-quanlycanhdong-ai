@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import api from "../services/api";
+import { useFeedback } from "../hooks/useFeedback";
 
 const emptyForm = {
   diseaseName: "",
@@ -47,6 +48,7 @@ const getStatusMeta = (status) => {
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString("vi-VN") : "--");
 
 const DiseaseLogs = () => {
+  const { toast, confirm } = useFeedback();
   const [fields, setFields] = useState([]);
   const [filterSeasons, setFilterSeasons] = useState([]);
   const [formSeasons, setFormSeasons] = useState([]);
@@ -193,6 +195,11 @@ const DiseaseLogs = () => {
     }),
     [filteredLogs]
   );
+  const selectedFormSeason = useMemo(
+    () => formSeasons.find((season) => season._id === form.seasonId) || null,
+    [formSeasons, form.seasonId]
+  );
+  const isHistoricalEdit = Boolean(editingLog && selectedFormSeason?.status !== "active");
 
   const openCreateModal = async () => {
     const fieldId = filters.fieldId || fields[0]?._id || "";
@@ -235,23 +242,32 @@ const DiseaseLogs = () => {
   };
 
   const handleSubmit = async () => {
-    if (!form.fieldId) {
-      alert("Vui lòng chọn cánh đồng.");
+    if (!isHistoricalEdit && !form.fieldId) {
+      toast.warning("Vui lòng chọn cánh đồng.");
       return;
     }
 
     if (!form.seasonId) {
-      alert("Vui lòng chọn mùa vụ.");
+      toast.warning("Vui lòng chọn mùa vụ.");
       return;
     }
 
-    if (!form.diseaseName.trim()) {
-      alert("Vui lòng nhập tên bệnh.");
+    if (!isHistoricalEdit && selectedFormSeason?.status !== "active") {
+      toast.warning("Chỉ có thể tạo hoặc chỉnh sửa nội dung cho vụ đang canh tác.");
       return;
     }
 
-    if (form.scope === "selected_plots" && form.plotIds.length === 0) {
-      alert("Vui lòng chọn ít nhất 1 thửa.");
+    if (!isHistoricalEdit && !form.diseaseName.trim()) {
+      toast.warning("Vui lòng nhập tên bệnh.");
+      return;
+    }
+
+    if (
+      !isHistoricalEdit &&
+      form.scope === "selected_plots" &&
+      form.plotIds.length === 0
+    ) {
+      toast.warning("Vui lòng chọn ít nhất 1 thửa.");
       return;
     }
 
@@ -264,7 +280,7 @@ const DiseaseLogs = () => {
       plotIds: form.scope === "selected_plots" ? form.plotIds : [],
       status: form.status,
       processingNote: form.processingNote,
-      source: "manual",
+      source: editingLog?.source || "manual",
     };
 
     try {
@@ -278,24 +294,34 @@ const DiseaseLogs = () => {
       setIsModalOpen(false);
       setEditingLog(null);
       setForm(emptyForm);
+      toast.success(editingLog ? "Đã cập nhật nhật ký bệnh." : "Đã lưu nhật ký bệnh.");
       await loadDiseaseLogs(filters);
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể lưu nhật ký bệnh.");
+      toast.error(error.response?.data?.message || "Không thể lưu nhật ký bệnh.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Bạn có chắc muốn xóa nhật ký bệnh này?")) {
+    const confirmed = await confirm({
+      title: "Xóa nhật ký bệnh?",
+      message:
+        "Nhật ký của vụ đã kết thúc sẽ không thể xóa. Với vụ đang hoạt động, thao tác này sẽ xóa bản ghi hiện tại.",
+      confirmText: "Xóa nhật ký",
+      tone: "danger",
+    });
+
+    if (!confirmed) {
       return;
     }
 
     try {
       await api.delete(`/disease-logs/${id}`);
+      toast.success("Đã xóa nhật ký bệnh.");
       await loadDiseaseLogs(filters);
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể xóa nhật ký bệnh.");
+      toast.error(error.response?.data?.message || "Không thể xóa nhật ký bệnh.");
     }
   };
 
@@ -433,6 +459,8 @@ const DiseaseLogs = () => {
               (log.plotSnapshot || []).map((item) => item.name).filter(Boolean).join(", ") ||
               "Toàn bộ thửa tham gia vụ";
 
+            const isSeasonActive = log.season?.status === "active";
+
             return (
               <article key={log._id} className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -461,6 +489,7 @@ const DiseaseLogs = () => {
                     <button
                       type="button"
                       onClick={() => openEditModal(log)}
+                      title={isSeasonActive ? "Sửa nhật ký bệnh" : "Cập nhật xử lý cho nhật ký lịch sử"}
                       className="inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 py-2 text-sm font-medium text-gray-600 transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
                     >
                       <Edit2 size={15} />
@@ -469,7 +498,17 @@ const DiseaseLogs = () => {
                     <button
                       type="button"
                       onClick={() => handleDelete(log._id)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition-all hover:bg-red-50"
+                      disabled={!isSeasonActive}
+                      title={
+                        isSeasonActive
+                          ? "Xóa nhật ký bệnh"
+                          : "Nhật ký của vụ đã kết thúc không thể xóa"
+                      }
+                      className={`inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
+                        isSeasonActive
+                          ? "border-red-200 text-red-600 hover:bg-red-50"
+                          : "cursor-not-allowed border-gray-200 text-gray-400"
+                      }`}
                     >
                       <Trash2 size={15} />
                       Xóa
@@ -516,6 +555,11 @@ const DiseaseLogs = () => {
                 <p className="mt-1 text-sm text-gray-500">
                   Ghi nhận bệnh theo đúng mùa vụ và phạm vi thửa bị ảnh hưởng.
                 </p>
+                {isHistoricalEdit ? (
+                  <p className="mt-2 text-sm font-medium text-amber-600">
+                    Vụ này đã kết thúc, chỉ còn cập nhật trạng thái xử lý và ghi chú.
+                  </p>
+                ) : null}
               </div>
 
               <button
@@ -538,6 +582,7 @@ const DiseaseLogs = () => {
                   <input
                     value={form.diseaseName}
                     onChange={(event) => setForm((prev) => ({ ...prev, diseaseName: event.target.value }))}
+                    disabled={isHistoricalEdit}
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
                     placeholder="Ví dụ: Đạo ôn lá, bạc lá..."
                   />
@@ -549,6 +594,7 @@ const DiseaseLogs = () => {
                     type="date"
                     value={form.detectedAt}
                     onChange={(event) => setForm((prev) => ({ ...prev, detectedAt: event.target.value }))}
+                    disabled={isHistoricalEdit}
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
                   />
                 </div>
@@ -560,6 +606,7 @@ const DiseaseLogs = () => {
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, fieldId: event.target.value, seasonId: "", plotIds: [] }))
                     }
+                    disabled={isHistoricalEdit}
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
                   >
                     <option value="">Chọn cánh đồng</option>
@@ -576,6 +623,7 @@ const DiseaseLogs = () => {
                   <select
                     value={form.seasonId}
                     onChange={(event) => setForm((prev) => ({ ...prev, seasonId: event.target.value, plotIds: [] }))}
+                    disabled={isHistoricalEdit}
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
                   >
                     <option value="">Chọn mùa vụ</option>
@@ -610,6 +658,7 @@ const DiseaseLogs = () => {
                         plotIds: event.target.value === "all_plots" ? [] : prev.plotIds,
                       }))
                     }
+                    disabled={isHistoricalEdit}
                     className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
                   >
                     <option value="all_plots">Toàn bộ thửa tham gia vụ</option>
@@ -625,6 +674,7 @@ const DiseaseLogs = () => {
                     rows={5}
                     value={form.description}
                     onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
+                    disabled={isHistoricalEdit}
                     className="w-full resize-none rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
                     placeholder="Mô tả biểu hiện bệnh, vị trí phát hiện, mức độ..."
                   />
@@ -672,6 +722,7 @@ const DiseaseLogs = () => {
                             <input
                               type="checkbox"
                               checked={form.plotIds.includes(plot._id)}
+                              disabled={isHistoricalEdit}
                               onChange={() => togglePlot(plot._id)}
                             />
                           </div>

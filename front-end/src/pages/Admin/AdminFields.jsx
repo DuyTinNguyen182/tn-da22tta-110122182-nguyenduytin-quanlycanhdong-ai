@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Edit2, MapPin, Plus, Sprout, Trash2, Users } from "lucide-react";
 import api from "../../services/api";
+import { useFeedback } from "../../hooks/useFeedback";
 
 const emptyFieldForm = {
   name: "",
@@ -8,6 +9,7 @@ const emptyFieldForm = {
 };
 
 const AdminFields = () => {
+  const { toast, confirm } = useFeedback();
   const [fields, setFields] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -22,6 +24,7 @@ const AdminFields = () => {
       setFields(res.data || []);
     } catch (error) {
       console.error("Lỗi tải cánh đồng cho admin", error);
+      toast.error("Không thể tải danh sách cánh đồng.");
     } finally {
       setLoading(false);
     }
@@ -69,26 +72,30 @@ const AdminFields = () => {
       setIsModalOpen(false);
       setFieldForm(emptyFieldForm);
       setEditingField(null);
+      toast.success(editingField ? "Đã cập nhật cánh đồng." : "Đã tạo cánh đồng mới.");
       await fetchFields();
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể lưu cánh đồng");
+      toast.error(error.response?.data?.message || "Không thể lưu cánh đồng");
     }
   };
 
   const handleDeleteField = async (fieldId) => {
-    if (
-      !window.confirm(
-        "Xóa cánh đồng này sẽ xóa luôn các thửa ruộng và mùa vụ liên quan. Bạn có chắc không?"
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "Xóa cánh đồng?",
+      message:
+        "Thao tác này sẽ xóa luôn các thửa ruộng, mùa vụ và nhật ký liên quan trong cánh đồng này.",
+      confirmText: "Xóa cánh đồng",
+      tone: "danger",
+    });
+
+    if (!confirmed) return;
 
     try {
       await api.delete(`/fields/${fieldId}`);
+      toast.success("Đã xóa cánh đồng.");
       await fetchFields();
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể xóa cánh đồng");
+      toast.error(error.response?.data?.message || "Không thể xóa cánh đồng");
     }
   };
 

@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { Plus, Calendar, DollarSign, Trash2, Edit3, ArrowLeft } from "lucide-react";
 import api from "../../services/api";
+import { useFeedback } from "../../hooks/useFeedback";
 
 const DiaryTimeline = ({ season, onBack }) => {
+  const { toast, confirm } = useFeedback();
   const [logs, setLogs] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -39,12 +41,18 @@ const DiaryTimeline = ({ season, onBack }) => {
       });
       fetchLogs();
     } catch (err) {
-      alert("Lỗi lưu nhật ký");
+      toast.error("Lỗi lưu nhật ký");
     }
   };
 
   const handleDelete = async (id) => {
-    if(!window.confirm("Xóa nhật ký này?")) return;
+    const confirmed = await confirm({
+      title: "Xóa nhật ký?",
+      message: "Bạn có chắc muốn xóa nhật ký này?",
+      confirmText: "Xóa nhật ký",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     try {
       await api.delete(`/diary-logs/${id}`);
       fetchLogs();

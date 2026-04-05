@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { Sprout, Loader2 } from "lucide-react";
+import { useFeedback } from "../../hooks/useFeedback";
 
 const Register = () => {
   const [fullName, setFullName] = useState("");
@@ -11,6 +12,7 @@ const Register = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { register } = useAuth();
+  const { toast } = useFeedback();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -20,7 +22,7 @@ const Register = () => {
 
     const result = await register(fullName, email, password);
     if (result.success) {
-      alert("Đăng ký thành công! Vui lòng đăng nhập.");
+      toast.success("Đăng ký thành công! Vui lòng đăng nhập.");
       navigate("/login");
     } else {
       setError(result.message);

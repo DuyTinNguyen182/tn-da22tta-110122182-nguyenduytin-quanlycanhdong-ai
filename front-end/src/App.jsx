@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import FeedbackProvider from "./components/Feedback/FeedbackProvider";
 
 import ProtectedLayout from "./components/Layout/ProtectedRoute";
 import PublicRoute from "./components/Layout/PublicRoute";
@@ -25,35 +26,37 @@ import AdminTasks from "./pages/Admin/AdminTasks";
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<PublicRoute />}>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-          </Route>
+      <FeedbackProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<PublicRoute />}>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+            </Route>
 
-          <Route element={<ProtectedLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/fields" element={<Fields />} />
-            <Route path="/crops" element={<CropsPage />} />
-            <Route path="/disease-logs" element={<DiseaseLogs />} />
-            <Route path="/ai-scan" element={<AIScan />} />
-            <Route path="/ask-ai" element={<AIChat />} />
-            <Route path="/account" element={<Account />} />
-          </Route>
+            <Route element={<ProtectedLayout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/fields" element={<Fields />} />
+              <Route path="/crops" element={<CropsPage />} />
+              <Route path="/disease-logs" element={<DiseaseLogs />} />
+              <Route path="/ai-scan" element={<AIScan />} />
+              <Route path="/ask-ai" element={<AIChat />} />
+              <Route path="/account" element={<Account />} />
+            </Route>
 
-          <Route element={<AdminLayout />}>
-            <Route path="/admin" element={<AdminOverview />} />
-            <Route path="/admin/fields" element={<AdminFields />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/seasons" element={<AdminSeasons />} />
-            <Route path="/admin/tasks" element={<AdminTasks />} />
-          </Route>
+            <Route element={<AdminLayout />}>
+              <Route path="/admin" element={<AdminOverview />} />
+              <Route path="/admin/fields" element={<AdminFields />} />
+              <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/seasons" element={<AdminSeasons />} />
+              <Route path="/admin/tasks" element={<AdminTasks />} />
+            </Route>
 
-          <Route path="*" element={<Navigate to="/login" />} />
-        </Routes>
-      </BrowserRouter>
+            <Route path="*" element={<Navigate to="/login" />} />
+          </Routes>
+        </BrowserRouter>
+      </FeedbackProvider>
     </AuthProvider>
   );
 }

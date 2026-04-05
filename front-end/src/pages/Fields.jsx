@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import api from "../services/api";
+import { useFeedback } from "../hooks/useFeedback";
 
 const emptyPlotForm = {
   name: "",
@@ -21,6 +22,7 @@ const emptyPlotForm = {
 };
 
 const Fields = () => {
+  const { toast, confirm } = useFeedback();
   const [fields, setFields] = useState([]);
   const [plots, setPlots] = useState([]);
   const [selectedField, setSelectedField] = useState(null);
@@ -98,6 +100,16 @@ const Fields = () => {
   const handleSavePlot = async () => {
     if (!selectedField) return;
 
+    if (!plotForm.name.trim()) {
+      toast.warning("Vui lòng nhập tên thửa.");
+      return;
+    }
+
+    if (!Number.isFinite(Number(plotForm.area)) || Number(plotForm.area) <= 0) {
+      toast.warning("Diện tích phải lớn hơn 0.");
+      return;
+    }
+
     try {
       if (editingPlot) {
         await api.put(`/plots/${editingPlot._id}`, plotForm);
@@ -110,20 +122,29 @@ const Fields = () => {
       setEditingPlot(null);
       await fetchFields(selectedField._id);
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể lưu thửa ruộng");
+      toast.error(error.response?.data?.message || "Không thể lưu thửa ruộng");
     }
   };
 
   const handleDeletePlot = async (plotId) => {
-    if (!window.confirm("Bạn có chắc muốn xóa thửa ruộng này?")) {
+    const confirmed = await confirm({
+      title: "Xóa thửa ruộng?",
+      message:
+        "Thao tác này chỉ nên dùng với thửa chưa phát sinh lịch sử. Nếu thửa đã có mùa vụ hoặc nhật ký, hệ thống sẽ tự chặn xóa.",
+      confirmText: "Xóa thửa",
+      tone: "danger",
+    });
+
+    if (!confirmed) {
       return;
     }
 
     try {
       await api.delete(`/plots/${plotId}`);
+      toast.success("Đã xóa thửa ruộng.");
       await fetchFields(selectedField?._id);
     } catch (error) {
-      alert(error.response?.data?.message || "Không thể xóa thửa ruộng");
+      toast.error(error.response?.data?.message || "Không thể xóa thửa ruộng");
     }
   };
 
@@ -139,17 +160,10 @@ const Fields = () => {
           <div className="mb-4">
             <h2 className="text-xl font-bold text-gray-800">Cánh đồng hợp tác xã</h2>
             <p className="mt-1 text-sm text-gray-500">
-              Chọn cánh đồng do admin cấu hình rồi thêm thửa ruộng của bạn vào đó.
+              Chọn cánh đồng có thửa ruộng của bạn và tiến hành khai báo.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-sm text-emerald-900">
-            <p className="font-semibold">Vai trò của bạn</p>
-            <p className="mt-1 text-emerald-700">
-              Bạn không tạo cánh đồng mới ở đây. Admin hợp tác xã quản lý danh mục cánh đồng,
-              còn bạn quản lý các thửa ruộng thuộc về mình.
-            </p>
-          </div>
         </div>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4">

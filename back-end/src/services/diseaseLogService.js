@@ -9,7 +9,7 @@ const normalizePlotIds = (plotIds = []) => {
     return [];
   }
 
-  return Array.from(new Set(plotIds.filter(Boolean).map((item) => String(item))));
+  return Array.from(new Set(plotIds.filter(Boolean).map((item) => String(item)))).sort();
 };
 
 const normalizeConfidence = (value) => {
@@ -23,6 +23,116 @@ const normalizeConfidence = (value) => {
 
 const normalizeStatus = (value, fallback = "unprocessed") =>
   ["unprocessed", "processed"].includes(value) ? value : fallback;
+
+const normalizeSource = (value, fallback = "ai_scan") =>
+  ["ai_scan", "manual"].includes(value) ? value : fallback;
+
+const formatComparableDate = (value) =>
+  value ? new Date(value).toISOString().slice(0, 10) : "";
+
+const normalizeExistingPlotIds = (log = {}) =>
+  normalizePlotIds(
+    Array.isArray(log.plots)
+      ? log.plots.map((plot) => (plot?._id ? String(plot._id) : String(plot)))
+      : []
+  );
+
+const applyProcessingFields = (target, data, actorId) => {
+  const nextStatus = normalizeStatus(data.status, target.status || "unprocessed");
+
+  target.status = nextStatus;
+  target.processingNote =
+    data.processingNote !== undefined
+      ? (data.processingNote || "").trim()
+      : (target.processingNote || "").trim();
+
+  if (nextStatus === "processed") {
+    target.processedAt = data.processedAt || target.processedAt || new Date();
+    target.processedBy = actorId;
+  } else {
+    target.processedAt = null;
+    target.processedBy = null;
+  }
+};
+
+const hasHistoricalContentChanges = (data, existingLog) => {
+  const currentSeasonId = String(existingLog.season || "");
+  const nextSeasonId = String(data.seasonId || data.season || existingLog.season || "");
+  if (nextSeasonId !== currentSeasonId) {
+    return true;
+  }
+
+  const nextDiseaseName = (
+    data.diseaseName ||
+    data.disease ||
+    existingLog.diseaseName ||
+    ""
+  ).trim();
+  if (nextDiseaseName !== (existingLog.diseaseName || "").trim()) {
+    return true;
+  }
+
+  const nextDescription =
+    data.description !== undefined
+      ? (data.description || "").trim()
+      : (existingLog.description || "").trim();
+  if (nextDescription !== (existingLog.description || "").trim()) {
+    return true;
+  }
+
+  const nextDetectedAt = formatComparableDate(
+    data.detectedAt || data.date || existingLog.detectedAt
+  );
+  if (nextDetectedAt !== formatComparableDate(existingLog.detectedAt)) {
+    return true;
+  }
+
+  const currentScope = existingLog.scope === "selected_plots" ? "selected_plots" : "all_plots";
+  const nextScope =
+    data.scope !== undefined
+      ? data.scope === "selected_plots"
+        ? "selected_plots"
+        : "all_plots"
+      : currentScope;
+  if (nextScope !== currentScope) {
+    return true;
+  }
+
+  const currentPlotIds =
+    currentScope === "selected_plots" ? normalizeExistingPlotIds(existingLog) : [];
+  const nextPlotIds =
+    nextScope === "selected_plots"
+      ? normalizePlotIds(data.plotIds !== undefined ? data.plotIds : currentPlotIds)
+      : [];
+  if (
+    nextPlotIds.length !== currentPlotIds.length ||
+    nextPlotIds.some((plotId, index) => plotId !== currentPlotIds[index])
+  ) {
+    return true;
+  }
+
+  const currentSource = normalizeSource(existingLog.source);
+  const nextSource =
+    data.source !== undefined ? normalizeSource(data.source, currentSource) : currentSource;
+  if (nextSource !== currentSource) {
+    return true;
+  }
+
+  const currentConfidence = normalizeConfidence(existingLog.confidence);
+  const nextConfidence =
+    data.confidence !== undefined
+      ? normalizeConfidence(data.confidence)
+      : currentConfidence;
+  if ((nextConfidence ?? null) !== (currentConfidence ?? null)) {
+    return true;
+  }
+
+  const currentImageName = (existingLog.imageName || "").trim();
+  const nextImageName =
+    data.imageName !== undefined ? (data.imageName || "").trim() : currentImageName;
+
+  return nextImageName !== currentImageName;
+};
 
 const mapDiseaseLogOutput = (logDoc) => {
   const log = logDoc.toObject ? logDoc.toObject() : { ...logDoc };
@@ -66,6 +176,12 @@ const getSeasonForUser = async (seasonId, userId) => {
   return season;
 };
 
+const ensureActiveSeasonForMutation = (season, action) => {
+  if (season.status !== "active") {
+    throw new Error(`Chi co the ${action} nhat ky benh cho vu dang canh tac`);
+  }
+};
+
 const getParticipantPlotsForSeason = async (seasonId, userId) => {
   const assignments = await SeasonPlotAssignment.find({
     seasonDetail: seasonId,
@@ -104,13 +220,22 @@ const resolveAffectedPlots = async ({ seasonId, userId, scope, plotIds }) => {
   return participantPlots;
 };
 
-const buildDiseaseLogPayload = async (data, userId, existingLog = null) => {
+const buildDiseaseLogPayload = async (
+  data,
+  userId,
+  existingLog = null,
+  { requireActiveSeason = false } = {}
+) => {
   const seasonId = data.seasonId || data.season || existingLog?.season;
   if (!seasonId) {
     throw new Error("Thieu seasonId");
   }
 
   const season = await getSeasonForUser(seasonId, userId);
+  if (requireActiveSeason) {
+    ensureActiveSeasonForMutation(season, "luu");
+  }
+
   const diseaseName = (data.diseaseName || data.disease || existingLog?.diseaseName || "").trim();
   if (!diseaseName) {
     throw new Error("Ten benh la bat buoc");
@@ -132,7 +257,7 @@ const buildDiseaseLogPayload = async (data, userId, existingLog = null) => {
         ? normalizeConfidence(data.confidence)
         : normalizeConfidence(existingLog?.confidence),
     description: (data.description || existingLog?.description || "").trim(),
-    source: data.source === "manual" || existingLog?.source === "manual" ? "manual" : "ai_scan",
+    source: normalizeSource(data.source, normalizeSource(existingLog?.source, "ai_scan")),
     imageName: (data.imageName || existingLog?.imageName || "").trim(),
     detectedAt: data.detectedAt || data.date || existingLog?.detectedAt || new Date(),
     status,
@@ -161,10 +286,14 @@ const buildDiseaseLogPayload = async (data, userId, existingLog = null) => {
 };
 
 const createDiseaseLog = async (data, userId) => {
-  const payload = await buildDiseaseLogPayload(data, userId);
+  const payload = await buildDiseaseLogPayload(data, userId, null, {
+    requireActiveSeason: true,
+  });
+
   if (payload.status === "processed") {
     payload.processedBy = userId;
   }
+
   const created = await DiseaseLog.create(payload);
   const populated = await populateDiseaseLogQuery(DiseaseLog.findById(created._id)).lean();
   return mapDiseaseLogOutput(populated);
@@ -208,7 +337,30 @@ const updateDiseaseLog = async (id, data, currentUser) => {
     throw new Error("Khong tim thay nhat ky benh");
   }
 
-  const payload = await buildDiseaseLogPayload(data, existing.user?.toString?.() || existing.user, existing);
+  const ownerUserId = existing.user?.toString?.() || existing.user;
+  const season = await getSeasonForUser(existing.season, ownerUserId);
+
+  if (season.status !== "active") {
+    if (hasHistoricalContentChanges(data, existing)) {
+      throw new Error(
+        "Vu mua da ket thuc. Ban chi co the cap nhat trang thai xu ly va ghi chu."
+      );
+    }
+
+    const updatedHistoricalLog = await DiseaseLog.findOne(query);
+    applyProcessingFields(updatedHistoricalLog, data, currentUser.id);
+    await updatedHistoricalLog.save();
+
+    const populatedHistoricalLog = await populateDiseaseLogQuery(
+      DiseaseLog.findById(updatedHistoricalLog._id)
+    ).lean();
+
+    return mapDiseaseLogOutput(populatedHistoricalLog);
+  }
+
+  const payload = await buildDiseaseLogPayload(data, ownerUserId, existing, {
+    requireActiveSeason: true,
+  });
 
   if (payload.status === "processed") {
     payload.processedBy = currentUser.id;
@@ -236,17 +388,7 @@ const updateDiseaseLogStatus = async (id, data, currentUser) => {
     throw new Error("Trang thai xu ly khong hop le");
   }
 
-  existing.status = nextStatus;
-  existing.processingNote = (data.processingNote || "").trim();
-
-  if (nextStatus === "processed") {
-    existing.processedAt = data.processedAt || new Date();
-    existing.processedBy = currentUser.id;
-  } else {
-    existing.processedAt = null;
-    existing.processedBy = null;
-  }
-
+  applyProcessingFields(existing, data, currentUser.id);
   await existing.save();
 
   const updated = await populateDiseaseLogQuery(DiseaseLog.findById(existing._id)).lean();
@@ -258,12 +400,16 @@ const deleteDiseaseLog = async (id, currentUser) => {
     ? { _id: id }
     : { _id: id, user: currentUser.id };
 
-  const deleted = await DiseaseLog.findOneAndDelete(query);
-  if (!deleted) {
+  const existing = await DiseaseLog.findOne(query).lean();
+  if (!existing) {
     throw new Error("Khong tim thay nhat ky benh");
   }
 
-  return deleted;
+  const ownerUserId = existing.user?.toString?.() || existing.user;
+  const season = await getSeasonForUser(existing.season, ownerUserId);
+  ensureActiveSeasonForMutation(season, "xoa");
+
+  return await DiseaseLog.findOneAndDelete(query);
 };
 
 module.exports = {
