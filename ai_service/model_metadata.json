@@ -1,0 +1,52 @@
+{
+  "backbone": "EfficientNetB0",
+  "image_size": [
+    224,
+    224
+  ],
+  "input_range": "0_255",
+  "num_classes": 10,
+  "class_names": [
+    "bacterial_leaf_blight",
+    "bacterial_leaf_streak",
+    "bacterial_panicle_blight",
+    "blast",
+    "brown_spot",
+    "dead_heart",
+    "downy_mildew",
+    "hispa",
+    "normal",
+    "tungro"
+  ],
+  "display_names": [
+    "Bacterial Leaf Blight (Bac la)",
+    "Bacterial Leaf Streak",
+    "Bacterial Panicle Blight",
+    "Rice Blast (Dao on)",
+    "Brown Spot (Dom nau)",
+    "Dead Heart",
+    "Downy Mildew",
+    "Hispa",
+    "Healthy Rice Leaf",
+    "Tungro"
+  ],
+  "train_samples": 16261,
+  "val_samples": 2870,
+  "test_samples": 10407,
+  "epochs_head": 5,
+  "epochs_finetune": 6,
+  "fine_tune_layers": 40,
+  "batch_size": 32,
+  "seed": 42,
+  "val_metrics": {
+    "accuracy": 0.8912891745567322,
+    "loss": 0.3299773037433624,
+    "top3_accuracy": 0.9829268455505371
+  },
+  "test_metrics": {
+    "accuracy": 0.8930527567863464,
+    "loss": 0.3138652443885803,
+    "top3_accuracy": 0.9862592220306396
+  },
+  "training_minutes": 55.83
+}

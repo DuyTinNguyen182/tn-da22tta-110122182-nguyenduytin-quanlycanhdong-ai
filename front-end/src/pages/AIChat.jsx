@@ -26,15 +26,85 @@ const getOrCreateTransientSessionId = () => {
 
 const buildWelcomeMessage = () => ({
   role: "assistant",
-  content: "Chào bạn! Tôi là trợ lý AI nông nghiệp. Hãy gửi câu hỏi hoặc kết quả chẩn đoán để tôi tư vấn.",
+  content:
+    "Chào bạn! Tôi là trợ lý AI nông nghiệp. Hãy gửi câu hỏi hoặc kết quả chẩn đoán để tôi tư vấn.",
 });
 
 const buildDiagnosisIntroMessage = () => ({
   role: "assistant",
-  content: "Đã nhận kết quả chẩn đoán. Tôi sẽ tư vấn dựa trên bệnh vừa quét.",
+  content:
+    "Đã nhận kết quả chẩn đoán. Tôi sẽ tư vấn dựa trên bệnh vừa quét.",
 });
 
-const trimConversationMessages = (messages) => messages.slice(-MAX_CONVERSATION_MESSAGES);
+const trimConversationMessages = (messages) =>
+  messages.slice(-MAX_CONVERSATION_MESSAGES);
+
+const formatPercent = (score) =>
+  typeof score === "number" ? `${(score * 100).toFixed(1)}%` : "Không xác định";
+
+const buildLowConfidenceMessage = (diagnosisResult) => {
+  if (!diagnosisResult?.is_low_confidence) return null;
+
+  const reasons = [];
+  if (
+    typeof diagnosisResult?.confidence === "number" &&
+    typeof diagnosisResult?.confidence_threshold === "number" &&
+    diagnosisResult.confidence < diagnosisResult.confidence_threshold
+  ) {
+    reasons.push(
+      `độ tin cậy hiện tại dưới ngưỡng ${formatPercent(
+        diagnosisResult.confidence_threshold
+      )}`
+    );
+  }
+
+  if (
+    typeof diagnosisResult?.confidence_gap === "number" &&
+    typeof diagnosisResult?.confidence_gap_threshold === "number" &&
+    diagnosisResult.confidence_gap < diagnosisResult.confidence_gap_threshold
+  ) {
+    reasons.push(
+      `chênh lệch giữa dự đoán 1 và 2 chỉ ${formatPercent(
+        diagnosisResult.confidence_gap
+      )}`
+    );
+  }
+
+  if (reasons.length === 0) {
+    return "Kết quả AI chưa đủ chắc chắn, cần đối chiếu thêm.";
+  }
+
+  return `Kết quả AI chưa đủ chắc chắn vì ${reasons.join(" và ")}.`;
+};
+
+const buildDiagnosisPrompt = (diagnosisResult) => {
+  const disease = diagnosisResult?.disease || "Không xác định";
+  const confidence = formatPercent(diagnosisResult?.confidence);
+  const confidenceWarning = buildLowConfidenceMessage(diagnosisResult);
+  const topPredictions = Array.isArray(diagnosisResult?.top_predictions)
+    ? diagnosisResult.top_predictions.slice(0, 3)
+    : [];
+  const topPredictionText =
+    topPredictions.length > 0
+      ? `Top dự đoán gần nhất: ${topPredictions
+          .map(
+            (prediction, index) =>
+              `${index + 1}. ${prediction.disease || prediction.class_name} (${formatPercent(
+                prediction.confidence
+              )})`
+          )
+          .join("; ")}.`
+      : "";
+
+  return [
+    `Tôi vừa quét lá lúa và hệ thống phát hiện bệnh: ${disease} (Độ tin cậy: ${confidence}).`,
+    confidenceWarning,
+    topPredictionText,
+    "Hãy tư vấn cho tôi hướng xử lý, phòng ngừa và các bước theo dõi.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+};
 
 const AIChat = () => {
   const location = useLocation();
@@ -53,17 +123,9 @@ const AIChat = () => {
   };
 
   const syncConversationMessages = (messages) => {
-    setConversationMessages(trimConversationMessages(Array.isArray(messages) ? messages : []));
-  };
-
-  const formatDiagnosisPrompt = (diagnosisResult) => {
-    const disease = diagnosisResult?.disease || "Không xác định";
-    const confidence =
-      typeof diagnosisResult?.confidence === "number"
-        ? `${(diagnosisResult.confidence * 100).toFixed(1)}%`
-        : "Không xác định";
-
-    return `Tôi vừa quét lá lúa và hệ thống phát hiện bệnh: ${disease} (Độ tin cậy: ${confidence}). Hãy tư vấn cho tôi hướng xử lý, phòng ngừa và các bước theo dõi.`;
+    setConversationMessages(
+      trimConversationMessages(Array.isArray(messages) ? messages : [])
+    );
   };
 
   const clearRemoteSession = async (targetSessionId) => {
@@ -74,7 +136,11 @@ const AIChat = () => {
     });
   };
 
-  const sendMessageToBackend = async (message, diagnosisResult, targetSessionId = sessionId) => {
+  const sendMessageToBackend = async (
+    message,
+    diagnosisResult,
+    targetSessionId = sessionId
+  ) => {
     const res = await api.post("/ai/chat", {
       message,
       sessionId: targetSessionId || undefined,
@@ -126,7 +192,7 @@ const AIChat = () => {
         try {
           await clearRemoteSession(previousSessionId);
           await sendMessageToBackend(
-            formatDiagnosisPrompt(location.state.result),
+            buildDiagnosisPrompt(location.state.result),
             location.state.result,
             nextSessionId
           );
@@ -166,7 +232,9 @@ const AIChat = () => {
 
     setInput("");
     setIsTyping(true);
-    setConversationMessages((prev) => trimConversationMessages([...prev, optimisticMessage]));
+    setConversationMessages((prev) =>
+      trimConversationMessages([...prev, optimisticMessage])
+    );
 
     try {
       await sendMessageToBackend(messageText);
@@ -177,7 +245,9 @@ const AIChat = () => {
           ...prev,
           {
             role: "assistant",
-            content: error?.response?.data?.message || "Không thể gửi câu hỏi tới AI. Vui lòng thử lại.",
+            content:
+              error?.response?.data?.message ||
+              "Không thể gửi câu hỏi tới AI. Vui lòng thử lại.",
           },
         ])
       );
@@ -220,19 +290,31 @@ const AIChat = () => {
           {displayedMessages.map((msg, idx) => (
             <div
               key={msg.clientId || `${msg.role}-${idx}`}
-              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} px-1 md:px-2`}
+              className={`flex ${
+                msg.role === "user" ? "justify-end" : "justify-start"
+              } px-1 md:px-2`}
             >
               <div
-                className={`flex max-w-[92%] md:max-w-[88%] lg:max-w-[85%] gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}
+                className={`flex max-w-[92%] md:max-w-[88%] lg:max-w-[85%] gap-2 ${
+                  msg.role === "user" ? "flex-row-reverse" : "flex-row"
+                }`}
               >
                 <div
-                  className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm ${msg.role === "user" ? "bg-blue-600 text-white" : "bg-emerald-600 text-white"}`}
+                  className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm ${
+                    msg.role === "user"
+                      ? "bg-blue-600 text-white"
+                      : "bg-emerald-600 text-white"
+                  }`}
                 >
                   {msg.role === "user" ? <User size={14} /> : <Bot size={16} />}
                 </div>
 
                 <div
-                  className={`px-3.5 md:px-4 py-2 md:py-2.5 rounded-xl shadow-sm text-xs md:text-sm leading-relaxed break-words ${msg.role === "user" ? "bg-blue-600 text-white rounded-tr-none whitespace-pre-wrap" : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"}`}
+                  className={`px-3.5 md:px-4 py-2 md:py-2.5 rounded-xl shadow-sm text-xs md:text-sm leading-relaxed break-words ${
+                    msg.role === "user"
+                      ? "bg-blue-600 text-white rounded-tr-none whitespace-pre-wrap"
+                      : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"
+                  }`}
                 >
                   {msg.role === "user" ? (
                     <>{msg.content}</>
@@ -240,10 +322,18 @@ const AIChat = () => {
                     <div className="prose prose-sm max-w-none space-y-2">
                       <ReactMarkdown
                         components={{
-                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                          ul: ({ children }) => <ul className="list-disc mb-2 ml-4">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal mb-2 ml-4">{children}</ol>,
-                          li: ({ children }) => <li className="mb-1 ml-2">{children}</li>,
+                          p: ({ children }) => (
+                            <p className="mb-2 last:mb-0">{children}</p>
+                          ),
+                          ul: ({ children }) => (
+                            <ul className="list-disc mb-2 ml-4">{children}</ul>
+                          ),
+                          ol: ({ children }) => (
+                            <ol className="list-decimal mb-2 ml-4">{children}</ol>
+                          ),
+                          li: ({ children }) => (
+                            <li className="mb-1 ml-2">{children}</li>
+                          ),
                           code: ({ children }) => (
                             <code className="bg-emerald-50 px-1.5 py-0.5 rounded text-emerald-700 font-mono text-xs">
                               {children}
@@ -259,10 +349,19 @@ const AIChat = () => {
                               {children}
                             </blockquote>
                           ),
-                          strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                          em: ({ children }) => <em className="italic">{children}</em>,
+                          strong: ({ children }) => (
+                            <strong className="font-bold">{children}</strong>
+                          ),
+                          em: ({ children }) => (
+                            <em className="italic">{children}</em>
+                          ),
                           a: ({ children, href }) => (
-                            <a href={href} className="text-emerald-600 hover:underline" target="_blank" rel="noopener noreferrer">
+                            <a
+                              href={href}
+                              className="text-emerald-600 hover:underline"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               {children}
                             </a>
                           ),
@@ -284,9 +383,18 @@ const AIChat = () => {
                   <Bot size={16} />
                 </div>
                 <div className="px-3 md:px-3.5 py-2 md:py-2.5 rounded-xl rounded-tl-none shadow-sm bg-white border border-gray-100 flex items-center gap-1 h-[32px] md:h-[36px]">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <div
+                    className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"
+                    style={{ animationDelay: "0ms" }}
+                  />
+                  <div
+                    className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"
+                    style={{ animationDelay: "150ms" }}
+                  />
+                  <div
+                    className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"
+                    style={{ animationDelay: "300ms" }}
+                  />
                 </div>
               </div>
             </div>
@@ -309,7 +417,11 @@ const AIChat = () => {
           <button
             onClick={handleSend}
             disabled={!input.trim() || isTyping}
-            className={`h-[42px] md:h-[46px] inline-flex items-center justify-center rounded-xl px-3.5 md:px-4 transition-all duration-200 ${input.trim() && !isTyping ? "bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200 text-white active:scale-95" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}
+            className={`h-[42px] md:h-[46px] inline-flex items-center justify-center rounded-xl px-3.5 md:px-4 transition-all duration-200 ${
+              input.trim() && !isTyping
+                ? "bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200 text-white active:scale-95"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
           >
             <Send size={16} />
           </button>
