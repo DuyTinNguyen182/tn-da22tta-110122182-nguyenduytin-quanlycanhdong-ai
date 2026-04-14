@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { Bot, RotateCcw, Send, User } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Bot, RotateCcw, Send, User, ChevronLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import api from "../services/api";
 
@@ -108,12 +108,49 @@ const buildDiagnosisPrompt = (diagnosisResult) => {
 
 const AIChat = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [pinnedMessage, setPinnedMessage] = useState(buildWelcomeMessage);
   const [conversationMessages, setConversationMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState(getOrCreateTransientSessionId);
   const messagesEndRef = useRef(null);
+
+  const [showHeader, setShowHeader] = useState(true);
+  const lastScrollY = useRef(0);
+
+  const handleScroll = (e) => {
+    const rawScrollY = e.target.scrollTop;
+    const maxScroll = e.target.scrollHeight - e.target.clientHeight;
+    
+    // Nếu nội dung không có thanh cuộn, luôn hiển thị header
+    if (maxScroll <= 0) {
+      setShowHeader(true);
+      return;
+    }
+
+    // Ép giá trị scroll thực vào trong giới hạn [0, maxScroll] để khử quán tính nảy (overscroll/rubber-band bounce) ở đáy hoặc đỉnh màn hình
+    const currentScrollY = Math.max(0, Math.min(rawScrollY, maxScroll));
+    
+    // Nếu chạm đỉnh thực sự, chắc chắn hiện header
+    if (currentScrollY <= 0) {
+      setShowHeader(true);
+      lastScrollY.current = currentScrollY;
+      return;
+    }
+
+    const diff = currentScrollY - lastScrollY.current;
+
+    // Ngưỡng 30px để bỏ qua các rung động li ti
+    if (Math.abs(diff) < 30) return;
+
+    if (diff > 0 && currentScrollY > 80) {
+      setShowHeader(false); // cuộn xuống
+    } else if (diff < 0) {
+      setShowHeader(true); // cuộn lên
+    }
+    lastScrollY.current = currentScrollY;
+  };
 
   const displayedMessages = [pinnedMessage, ...conversationMessages];
 
@@ -180,19 +217,28 @@ const AIChat = () => {
 
   useEffect(() => {
     const initChat = async () => {
+      // NẾU TỪ TRANG QUÉT QUA
       if (location.state?.result) {
         const previousSessionId = sessionId;
         const nextSessionId = createSessionId();
+        const prompt = buildDiagnosisPrompt(location.state.result);
 
         setActiveSessionId(nextSessionId);
         setPinnedMessage(buildDiagnosisIntroMessage());
-        syncConversationMessages([]);
+        
+        // Optimistic setup: Show the user's message immediately
+        syncConversationMessages([{
+          role: "user",
+          content: prompt,
+          clientId: `local-${Date.now()}`,
+        }]);
+        
         setIsTyping(true);
 
         try {
           await clearRemoteSession(previousSessionId);
           await sendMessageToBackend(
-            buildDiagnosisPrompt(location.state.result),
+            prompt,
             location.state.result,
             nextSessionId
           );
@@ -206,6 +252,7 @@ const AIChat = () => {
         return;
       }
 
+      // TRẠNG THÁI NORMAL
       setPinnedMessage(buildWelcomeMessage());
       const hasHistory = await loadHistory(sessionId);
       if (!hasHistory) {
@@ -218,7 +265,7 @@ const AIChat = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [displayedMessages, isTyping]);
+  }, [conversationMessages.length, isTyping]);
 
   const handleSend = async () => {
     if (!input.trim() || isTyping) return;
@@ -231,6 +278,8 @@ const AIChat = () => {
     };
 
     setInput("");
+    const textarea = document.getElementById("ai-chat-input");
+    if (textarea) textarea.style.height = 'auto';
     setIsTyping(true);
     setConversationMessages((prev) =>
       trimConversationMessages([...prev, optimisticMessage])
@@ -248,6 +297,7 @@ const AIChat = () => {
             content:
               error?.response?.data?.message ||
               "Không thể gửi câu hỏi tới AI. Vui lòng thử lại.",
+            clientId: `error-${Date.now()}`
           },
         ])
       );
@@ -272,6 +322,8 @@ const AIChat = () => {
       setPinnedMessage(buildWelcomeMessage());
       syncConversationMessages([]);
       setInput("");
+      const textarea = document.getElementById("ai-chat-input");
+      if (textarea) textarea.style.height = 'auto';
       setIsTyping(false);
     }
   };
@@ -284,84 +336,108 @@ const AIChat = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] bg-gray-50">
-      <div className="flex-1 overflow-y-auto px-3 md:px-4 py-2 md:py-3 space-y-3">
-        <div className="w-full space-y-3">
+    <div className="flex flex-col h-[calc(100vh-80px)] bg-slate-50 relative overflow-hidden">
+      {/* Smart Scrolling Header */}
+      <div 
+        className={`absolute top-0 left-0 right-0 z-30 transition-transform duration-300 ease-in-out border-b border-slate-200/60 bg-white/85 backdrop-blur-xl px-4 md:px-6 py-2.5 shadow-sm hook-header ${
+          showHeader ? "translate-y-0" : "-translate-y-[120%]"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/ai-scan")}
+              className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-50 hover:bg-slate-100 text-slate-700 transition"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div>
+              <h1 className="text-sm md:text-base font-bold text-slate-800">Cố vấn Nông nghiệp AI</h1>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ring-[2px] ring-emerald-100"></span>
+                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Đang trực tuyến</span>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleResetChat}
+            disabled={isTyping}
+            className="h-8 inline-flex items-center gap-1.5 rounded-xl bg-rose-50 text-rose-600 px-3 text-xs font-semibold transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RotateCcw size={14} />
+            <span className="hidden sm:inline">Làm mới</span>
+          </button>
+        </div>
+      </div>
+
+      <div 
+        className="flex-1 min-h-0 overflow-y-auto custom-scrollbar pt-[60px]"
+        onScroll={handleScroll}
+      >
+        {/* Chat messages wrapper */}
+        <div className="px-4 md:px-6 py-4 md:py-6 space-y-6">
+          <div className="w-full max-w-5xl mx-auto space-y-6">
           {displayedMessages.map((msg, idx) => (
             <div
               key={msg.clientId || `${msg.role}-${idx}`}
-              className={`flex ${
+              className={`flex w-full animate-slide-up ${
                 msg.role === "user" ? "justify-end" : "justify-start"
-              } px-1 md:px-2`}
+              }`}
             >
               <div
-                className={`flex max-w-[92%] md:max-w-[88%] lg:max-w-[85%] gap-2 ${
+                className={`flex w-full max-w-[95%] md:max-w-[85%] lg:max-w-[75%] gap-3 items-end ${
                   msg.role === "user" ? "flex-row-reverse" : "flex-row"
                 }`}
               >
+                {/* Avatar */}
                 <div
-                  className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm ${
+                  className={`w-9 h-9 md:w-10 md:h-10 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm ${
                     msg.role === "user"
-                      ? "bg-blue-600 text-white"
-                      : "bg-emerald-600 text-white"
+                      ? "bg-slate-800 text-white"
+                      : "bg-emerald-100/50 text-emerald-600 ring-4 ring-white shadow-emerald-100"
                   }`}
                 >
-                  {msg.role === "user" ? <User size={14} /> : <Bot size={16} />}
+                  {msg.role === "user" ? <User size={16} /> : <Bot size={20} />}
                 </div>
 
+                {/* Bubble */}
                 <div
-                  className={`px-3.5 md:px-4 py-2 md:py-2.5 rounded-xl shadow-sm text-xs md:text-sm leading-relaxed break-words ${
+                  className={`px-5 py-4 rounded-[24px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-sm md:text-[15px] leading-relaxed break-words relative w-fit overflow-hidden ${
                     msg.role === "user"
-                      ? "bg-blue-600 text-white rounded-tr-none whitespace-pre-wrap"
-                      : "bg-white border border-gray-100 text-gray-800 rounded-tl-none"
+                      ? "bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-br-[8px]"
+                      : "bg-white border border-slate-100/60 text-slate-800 rounded-bl-[8px]"
                   }`}
                 >
                   {msg.role === "user" ? (
-                    <>{msg.content}</>
+                    <div className="whitespace-pre-wrap">{msg.content}</div>
                   ) : (
-                    <div className="prose prose-sm max-w-none space-y-2">
+                    <div className="prose prose-sm md:prose-base prose-emerald max-w-none">
                       <ReactMarkdown
                         components={{
-                          p: ({ children }) => (
-                            <p className="mb-2 last:mb-0">{children}</p>
-                          ),
-                          ul: ({ children }) => (
-                            <ul className="list-disc mb-2 ml-4">{children}</ul>
-                          ),
-                          ol: ({ children }) => (
-                            <ol className="list-decimal mb-2 ml-4">{children}</ol>
-                          ),
-                          li: ({ children }) => (
-                            <li className="mb-1 ml-2">{children}</li>
-                          ),
+                          p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc mb-3 ml-5 space-y-1">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal mb-3 ml-5 space-y-1">{children}</ol>,
+                          li: ({ children }) => <li className="pl-1">{children}</li>,
                           code: ({ children }) => (
-                            <code className="bg-emerald-50 px-1.5 py-0.5 rounded text-emerald-700 font-mono text-xs">
+                            <code className="bg-slate-100 px-1.5 py-0.5 rounded text-emerald-700 font-mono text-[13px]">
                               {children}
                             </code>
                           ),
                           pre: ({ children }) => (
-                            <pre className="bg-gray-900 text-gray-100 p-2 md:p-3 rounded-lg overflow-x-auto mb-2 text-xs">
+                            <pre className="bg-slate-900 text-slate-100 p-4 rounded-xl overflow-x-auto mb-3 text-[13px] shadow-inner">
                               {children}
                             </pre>
                           ),
                           blockquote: ({ children }) => (
-                            <blockquote className="border-l-4 border-emerald-300 pl-3 italic text-gray-600 mb-2">
+                            <blockquote className="border-l-4 border-emerald-400 pl-4 py-1 italic text-slate-600 mb-3 bg-emerald-50/50 rounded-r-lg">
                               {children}
                             </blockquote>
                           ),
-                          strong: ({ children }) => (
-                            <strong className="font-bold">{children}</strong>
-                          ),
-                          em: ({ children }) => (
-                            <em className="italic">{children}</em>
-                          ),
+                          strong: ({ children }) => <strong className="font-bold text-slate-900">{children}</strong>,
+                          em: ({ children }) => <em className="italic">{children}</em>,
                           a: ({ children, href }) => (
-                            <a
-                              href={href}
-                              className="text-emerald-600 hover:underline"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
+                            <a href={href} className="text-emerald-600 font-medium hover:text-emerald-700 hover:underline transition-colors" target="_blank" rel="noopener noreferrer">
                               {children}
                             </a>
                           ),
@@ -377,68 +453,57 @@ const AIChat = () => {
           ))}
 
           {isTyping && (
-            <div className="flex justify-start px-1 md:px-2">
-              <div className="flex max-w-[92%] md:max-w-[88%] lg:max-w-[85%] gap-2 flex-row">
-                <div className="w-7 h-7 md:w-8 md:h-8 rounded-full flex flex-shrink-0 items-center justify-center shadow-sm bg-emerald-600 text-white">
-                  <Bot size={16} />
+            <div className="flex w-full animate-slide-up justify-start">
+              <div className="flex max-w-[95%] gap-3 items-end flex-row">
+                <div className="w-9 h-9 md:w-10 md:h-10 rounded-full flex flex-shrink-0 items-center justify-center bg-emerald-100/50 text-emerald-600 ring-4 ring-white shadow-sm shadow-emerald-100">
+                  <Bot size={20} />
                 </div>
-                <div className="px-3 md:px-3.5 py-2 md:py-2.5 rounded-xl rounded-tl-none shadow-sm bg-white border border-gray-100 flex items-center gap-1 h-[32px] md:h-[36px]">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"
-                    style={{ animationDelay: "0ms" }}
-                  />
-                  <div
-                    className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"
-                    style={{ animationDelay: "150ms" }}
-                  />
-                  <div
-                    className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce"
-                    style={{ animationDelay: "300ms" }}
-                  />
+                <div className="px-5 py-4 rounded-[24px] rounded-bl-[8px] shadow-[0_8px_30px_rgb(0,0,0,0.04)] bg-white border border-slate-100/60 flex items-center gap-1.5 h-[52px]">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             </div>
           )}
-          <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} className="h-2" />
+        </div>
         </div>
       </div>
 
-      <div className="bg-white border-t border-gray-100 px-3 md:px-4 py-2.5 md:py-3 shadow-[0_-4px_10px_rgba(0,0,0,0.02)]">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Nhập câu hỏi của bạn..."
-            className="flex-1 bg-gray-50 hover:bg-gray-100/50 focus:bg-white border-2 border-transparent transition-colors text-sm md:text-base text-gray-800 rounded-xl py-2 md:py-2.5 px-3.5 md:px-4 focus:outline-none focus:border-emerald-200 focus:ring-4 focus:ring-emerald-50 resize-none shadow-inner"
-            rows={1}
-          />
+      {/* Input Box */}
+      <div className="sticky bottom-0 bg-white/75 backdrop-blur-xl border-t border-white/50 px-4 py-2.5 md:py-3 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] z-20">
+        <div className="max-w-5xl mx-auto flex items-end gap-2.5 w-full">
+          <div className="flex-1 bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] ring-1 ring-slate-100 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-400 focus-within:shadow-emerald-100/50 transition-all duration-200">
+            <textarea
+              id="ai-chat-input"
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = e.target.scrollHeight + 'px';
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Nhập dấu hiệu bệnh hoặc câu hỏi cho AI..."
+              className="w-full bg-transparent text-sm md:text-[15px] text-slate-800 py-2.5 md:py-3 px-4 focus:outline-none resize-none min-h-[44px] max-h-48"
+              rows={1}
+            />
+          </div>
 
           <button
             onClick={handleSend}
             disabled={!input.trim() || isTyping}
-            className={`h-[42px] md:h-[46px] inline-flex items-center justify-center rounded-xl px-3.5 md:px-4 transition-all duration-200 ${
+            className={`h-[44px] md:h-[48px] w-[44px] md:w-[48px] flex-shrink-0 inline-flex items-center justify-center rounded-2xl transition-all duration-300 ${
               input.trim() && !isTyping
-                ? "bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-200 text-white active:scale-95"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                ? "bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-md shadow-emerald-500/20 text-white active:scale-95"
+                : "bg-slate-100 text-slate-400 cursor-not-allowed"
             }`}
           >
-            <Send size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleResetChat}
-            disabled={isTyping}
-            className="h-[42px] md:h-[46px] inline-flex items-center gap-2 rounded-xl border border-gray-200 px-3 md:px-4 text-xs md:text-sm font-medium text-gray-600 transition-colors hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RotateCcw size={14} />
-            <span className="hidden sm:inline">Reset</span>
+            <Send size={18} className={input.trim() && !isTyping ? "ml-0.5" : ""} />
           </button>
         </div>
-
-        <p className="text-center text-[10px] md:text-xs text-gray-400 mt-2 font-medium">
-          AI có thể không chính xác. Kiểm tra lại các lời khuyên quan trọng.
+        <p className="text-center text-[10px] md:text-[11px] text-slate-400 mt-2 font-medium">
+          Trí tuệ nhân tạo có thể sai sót, luôn đối chiếu với thực tế để có quyết định tốt nhất.
         </p>
       </div>
     </div>
