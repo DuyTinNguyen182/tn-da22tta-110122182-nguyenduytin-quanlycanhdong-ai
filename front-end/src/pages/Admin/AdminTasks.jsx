@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Loader, Plus, Pencil, Trash2, Save, X } from "lucide-react";
 import api from "../../services/api";
 import { useFeedback } from "../../hooks/useFeedback";
+import LoadingScreen from "../../components/Layout/LoadingScreen";
 
 const AdminTasks = () => {
   const { toast, confirm } = useFeedback();
@@ -132,9 +133,9 @@ const AdminTasks = () => {
         </div>
 
         {loading ? (
-          <div className="h-44 flex items-center justify-center text-gray-500 gap-2">
-            <Loader size={18} className="animate-spin" /> Đang tải...
-          </div>
+          <LoadingScreen message="Đang tải dữ liệu công việc..." />
+
+
         ) : tasks.length === 0 ? (
           <div className="h-44 flex items-center justify-center text-gray-500">Chưa có công việc nào</div>
         ) : (

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Edit2, MapPin, Plus, Sprout, Trash2, Users } from "lucide-react";
 import api from "../../services/api";
 import { useFeedback } from "../../hooks/useFeedback";
+import LoadingScreen from "../../components/Layout/LoadingScreen";
 
 const emptyFieldForm = {
   name: "",
@@ -128,9 +129,7 @@ const AdminFields = () => {
       </div>
 
       {loading ? (
-        <div className="rounded-3xl border border-gray-100 bg-white p-10 text-center text-gray-500 shadow-sm">
-          Đang tải dữ liệu cánh đồng...
-        </div>
+        <LoadingScreen message="Đang tải dữ liệu cánh đồng..." />
       ) : filteredFields.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-gray-200 bg-white p-10 text-center text-gray-500 shadow-sm">
           Chưa có cánh đồng nào phù hợp.

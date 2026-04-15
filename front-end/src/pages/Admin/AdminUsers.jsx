@@ -16,6 +16,7 @@ import {
 import api from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useFeedback } from "../../hooks/useFeedback";
+import LoadingScreen from "../../components/Layout/LoadingScreen";
 
 const emptyForm = {
   fullName: "",
@@ -352,9 +353,7 @@ const AdminUsers = () => {
 
       <div className="mt-6 flex-1 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
         {loading ? (
-          <div className="flex h-full min-h-[360px] items-center justify-center text-gray-500">
-            Đang tải danh sách người dùng...
-          </div>
+          <LoadingScreen message="Đang tải danh sách người dùng..." />
         ) : filteredUsers.length === 0 ? (
           <div className="flex h-full min-h-[360px] items-center justify-center text-gray-500">
             Không có người dùng nào phù hợp.

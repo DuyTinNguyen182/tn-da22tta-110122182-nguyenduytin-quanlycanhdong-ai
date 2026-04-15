@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import { useFeedback } from "../hooks/useFeedback";
+import LoadingScreen from "../components/Layout/LoadingScreen";
 
 const emptyForm = {
   diseaseName: "",
@@ -445,9 +446,7 @@ const DiseaseLogs = () => {
 
       <div className="mt-6 space-y-4">
         {loading ? (
-          <div className="rounded-3xl border border-dashed border-gray-200 bg-white p-10 text-center text-gray-500 shadow-sm">
-            Đang tải nhật ký bệnh...
-          </div>
+          <LoadingScreen message="Đang tải nhật ký bệnh..." />
         ) : filteredLogs.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-gray-200 bg-white p-10 text-center text-gray-500 shadow-sm">
             Chưa có nhật ký bệnh nào phù hợp.

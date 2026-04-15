@@ -12,6 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import api from "../../services/api";
+import LoadingScreen from "../../components/Layout/LoadingScreen";
 
 const defaultFilters = {
   seasonId: "",
@@ -190,6 +191,10 @@ const AdminOverview = () => {
   const handleRefresh = () => {
     fetchOverview(appliedFilters, { silent: true });
   };
+
+  if (loading && !overview) {
+    return <LoadingScreen fullScreen={true} message="Đang tải dữ liệu tổng quan..." />;
+  }
 
   return (
     <div className="h-full overflow-y-auto bg-[#f4f6f8] p-8">

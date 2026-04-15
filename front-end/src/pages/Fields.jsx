@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import { useFeedback } from "../hooks/useFeedback";
+import LoadingScreen from "../components/Layout/LoadingScreen";
 
 const emptyPlotForm = {
   name: "",
@@ -153,6 +154,10 @@ const Fields = () => {
     [plots]
   );
 
+  if (loadingFields && fields.length === 0) {
+    return <LoadingScreen fullScreen={true} message="Đang chuẩn bị không gian canh tác..." />;
+  }
+
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-gray-50 font-sans">
       <aside className="z-10 flex w-[360px] flex-col border-r border-gray-200 bg-white shadow-lg">
@@ -272,9 +277,7 @@ const Fields = () => {
 
                 <div className="divide-y divide-gray-50">
                   {loadingPlots ? (
-                    <div className="px-6 py-12 text-center text-sm text-gray-500">
-                      Đang tải danh sách thửa ruộng...
-                    </div>
+                    <LoadingScreen message="Đang tải danh sách thửa ruộng..." />
                   ) : plots.length === 0 ? (
                     <div className="flex flex-col items-center justify-center px-6 py-16 text-center text-gray-400">
                       <div className="mb-3 rounded-full bg-gray-50 p-4">

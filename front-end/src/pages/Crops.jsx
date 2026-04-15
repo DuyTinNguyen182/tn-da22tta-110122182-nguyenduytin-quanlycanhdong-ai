@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import api from "../services/api";
 import { useFeedback } from "../hooks/useFeedback";
+import LoadingScreen from "../components/Layout/LoadingScreen";
 
 const getToday = () => new Date().toISOString().split("T")[0];
 
@@ -768,7 +769,7 @@ const Crops = () => {
 
             <div className="flex-1 overflow-y-auto px-6 py-6 lg:px-8">
               {loadingFieldDetail || loadingLogs ? (
-                <div className="py-10 text-center text-gray-400">Đang tải dữ liệu mùa vụ...</div>
+                <LoadingScreen message="Đang tải dữ liệu mùa vụ..." />
               ) : !currentSeason ? (
                 <div className="flex h-full flex-col items-center justify-center text-center text-gray-400">
                   <Sprout size={48} className="mb-4 text-gray-300" />

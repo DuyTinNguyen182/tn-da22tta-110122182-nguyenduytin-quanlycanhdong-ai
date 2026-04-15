@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import api from "../../services/api";
 import { useFeedback } from "../../hooks/useFeedback";
+import LoadingScreen from "../../components/Layout/LoadingScreen";
 
 const sortSeasons = (items = []) => {
   return [...items].sort((a, b) => {
@@ -185,9 +186,9 @@ const AdminSeasons = () => {
         </div>
 
         {loading ? (
-          <div className="h-44 flex items-center justify-center text-gray-500 gap-2">
-            <Loader size={18} className="animate-spin" /> Đang tải...
-          </div>
+          <LoadingScreen message="Đang tải dữ liệu mùa vụ..." />
+
+
         ) : seasons.length === 0 ? (
           <div className="h-44 flex items-center justify-center text-gray-500">Chưa có mùa vụ nào</div>
         ) : (
