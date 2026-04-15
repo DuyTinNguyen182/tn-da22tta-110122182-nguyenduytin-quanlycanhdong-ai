@@ -21,7 +21,7 @@ const getWeatherInfo = (code) => {
   if ([45, 48].includes(code)) return { label: "Sương mù", icon: CloudFog, color: "text-slate-400" };
   if ([51, 53, 55, 56, 57].includes(code)) return { label: "Mưa phùn", icon: CloudRain, color: "text-blue-400" };
   if ([61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return { label: "Có mưa", icon: CloudRain, color: "text-blue-500" };
-  if ([95, 96, 99].includes(code)) return { label: "Mưa dông", icon: CloudLightning, color: "text-purple-600" };
+  if ([95, 96, 99].includes(code)) return { label: "Mưa dông", icon: CloudLightning, color: "text-violet-600" };
   return { label: "Bình thường", icon: Cloud, color: "text-gray-400" };
 };
 
@@ -71,8 +71,7 @@ const ClockWeatherWidget = () => {
             setLocationName("Đồng bằng sông Cửu Long (Mặc định)");
           }
         })
-        .catch((error) => {
-          console.warn("Lỗi lấy vị trí qua IP, dùng tọa độ mặc định:", error);
+        .catch(() => {
           fetchWeather(DEFAULT_LAT, DEFAULT_LON);
           setLocationName("Đồng bằng sông Cửu Long (Mặc định)");
         });
@@ -83,9 +82,7 @@ const ClockWeatherWidget = () => {
         (position) => {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
-          
           // Kiểm tra xem vị trí GPS có nằm trong biên giới Việt Nam không
-          // Để tránh tình trạng PC/Desktop bị nhận dạng sai vị trí ở nước ngoài (VD: Mỹ, mạng riêng ảo)
           if (lat >= 8.0 && lat <= 24.0 && lon >= 102.0 && lon <= 110.0) {
             fetchWeather(lat, lon);
             setLocationName("Vị trí của bạn (Thực tế)");
@@ -93,11 +90,8 @@ const ClockWeatherWidget = () => {
             fetchWeatherByIP();
           }
         },
-        (error) => {
-          // Bị từ chối vị trí hoặc timeout -> Quành về lấy IP
-          fetchWeatherByIP();
-        },
-        { timeout: 7000 } // Chờ định vị GPS lâu nhất 7 giây
+        () => fetchWeatherByIP(),
+        { timeout: 7000 }
       );
     } else {
       fetchWeatherByIP();
@@ -111,96 +105,96 @@ const ClockWeatherWidget = () => {
     year: "numeric",
   }).format(time);
 
-  return (
-    <div className="flex flex-col xl:flex-row gap-6 mb-8 mt-[1px]">
-      {/* Clock Widget */}
-      <div className="flex-1 rounded-3xl bg-gradient-to-br from-emerald-600 to-teal-800 p-8 text-white shadow-xl shadow-emerald-900/20 relative overflow-hidden flex flex-col justify-between min-h-[220px]">
-        {/* Decorator circles */}
-        <div className="absolute top-[-20%] right-[-10%] w-64 h-64 rounded-full bg-white/5 blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-[-20%] left-[-10%] w-48 h-48 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
-        
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 text-emerald-100 mb-2">
-            <Clock size={18} />
-            <span className="font-medium tracking-wide">THỜI GIAN THỰC TẾ</span>
-          </div>
-          <p className="text-emerald-50 opacity-90 text-sm capitalize">{formatDate}</p>
-        </div>
+  const currentWeather = weatherData?.current;
+  const weatherInfo = currentWeather ? getWeatherInfo(currentWeather.weather_code) : null;
+  const WeatherIcon = weatherInfo?.icon;
 
-        <div className="mt-4 relative z-10">
-          <h2 className="text-5xl lg:text-6xl font-black tracking-tight drop-shadow-md">
-            {time.toLocaleTimeString("vi-VN", { hour12: false, hour: '2-digit', minute: '2-digit' })}
-            <span className="text-2xl lg:text-3xl text-emerald-200/80 ml-2 font-bold select-none">{time.toLocaleTimeString("vi-VN", { second: '2-digit' })}</span>
+  return (
+    <div className="flex flex-col xl:flex-row gap-4">
+      {/* Clock — compact */}
+      <div className="relative flex flex-col justify-between overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 px-6 py-5 text-white shadow-lg shadow-emerald-900/15 xl:w-[280px]">
+        <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/5 blur-2xl pointer-events-none" />
+        <div className="relative z-10">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-200">
+            <Clock size={12} />
+            Thời gian thực
+          </div>
+          <p className="mt-1 text-xs capitalize text-emerald-100/80">{formatDate}</p>
+        </div>
+        <div className="relative z-10 mt-3">
+          <h2 className="text-4xl font-black tracking-tight">
+            {time.toLocaleTimeString("vi-VN", { hour12: false, hour: "2-digit", minute: "2-digit" })}
+            <span className="ml-1.5 text-lg font-bold text-emerald-200/70">
+              {String(time.getSeconds()).padStart(2, "0")}
+            </span>
           </h2>
         </div>
       </div>
 
-      {/* Weather Widget */}
-      <div className="flex-[2] rounded-3xl border border-gray-100 bg-white shadow-sm flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-100">
-        {/* Current Weather */}
-        <div className="p-8 md:w-[45%] flex flex-col justify-center">
-          <div className="flex items-center gap-2 text-gray-500 mb-6 font-medium text-sm">
-            <MapPin size={16} className="text-emerald-500" />
-            <span className="truncate">{locationName}</span>
-          </div>
-
+      {/* Weather — compact */}
+      <div className="flex flex-1 flex-col divide-y divide-gray-100 rounded-2xl border border-gray-100 bg-white shadow-sm md:flex-row md:divide-x md:divide-y-0">
+        {/* Current */}
+        <div className="flex items-center gap-5 p-5 md:w-[40%]">
           {loadingWeather || !weatherData ? (
-             <div className="animate-pulse space-y-4">
-                <div className="h-12 w-24 bg-gray-200 rounded-xl"></div>
-                <div className="h-6 w-32 bg-gray-100 rounded-md"></div>
-             </div>
+            <div className="animate-pulse space-y-3 w-full">
+              <div className="h-10 w-20 rounded-lg bg-gray-200" />
+              <div className="h-4 w-28 rounded bg-gray-100" />
+            </div>
           ) : (
-             <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-5xl font-bold tracking-tight text-gray-800">
-                    {Math.round(weatherData.current.temperature_2m)}°
-                  </h2>
-                  <p className="text-lg font-medium text-gray-500 mt-1 capitalize">
-                    {getWeatherInfo(weatherData.current.weather_code).label}
-                  </p>
-                  <div className="flex items-center gap-4 mt-6">
-                     <div className="flex items-center gap-1.5 text-sm text-gray-500" title="Độ ẩm">
-                        <Droplets size={16} className="text-blue-400" />
-                        {weatherData.current.relative_humidity_2m}%
-                     </div>
-                     <div className="flex items-center gap-1.5 text-sm text-gray-500" title="Sức gió">
-                        <Wind size={16} className="text-teal-400" />
-                        {weatherData.current.wind_speed_10m} km/h
-                     </div>
-                  </div>
+            <>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500">
+                  <MapPin size={12} className="shrink-0 text-emerald-500" />
+                  <span className="truncate">{locationName}</span>
                 </div>
-                
-                {React.createElement(getWeatherInfo(weatherData.current.weather_code).icon, {
-                    size: 84,
-                    className: getWeatherInfo(weatherData.current.weather_code).color + ' drop-shadow-lg opacity-80',
-                })}
-             </div>
+                <h2 className="mt-1 text-4xl font-bold tracking-tight text-gray-800">
+                  {Math.round(currentWeather.temperature_2m)}°
+                </h2>
+                <p className="mt-0.5 text-sm font-medium capitalize text-gray-500">
+                  {weatherInfo.label}
+                </p>
+                <div className="mt-2 flex items-center gap-3 text-xs text-gray-500">
+                  <span className="flex items-center gap-1" title="Độ ẩm">
+                    <Droplets size={13} className="text-blue-400" />
+                    {currentWeather.relative_humidity_2m}%
+                  </span>
+                  <span className="flex items-center gap-1" title="Sức gió">
+                    <Wind size={13} className="text-teal-400" />
+                    {currentWeather.wind_speed_10m} km/h
+                  </span>
+                </div>
+              </div>
+              {WeatherIcon && (
+                <WeatherIcon size={56} className={`shrink-0 opacity-70 drop-shadow-md ${weatherInfo.color}`} />
+              )}
+            </>
           )}
         </div>
 
-        {/* 7-Day Forecast */}
-        <div className="p-6 md:w-[55%] flex items-center justify-center bg-gray-50/50 rounded-b-3xl md:rounded-bl-none md:rounded-r-3xl">
+        {/* Forecast */}
+        <div className="flex items-center justify-center bg-gray-50/40 p-4 md:w-[60%] md:rounded-r-2xl">
           {loadingWeather || !weatherData ? (
-              <div className="w-full h-full flex items-center justify-center">
-                 <div className="inline-block w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-              </div>
+            <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 w-full px-1">
-                {weatherData.daily.time.slice(0, 6).map((dateStr, index) => {
-                  const dayCode = weatherData.daily.weather_code[index];
-                  const { icon: DayIcon, color: dayColor } = getWeatherInfo(dayCode);
-                  const minT = Math.round(weatherData.daily.temperature_2m_min[index]);
-                  const maxT = Math.round(weatherData.daily.temperature_2m_max[index]);
-                  return (
-                    <div key={dateStr} className="flex flex-col items-center justify-center py-4 px-2 rounded-2xl transition-all duration-300 hover:bg-white hover:shadow-md hover:-translate-y-1 cursor-default">
-                      <span className="text-xs font-semibold text-gray-500 mb-3">{formatDayName(dateStr)}</span>
-                      <DayIcon size={26} className={dayColor + " drop-shadow-sm"} />
-                      <div className="mt-4 text-sm font-bold text-gray-700">
-                        {maxT}°<span className="text-gray-400 ml-1 font-normal text-xs">{minT}°</span>
-                      </div>
+            <div className="grid w-full grid-cols-3 gap-1 sm:grid-cols-6">
+              {weatherData.daily.time.slice(0, 6).map((dateStr, i) => {
+                const dayCode = weatherData.daily.weather_code[i];
+                const { icon: DayIcon, color: dayColor } = getWeatherInfo(dayCode);
+                const minT = Math.round(weatherData.daily.temperature_2m_min[i]);
+                const maxT = Math.round(weatherData.daily.temperature_2m_max[i]);
+                return (
+                  <div
+                    key={dateStr}
+                    className="flex cursor-default flex-col items-center rounded-xl px-1.5 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
+                  >
+                    <span className="text-[10px] font-semibold text-gray-500">{formatDayName(dateStr)}</span>
+                    <DayIcon size={20} className={`mt-1.5 ${dayColor} drop-shadow-sm`} />
+                    <div className="mt-1.5 text-xs font-bold text-gray-700">
+                      {maxT}°<span className="ml-0.5 font-normal text-gray-400">{minT}°</span>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

@@ -1,42 +1,28 @@
 import React from "react";
 
-const StatCard = ({ title, value, unit, icon: Icon, trend, color }) => {
-  // Map màu sắc dựa trên props color
+const StatCard = ({ title, value, unit, icon: Icon, color }) => {
   const colorStyles = {
-    emerald: "bg-emerald-50 text-emerald-600",
-    blue: "bg-blue-50 text-blue-600",
-    orange: "bg-orange-50 text-orange-600",
-    purple: "bg-purple-50 text-purple-600",
+    emerald: { bg: "bg-emerald-50", text: "text-emerald-600", ring: "ring-emerald-100" },
+    blue: { bg: "bg-blue-50", text: "text-blue-600", ring: "ring-blue-100" },
+    amber: { bg: "bg-amber-50", text: "text-amber-600", ring: "ring-amber-100" },
+    violet: { bg: "bg-violet-50", text: "text-violet-600", ring: "ring-violet-100" },
+    // fallback for old color names
+    orange: { bg: "bg-amber-50", text: "text-amber-600", ring: "ring-amber-100" },
+    purple: { bg: "bg-violet-50", text: "text-violet-600", ring: "ring-violet-100" },
   };
 
+  const c = colorStyles[color] || colorStyles.emerald;
+
   return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex justify-between items-start mb-4">
-        <div
-          className={`${
-            colorStyles[color] || colorStyles.emerald
-          } p-3 rounded-xl`}
-        >
-          <Icon size={24} />
-        </div>
-        {trend && (
-          <span
-            className={`text-xs font-medium px-2 py-1 rounded-full ${
-              trend > 0
-                ? "bg-green-100 text-green-700"
-                : "bg-red-100 text-red-700"
-            }`}
-          >
-            {trend > 0 ? "+" : ""}
-            {trend}%
-          </span>
-        )}
+    <div className="flex items-center gap-3.5 rounded-xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
+      <div className={`shrink-0 rounded-xl p-2.5 ring-1 ${c.bg} ${c.text} ${c.ring}`}>
+        <Icon size={20} />
       </div>
-      <div>
-        <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-gray-800">
-          {value}{" "}
-          <span className="text-sm text-gray-400 font-normal ml-1">{unit}</span>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium text-gray-500">{title}</p>
+        <h3 className="mt-0.5 text-xl font-bold text-gray-800">
+          {value}
+          <span className="ml-1 text-xs font-normal text-gray-400">{unit}</span>
         </h3>
       </div>
     </div>

@@ -10,10 +10,12 @@ import {
   Sprout,
   Tractor,
   Trash2,
+  X,
 } from "lucide-react";
 import api from "../services/api";
 import { useFeedback } from "../hooks/useFeedback";
 import LoadingScreen from "../components/Layout/LoadingScreen";
+import CustomDropdown from "../components/UI/CustomDropdown";
 
 const emptyPlotForm = {
   name: "",
@@ -21,6 +23,19 @@ const emptyPlotForm = {
   status: "active",
   addressDetail: "",
 };
+
+const statusOptions = [
+  {
+    value: "active",
+    label: "Đang canh tác",
+    dot: "bg-emerald-500",
+  },
+  {
+    value: "inactive",
+    label: "Chờ vụ mới",
+    dot: "bg-orange-400",
+  },
+];
 
 const Fields = () => {
   const { toast, confirm } = useFeedback();
@@ -160,71 +175,81 @@ const Fields = () => {
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-gray-50 font-sans">
-      <aside className="z-10 flex w-[360px] flex-col border-r border-gray-200 bg-white shadow-lg">
-        <div className="border-b border-gray-100 p-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Cánh đồng hợp tác xã</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Chọn cánh đồng có thửa ruộng của bạn và tiến hành khai báo.
-            </p>
+      <aside className="z-10 flex w-[300px] shrink-0 flex-col border-r border-gray-200 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-4 py-4">
+          <div className="flex items-center gap-2">
+            <div className="rounded-lg bg-emerald-50 p-1.5">
+              <Sprout size={16} className="text-emerald-600" />
+            </div>
+            <h2 className="text-base font-bold text-gray-800">Cánh đồng HTX</h2>
           </div>
-
+          <p className="mt-2 text-xs text-gray-400">
+            Chọn cánh đồng để quản lý các thửa ruộng.
+          </p>
         </div>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
+        <div className="flex-1 space-y-1 overflow-y-auto p-2">
           {loadingFields ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
-              Đang tải danh sách cánh đồng...
+            <div className="flex flex-col items-center py-10 text-center text-gray-400">
+              <div className="mb-3 rounded-2xl bg-gray-100 p-4">
+                <MapPin size={24} className="text-gray-300" />
+              </div>
+              <p className="text-sm">Đang tải...</p>
             </div>
           ) : fields.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-5 text-sm text-gray-500">
-              Chưa có cánh đồng nào. Hãy nhờ admin hợp tác xã tạo trước.
+            <div className="flex flex-col items-center py-10 text-center text-gray-400">
+              <div className="mb-3 rounded-2xl bg-gray-100 p-4">
+                <MapPin size={24} className="text-gray-300" />
+              </div>
+              <p className="text-sm font-medium text-gray-500">Chưa có cánh đồng nào.</p>
+              <p className="mt-1 text-xs text-gray-400">Nhờ admin HTX tạo trước.</p>
             </div>
           ) : (
-            fields.map((field) => (
-              <button
-                key={field._id}
-                onClick={() => {
-                  setSelectedField(field);
-                  fetchPlots(field._id);
-                }}
-                className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                  selectedField?._id === field._id
-                    ? "border-emerald-200 bg-emerald-50 shadow-sm"
-                    : "border-transparent bg-white hover:border-gray-100 hover:shadow-md"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex gap-3">
+            fields.map((field) => {
+              const isSelected = selectedField?._id === field._id;
+              return (
+                <button
+                  key={field._id}
+                  onClick={() => {
+                    setSelectedField(field);
+                    fetchPlots(field._id);
+                  }}
+                  className={`w-full rounded-xl border p-3 text-left transition-all duration-200 ${
+                    isSelected
+                      ? "border-emerald-200 bg-emerald-50/80 shadow-sm shadow-emerald-100"
+                      : "border-transparent hover:bg-gray-50 hover:shadow-sm"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
                     <div
-                      className={`rounded-xl p-2.5 ${
-                        selectedField?._id === field._id
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-gray-100 text-gray-500"
+                      className={`shrink-0 rounded-lg p-1.5 transition-colors ${
+                        isSelected
+                          ? "bg-emerald-100 text-emerald-600"
+                          : "bg-gray-100 text-gray-400"
                       }`}
                     >
-                      <Sprout size={18} />
+                      <Sprout size={16} />
                     </div>
-                    <div>
-                      <h3 className="font-bold text-gray-800">{field.name}</h3>
-                      <p className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                        <MapPin size={12} />
-                        {field.address || "Admin chưa cập nhật địa bàn"}
+                    <div className="min-w-0">
+                      <h3
+                        className={`truncate text-sm font-semibold ${
+                          isSelected ? "text-emerald-800" : "text-gray-700"
+                        }`}
+                      >
+                        {field.name}
+                      </h3>
+                      <p className="mt-0.5 truncate text-xs text-gray-400">
+                        {field.address || "Chưa cập nhật địa bàn"}
                       </p>
                     </div>
                   </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-                  <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
-                    {field.plotCount || 0} thửa toàn cánh đồng
-                  </span>
-                  <span className="rounded-full bg-white px-3 py-1 text-gray-600 ring-1 ring-gray-200">
-                    {field.farmerCount || 0} nông dân tham gia
-                  </span>
-                </div>
-              </button>
-            ))
+                  <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-gray-500">
+                    <span className="rounded-md bg-gray-100 px-2 py-0.5">{field.plotCount || 0} thửa</span>
+                    <span className="rounded-md bg-gray-100 px-2 py-0.5">{field.farmerCount || 0} nông dân</span>
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
       </aside>
@@ -232,42 +257,37 @@ const Fields = () => {
       <section className="relative flex flex-1 flex-col bg-gray-50/60">
         {selectedField ? (
           <>
-            <div className="z-10 flex items-center justify-between border-b border-gray-200 bg-white px-8 py-6 shadow-sm">
+            <div className="z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
               <div>
-                <div className="mb-1 flex items-center gap-2">
-                  <h1 className="text-2xl font-bold text-gray-800">{selectedField.name}</h1>
-                  <span className="rounded-md bg-gray-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-gray-600">
-                    Cánh đồng chung
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-sm font-medium text-gray-500">
-                  <span className="flex items-center gap-1.5">
-                    <MapPin size={16} className="text-gray-400" />
+                <h1 className="text-xl font-bold text-gray-800">{selectedField.name}</h1>
+                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs font-medium text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <MapPin size={13} className="text-gray-400" />
                     {selectedField.address || "Chưa có địa bàn"}
                   </span>
-                  <span className="h-1 w-1 rounded-full bg-gray-300"></span>
-                  <span className="flex items-center gap-1.5 text-emerald-600">
-                    <Layers size={16} />
-                    {plots.length} thửa của bạn
+                  <span className="h-1 w-1 rounded-full bg-gray-300" />
+                  <span className="flex items-center gap-1 text-emerald-600">
+                    <Layers size={13} />
+                    {plots.length} thửa
                   </span>
-                  <span className="h-1 w-1 rounded-full bg-gray-300"></span>
-                  <span className="text-emerald-600">
-                    Tổng diện tích: {totalArea.toLocaleString()} m2
+                  <span className="h-1 w-1 rounded-full bg-gray-300" />
+                  <span className="rounded-lg bg-emerald-50 px-2 py-0.5 font-bold text-emerald-600 ring-1 ring-emerald-100">
+                    {totalArea.toLocaleString()} m²
                   </span>
                 </div>
               </div>
 
               <button
                 onClick={openCreatePlotModal}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-lg"
               >
-                <Plus size={18} /> Thêm thửa ruộng
+                <Plus size={16} /> Thêm thửa
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8">
-              <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-                <div className="grid grid-cols-[1.3fr_0.8fr_0.9fr_1.4fr_0.8fr] gap-4 border-b border-gray-100 bg-gray-50 px-6 py-4 text-xs font-bold uppercase tracking-wider text-gray-400">
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+                <div className="grid grid-cols-[1.5fr_1fr_1fr_1.5fr_auto] gap-4 border-b border-gray-100 bg-gray-50 px-5 py-3 text-xs font-bold uppercase tracking-wider text-gray-500">
                   <span>Tên thửa</span>
                   <span>Diện tích</span>
                   <span>Trạng thái</span>
@@ -280,46 +300,41 @@ const Fields = () => {
                     <LoadingScreen message="Đang tải danh sách thửa ruộng..." />
                   ) : plots.length === 0 ? (
                     <div className="flex flex-col items-center justify-center px-6 py-16 text-center text-gray-400">
-                      <div className="mb-3 rounded-full bg-gray-50 p-4">
-                        <LayoutGrid size={32} className="text-gray-300" />
+                      <div className="mb-3 rounded-2xl bg-gray-100 p-4">
+                        <LayoutGrid size={28} className="text-gray-300" />
                       </div>
                       <p className="font-medium text-gray-500">
                         Bạn chưa có thửa ruộng nào trong cánh đồng này
                       </p>
                       <button
                         onClick={openCreatePlotModal}
-                        className="mt-3 text-sm font-semibold text-emerald-600 hover:underline"
+                        className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-600 ring-1 ring-emerald-100 transition-all hover:bg-emerald-100"
                       >
-                        Thêm thửa đầu tiên
+                        <Plus size={14} /> Thêm thửa đầu tiên
                       </button>
                     </div>
                   ) : (
                     plots.map((plot) => (
                       <div
                         key={plot._id}
-                        className="grid grid-cols-[1.3fr_0.8fr_0.9fr_1.4fr_0.8fr] items-center gap-4 px-6 py-4 transition-colors hover:bg-emerald-50/30"
+                        className="group grid grid-cols-[1.5fr_1fr_1fr_1.5fr_auto] items-center gap-4 px-5 py-3 transition-colors hover:bg-emerald-50/40"
                       >
                         <div className="flex items-center gap-3">
                           <div className="rounded-lg bg-gray-50 p-2 text-emerald-600">
-                            <Tractor size={18} />
+                            <Tractor size={16} />
                           </div>
-                          <div>
-                            <p className="font-semibold text-gray-800">{plot.name}</p>
-                            <p className="text-xs text-gray-500">
-                              Gắn với cánh đồng {selectedField.name}
-                            </p>
-                          </div>
+                          <p className="text-sm font-semibold text-gray-800">{plot.name}</p>
                         </div>
 
-                        <span className="inline-flex w-fit rounded-lg bg-gray-100 px-2 py-1 font-mono text-xs font-medium text-gray-600">
-                          {Number(plot.area || 0).toLocaleString()} m2
+                        <span className="inline-flex w-fit rounded-lg bg-gray-100 px-2.5 py-1 font-mono text-xs font-medium text-gray-600 ring-1 ring-gray-200/50">
+                          {Number(plot.area || 0).toLocaleString()} m²
                         </span>
 
                         <span
-                          className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${
+                          className={`inline-flex w-fit items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-bold ${
                             plot.status === "active"
-                              ? "border-green-200 bg-green-50 text-green-600"
-                              : "border-orange-200 bg-orange-50 text-orange-600"
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-orange-100 text-orange-700"
                           }`}
                         >
                           {plot.status === "active" ? (
@@ -330,24 +345,24 @@ const Fields = () => {
                           {plot.status === "active" ? "Đang canh tác" : "Chờ vụ mới"}
                         </span>
 
-                        <p className="text-sm text-gray-600">
-                          {plot.addressDetail || "Chưa bổ sung địa chỉ chi tiết"}
+                        <p className="truncate text-xs text-gray-600" title={plot.addressDetail || "Chưa bổ sung"}>
+                          {plot.addressDetail || <span className="italic text-gray-400">Chưa bổ sung</span>}
                         </p>
 
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                           <button
                             onClick={() => openEditPlotModal(plot)}
-                            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
                             title="Sửa"
                           >
-                            <Edit2 size={16} />
+                            <Edit2 size={15} />
                           </button>
                           <button
                             onClick={() => handleDeletePlot(plot._id)}
-                            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
                             title="Xóa"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={15} />
                           </button>
                         </div>
                       </div>
@@ -359,11 +374,12 @@ const Fields = () => {
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400">
-            <LayoutGrid size={64} className="mb-6 text-gray-300" />
-            <h3 className="text-xl font-bold text-gray-600">Chưa có cánh đồng để chọn</h3>
+            <div className="mb-4 rounded-2xl bg-gray-100 p-5">
+              <LayoutGrid size={40} className="text-gray-300" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-600">Chưa có cánh đồng để chọn</h3>
             <p className="mt-2 max-w-sm text-center text-sm text-gray-400">
-              Khi admin tạo cánh đồng cho hợp tác xã, bạn sẽ chọn ở đây để thêm thửa ruộng của
-              mình.
+              Khi admin tạo cánh đồng cho hợp tác xã, bạn sẽ chọn ở đây để thêm thửa ruộng.
             </p>
           </div>
         )}
@@ -371,95 +387,92 @@ const Fields = () => {
 
       {isPlotModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-100 bg-gray-50 px-6 py-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl animate-dropdown-enter">
+            {/* Gradient header */}
+            <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-4">
               <div>
-                <h3 className="text-lg font-bold text-gray-800">
+                <h3 className="text-base font-bold text-white">
                   {editingPlot ? "Cập nhật thửa ruộng" : "Thêm thửa ruộng mới"}
                 </h3>
-                <p className="text-sm text-gray-500">
-                  Cánh đồng đang chọn: {selectedField?.name || "-"}
+                <p className="mt-0.5 text-xs text-emerald-200">
+                  Cánh đồng: {selectedField?.name || "-"}
                 </p>
               </div>
               <button
                 onClick={() => setIsPlotModalOpen(false)}
-                className="text-2xl text-gray-400 transition-colors hover:text-gray-600"
+                className="rounded-lg p-1.5 text-emerald-200 transition-colors hover:bg-white/15 hover:text-white"
               >
-                &times;
+                <X size={18} />
               </button>
             </div>
 
-            <div className="space-y-5 p-6">
+            <div className="space-y-4 p-5">
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
                   Tên thửa
                 </label>
                 <input
                   type="text"
                   value={plotForm.name}
-                  onChange={(event) =>
-                    setPlotForm((prev) => ({ ...prev, name: event.target.value }))
+                  onChange={(e) =>
+                    setPlotForm((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-medium outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm font-medium outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                   placeholder="Ví dụ: Thửa số 1"
                   autoFocus
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
-                    Diện tích (m2)
+                  <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Diện tích (m²)
                   </label>
                   <input
                     type="number"
                     value={plotForm.area}
-                    onChange={(event) =>
-                      setPlotForm((prev) => ({ ...prev, area: event.target.value }))
+                    onChange={(e) =>
+                      setPlotForm((prev) => ({ ...prev, area: e.target.value }))
                     }
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-medium outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm font-medium outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     placeholder="0"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                  <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
                     Trạng thái
                   </label>
-                  <select
+                  <CustomDropdown
                     value={plotForm.status}
-                    onChange={(event) =>
-                      setPlotForm((prev) => ({ ...prev, status: event.target.value }))
+                    onChange={(val) =>
+                      setPlotForm((prev) => ({ ...prev, status: val }))
                     }
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-medium outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                  >
-                    <option value="active">Đang canh tác</option>
-                    <option value="inactive">Chờ vụ mới</option>
-                  </select>
+                    options={statusOptions}
+                    placeholder="Chọn trạng thái"
+                    className="w-full"
+                  />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-xs font-bold uppercase text-gray-500">
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
                   Địa chỉ chi tiết
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={plotForm.addressDetail}
-                  onChange={(event) =>
-                    setPlotForm((prev) => ({ ...prev, addressDetail: event.target.value }))
+                  onChange={(e) =>
+                    setPlotForm((prev) => ({ ...prev, addressDetail: e.target.value }))
                   }
-                  className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-medium outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                  placeholder="Ví dụ: Ấp 2, gần kênh Ngang, lô trong cùng"
+                  className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                  placeholder="Ấp 2, gần kênh Ngang, lô trong cùng"
                 />
-                <p className="mt-2 text-xs text-gray-500">
-                  Địa chỉ này để mô tả thực địa. Thống kê vẫn dựa trên cánh đồng do admin quản lý.
-                </p>
               </div>
 
               <button
                 onClick={handleSavePlot}
-                className="w-full rounded-xl bg-emerald-600 py-3 font-bold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700"
+                className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-lg"
               >
                 {editingPlot ? "Lưu thay đổi" : "Tạo thửa ruộng"}
               </button>
