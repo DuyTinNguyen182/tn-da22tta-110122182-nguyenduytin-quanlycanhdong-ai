@@ -1,18 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Activity,
   CalendarDays,
-  ClipboardList,
   Filter,
-  LayoutDashboard,
   Map,
   RefreshCw,
   Sprout,
   Users,
   Wallet,
+  LayoutDashboard,
 } from "lucide-react";
 import api from "../../services/api";
 import LoadingScreen from "../../components/Layout/LoadingScreen";
+import CustomDropdown from "../../components/UI/CustomDropdown";
 
 const defaultFilters = {
   seasonId: "",
@@ -65,26 +64,23 @@ const StatCard = ({ title, value, subtitle, icon, tone = "emerald" }) => {
   };
 
   return (
-    <div className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="mt-3 text-3xl font-bold tracking-tight text-gray-900">{value}</p>
-          {subtitle ? <p className="mt-2 text-xs text-gray-400">{subtitle}</p> : null}
+          <p className="mt-2 text-2xl font-bold tracking-tight text-gray-900">{value}</p>
+          {subtitle ? <p className="mt-1.5 text-xs text-gray-400">{subtitle}</p> : null}
         </div>
-        <div className={`rounded-2xl p-3 ${tones[tone] || tones.emerald}`}>{icon}</div>
+        <div className={`rounded-xl p-2.5 ${tones[tone] || tones.emerald}`}>{icon}</div>
       </div>
     </div>
   );
 };
 
-const SectionCard = ({ title, description, actions, children }) => (
-  <section className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
-    <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-        {description ? <p className="mt-1 text-sm text-gray-500">{description}</p> : null}
-      </div>
+const SectionCard = ({ title, actions, children }) => (
+  <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <h2 className="text-lg font-bold text-gray-900">{title}</h2>
       {actions}
     </div>
     {children}
@@ -94,14 +90,14 @@ const SectionCard = ({ title, description, actions, children }) => (
 const DataTable = ({ columns, rows, emptyText, rowKey }) => {
   if (!rows.length) {
     return (
-      <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
         {emptyText}
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-100">
+    <div className="overflow-hidden rounded-xl border border-gray-100">
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100">
           <thead className="bg-gray-50">
@@ -171,8 +167,6 @@ const AdminOverview = () => {
 
   const seasonRows = useMemo(() => (overview?.seasonOverview || []).slice(0, 6), [overview]);
   const fieldRows = useMemo(() => (overview?.fieldOverview || []).slice(0, 6), [overview]);
-  const farmerRows = useMemo(() => (overview?.farmerOverview || []).slice(0, 6), [overview]);
-  const taskRows = useMemo(() => (overview?.taskOverview || []).slice(0, 6), [overview]);
   const recentActivities = overview?.recentActivities || [];
   const seasonInstances = useMemo(
     () => (overview?.seasonInstances || []).slice(0, 8),
@@ -197,229 +191,168 @@ const AdminOverview = () => {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-[#f4f6f8] p-8">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Tổng quan điều hành hợp tác xã
-          </h1>
-          <p className="mt-2 max-w-3xl text-sm text-gray-500">
-            Tách riêng phần thống kê toàn hệ thống và phần thống kê theo mùa vụ để admin nhìn dữ
-            liệu tổng quan và dữ liệu vận hành theo từng đợt canh tác rõ hơn.
-          </p>
-        </div>
-
+    <div className="h-full overflow-y-auto bg-[#f4f6f8] p-6">
+      {/* Header */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+          Tổng quan hợp tác xã
+        </h1>
         <button
           type="button"
           onClick={handleRefresh}
-          className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:border-emerald-200 hover:text-emerald-700"
+          className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition-all hover:border-emerald-200 hover:text-emerald-700"
         >
-          <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+          <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
           Làm mới
         </button>
       </div>
 
-      <SectionCard
-        title="Thống kê toàn hệ thống"
-        description="Nhóm chỉ số cứng của hợp tác xã, không phụ thuộc bộ lọc mùa vụ."
-      >
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+      {/* Thống kê hệ thống */}
+      <SectionCard title="Thống kê hệ thống">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard
             title="Cánh đồng"
             value={loading ? "--" : formatNumber(systemSummary.fieldCount)}
             subtitle={`${formatNumber(systemSummary.activeSeasonCount)} vụ đang canh tác`}
-            icon={<LayoutDashboard size={22} />}
+            icon={<LayoutDashboard size={20} />}
             tone="emerald"
           />
           <StatCard
             title="Nông dân"
             value={loading ? "--" : formatNumber(systemSummary.farmerCount)}
             subtitle={`${formatNumber(systemSummary.completedSeasonCount)} vụ đã kết thúc`}
-            icon={<Users size={22} />}
+            icon={<Users size={20} />}
             tone="orange"
           />
           <StatCard
             title="Thửa ruộng"
             value={loading ? "--" : formatNumber(systemSummary.plotCount)}
             subtitle={`${formatNumber(systemSummary.activePlotCount)} thửa đang active`}
-            icon={<Sprout size={22} />}
+            icon={<Sprout size={20} />}
             tone="blue"
           />
           <StatCard
-            title="Diện tích đã khai báo"
+            title="Diện tích"
             value={loading ? "--" : formatArea(systemSummary.totalArea)}
             subtitle={`${formatNumber(systemSummary.inactivePlotCount)} thửa tạm ngưng`}
-            icon={<Map size={22} />}
+            icon={<Map size={20} />}
             tone="slate"
           />
         </div>
       </SectionCard>
 
-      <div className="mt-8">
+      {/* Bộ lọc mùa vụ */}
+      <div className="mt-6">
         <SectionCard
-          title="Bộ lọc thống kê mùa vụ"
-          description="Chỉ áp dụng cho phần thống kê vận hành theo mùa vụ ở bên dưới."
+          title="Bộ lọc mùa vụ"
           actions={
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="rounded-2xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:border-gray-300 hover:text-gray-800"
+                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-all hover:border-gray-300"
               >
                 Đặt lại
               </button>
               <button
                 type="button"
                 onClick={handleApplyFilters}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700"
               >
-                <Filter size={16} />
-                Áp dụng bộ lọc
+                <Filter size={14} />
+                Áp dụng
               </button>
             </div>
           }
         >
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Mùa vụ
-              </label>
-              <select
-                value={filterForm.seasonId}
-                onChange={(event) =>
-                  setFilterForm((prev) => ({ ...prev, seasonId: event.target.value }))
-                }
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
-              >
-                <option value="">Tất cả mùa vụ</option>
-                {(options.seasons || []).map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <CustomDropdown
+              value={filterForm.seasonId}
+              onChange={(val) => setFilterForm((prev) => ({ ...prev, seasonId: val }))}
+              placeholder="Tất cả mùa vụ"
+              variant="filter"
+              options={[
+                { value: "", label: "Tất cả mùa vụ" },
+                ...(options.seasons || []).map((item) => ({
+                  value: item._id,
+                  label: item.name,
+                })),
+              ]}
+            />
 
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Năm
-              </label>
-              <select
-                value={filterForm.year}
-                onChange={(event) =>
-                  setFilterForm((prev) => ({ ...prev, year: event.target.value }))
-                }
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
-              >
-                <option value="">Tất cả năm</option>
-                {(options.years || []).map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              value={filterForm.year}
+              onChange={(val) => setFilterForm((prev) => ({ ...prev, year: val }))}
+              placeholder="Tất cả năm"
+              variant="filter"
+              options={[
+                { value: "", label: "Tất cả năm" },
+                ...(options.years || []).map((item) => ({
+                  value: item,
+                  label: String(item),
+                })),
+              ]}
+            />
 
-            <div>
-              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-500">
-                Cánh đồng
-              </label>
-              <select
-                value={filterForm.fieldId}
-                onChange={(event) =>
-                  setFilterForm((prev) => ({ ...prev, fieldId: event.target.value }))
-                }
-                className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
-              >
-                <option value="">Tất cả cánh đồng</option>
-                {(options.fields || []).map((item) => (
-                  <option key={item._id} value={item._id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <CustomDropdown
+              value={filterForm.fieldId}
+              onChange={(val) => setFilterForm((prev) => ({ ...prev, fieldId: val }))}
+              placeholder="Tất cả cánh đồng"
+              variant="filter"
+              options={[
+                { value: "", label: "Tất cả cánh đồng" },
+                ...(options.fields || []).map((item) => ({
+                  value: item._id,
+                  label: item.name,
+                })),
+              ]}
+            />
           </div>
         </SectionCard>
       </div>
 
-      <div className="mt-8">
-        <SectionCard
-          title="Thống kê theo mùa vụ đã lọc"
-          description="Các số liệu dưới đây thay đổi theo bộ lọc mùa vụ, năm và cánh đồng."
-        >
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+      {/* Thống kê mùa vụ - giảm từ 8 xuống 4 */}
+      <div className="mt-6">
+        <SectionCard title="Thống kê theo mùa vụ">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
-              title="Đợt mùa vụ thực tế"
+              title="Đợt mùa vụ"
               value={loading ? "--" : formatNumber(seasonalSummary.seasonInstanceCount)}
-              subtitle={`${formatNumber(seasonalSummary.activeSeasonCount)} vụ đang canh tác`}
-              icon={<CalendarDays size={22} />}
+              subtitle={`${formatNumber(seasonalSummary.activeSeasonCount)} đang canh tác`}
+              icon={<CalendarDays size={20} />}
               tone="emerald"
             />
             <StatCard
               title="Nông dân tham gia"
               value={loading ? "--" : formatNumber(seasonalSummary.participatingFarmerCount)}
-              subtitle={`${formatNumber(seasonalSummary.participatingFieldCount)} cánh đồng có tham gia`}
-              icon={<Users size={22} />}
+              subtitle={`${formatNumber(seasonalSummary.participatingFieldCount)} cánh đồng`}
+              icon={<Users size={20} />}
               tone="orange"
             />
             <StatCard
-              title="Thửa tham gia vụ"
+              title="Thửa tham gia"
               value={loading ? "--" : formatNumber(seasonalSummary.assignedPlotCount)}
-              subtitle={`${formatNumber(seasonalSummary.readyPlotCount)} thửa sẵn sàng ghi nhật ký`}
-              icon={<Sprout size={22} />}
+              subtitle={formatArea(seasonalSummary.assignedArea)}
+              icon={<Sprout size={20} />}
               tone="blue"
             />
             <StatCard
-              title="Chi phí đã ghi nhận"
+              title="Chi phí ghi nhận"
               value={loading ? "--" : formatCurrency(seasonalSummary.totalCost)}
-              subtitle={`${formatNumber(seasonalSummary.diaryLogCount)} nhật ký trong phạm vi lọc`}
-              icon={<Wallet size={22} />}
-              tone="slate"
-            />
-          </div>
-
-          <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              title="Diện tích tham gia"
-              value={loading ? "--" : formatArea(seasonalSummary.assignedArea)}
-              subtitle="Diện tích của các thửa đã gán vào vụ"
-              icon={<Map size={22} />}
-              tone="emerald"
-            />
-            <StatCard
-              title="Vụ chưa có nhật ký"
-              value={loading ? "--" : formatNumber(seasonalSummary.seasonWithoutDiaryCount)}
-              subtitle="Giúp admin phát hiện mùa vụ chưa được cập nhật"
-              icon={<ClipboardList size={22} />}
-              tone="orange"
-            />
-            <StatCard
-              title="Thửa chưa sẵn sàng"
-              value={loading ? "--" : formatNumber(seasonalSummary.inactiveAssignedPlotCount)}
-              subtitle="Thửa đã gán nhưng hiện không active"
-              icon={<Activity size={22} />}
-              tone="blue"
-            />
-            <StatCard
-              title="Vụ đã kết thúc"
-              value={loading ? "--" : formatNumber(seasonalSummary.completedSeasonCount)}
-              subtitle="Tổng số đợt mùa vụ đã hoàn thành trong phạm vi lọc"
-              icon={<CalendarDays size={22} />}
+              subtitle={`${formatNumber(seasonalSummary.diaryLogCount)} nhật ký`}
+              icon={<Wallet size={20} />}
               tone="slate"
             />
           </div>
         </SectionCard>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[1.2fr_0.8fr]">
-        <SectionCard
-          title="Tổng hợp theo mùa vụ"
-          description="Nhóm theo tên mùa vụ và năm để admin so sánh quy mô triển khai giữa các đợt canh tác."
-        >
+      {/* Bảng: Mùa vụ + Nhật ký gần đây */}
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+        <SectionCard title="Tổng hợp theo mùa vụ">
           <DataTable
             rowKey={(row) => `${row.seasonId}-${row.year}`}
-            emptyText="Chưa có dữ liệu mùa vụ theo bộ lọc đã chọn."
+            emptyText="Chưa có dữ liệu mùa vụ."
             columns={[
               {
                 key: "seasonLabel",
@@ -427,8 +360,8 @@ const AdminOverview = () => {
                 render: (row) => (
                   <div>
                     <p className="font-semibold text-gray-900">{row.seasonLabel}</p>
-                    <p className="mt-1 text-xs text-gray-400">
-                      {row.activeSeasonCount} active, {row.completedSeasonCount} completed
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      {row.activeSeasonCount} active · {row.completedSeasonCount} done
                     </p>
                   </div>
                 ),
@@ -437,17 +370,10 @@ const AdminOverview = () => {
                 key: "scope",
                 label: "Quy mô",
                 render: (row) => (
-                  <div className="space-y-1 text-sm">
-                    <p>{row.fieldCount} cánh đồng</p>
-                    <p>{row.farmerCount} nông dân</p>
-                    <p>{row.plotCount} thửa</p>
-                  </div>
+                  <span className="text-sm">
+                    {row.fieldCount} đồng · {row.farmerCount} ND · {row.plotCount} thửa
+                  </span>
                 ),
-              },
-              {
-                key: "assignedArea",
-                label: "Diện tích",
-                render: (row) => formatArea(row.assignedArea),
               },
               {
                 key: "totalCost",
@@ -459,48 +385,40 @@ const AdminOverview = () => {
           />
         </SectionCard>
 
-        <SectionCard
-          title="Nhật ký gần đây"
-          description="Hoạt động canh tác mới nhất trong phạm vi bộ lọc mùa vụ."
-        >
+        <SectionCard title="Nhật ký gần đây">
           {recentActivities.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
-              Chưa có nhật ký nào trong phạm vi lọc.
+            <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500">
+              Chưa có nhật ký nào.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {recentActivities.map((item) => {
                 const statusMeta = getStatusMeta(item.status);
 
                 return (
                   <article
                     key={item._id}
-                    className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4"
+                    className="rounded-xl border border-gray-100 bg-gray-50/80 p-3.5"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold text-gray-900">{item.taskName}</p>
-                        <p className="mt-1 text-xs text-gray-500">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{item.taskName}</p>
+                        <p className="mt-0.5 text-xs text-gray-500 truncate">
                           {item.fieldName} • {item.farmerName}
                         </p>
                       </div>
                       <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusMeta.className}`}
+                        className={`flex-shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusMeta.className}`}
                       >
                         {statusMeta.label}
                       </span>
                     </div>
-                    <div className="mt-3 flex flex-wrap gap-3 text-xs text-gray-500">
+                    <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
                       <span>{formatDate(item.date)}</span>
-                      <span>{item.plotName || "Toàn cánh đồng"}</span>
-                      <span>{item.seasonLabel}</span>
+                      <span className="font-semibold text-emerald-700">
+                        {formatCurrency(item.cost)}
+                      </span>
                     </div>
-                    {item.description ? (
-                      <p className="mt-3 line-clamp-2 text-sm text-gray-600">{item.description}</p>
-                    ) : null}
-                    <p className="mt-3 text-sm font-semibold text-emerald-700">
-                      {formatCurrency(item.cost)}
-                    </p>
                   </article>
                 );
               })}
@@ -509,11 +427,9 @@ const AdminOverview = () => {
         </SectionCard>
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-2">
-        <SectionCard
-          title="Cánh đồng nổi bật theo hoạt động"
-          description="Ưu tiên các cánh đồng có nhiều nhật ký hoặc chi phí phát sinh trong phạm vi đang xem."
-        >
+      {/* Bảng: Cánh đồng + Mùa vụ thực tế */}
+      <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SectionCard title="Cánh đồng nổi bật">
           <DataTable
             rowKey={(row) => row.fieldId}
             emptyText="Chưa có thống kê cánh đồng."
@@ -522,27 +438,17 @@ const AdminOverview = () => {
                 key: "fieldName",
                 label: "Cánh đồng",
                 render: (row) => (
-                  <div>
-                    <p className="font-semibold text-gray-900">{row.fieldName}</p>
-                    <p className="mt-1 text-xs text-gray-400">{row.address || "Chưa cập nhật địa bàn"}</p>
-                  </div>
+                  <p className="font-semibold text-gray-900">{row.fieldName}</p>
                 ),
               },
               {
                 key: "participation",
-                label: "Tham gia",
+                label: "Quy mô",
                 render: (row) => (
-                  <div className="space-y-1 text-sm">
-                    <p>{row.seasonInstanceCount} đợt mùa vụ</p>
-                    <p>{row.farmerCount} nông dân</p>
-                    <p>{row.plotCount} thửa</p>
-                  </div>
+                  <span className="text-sm">
+                    {row.seasonInstanceCount} vụ · {row.farmerCount} ND · {row.plotCount} thửa
+                  </span>
                 ),
-              },
-              {
-                key: "assignedArea",
-                label: "Diện tích",
-                render: (row) => formatArea(row.assignedArea),
               },
               {
                 key: "totalCost",
@@ -554,59 +460,10 @@ const AdminOverview = () => {
           />
         </SectionCard>
 
-        <SectionCard
-          title="Nông dân tham gia nhiều"
-          description="Cho biết ai đang có nhiều hoạt động mùa vụ, nhiều thửa tham gia và phát sinh nhật ký."
-        >
-          <DataTable
-            rowKey={(row) => row.farmerId}
-            emptyText="Chưa có thống kê nông dân."
-            columns={[
-              {
-                key: "fullName",
-                label: "Nông dân",
-                render: (row) => (
-                  <div>
-                    <p className="font-semibold text-gray-900">{row.fullName}</p>
-                    <p className="mt-1 text-xs text-gray-400">{row.email || "Không có email"}</p>
-                  </div>
-                ),
-              },
-              {
-                key: "scope",
-                label: "Phạm vi",
-                render: (row) => (
-                  <div className="space-y-1 text-sm">
-                    <p>{row.fieldCount} cánh đồng</p>
-                    <p>{row.seasonInstanceCount} vụ</p>
-                    <p>{row.plotCount} thửa</p>
-                  </div>
-                ),
-              },
-              {
-                key: "diaryLogCount",
-                label: "Nhật ký",
-                render: (row) => formatNumber(row.diaryLogCount),
-              },
-              {
-                key: "totalCost",
-                label: "Chi phí",
-                render: (row) => formatCurrency(row.totalCost),
-              },
-            ]}
-            rows={farmerRows}
-          />
-        </SectionCard>
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 gap-8 xl:grid-cols-[1.1fr_0.9fr]">
-        <SectionCard
-          title="Các đợt mùa vụ thực tế"
-          description="Chi tiết từng vụ đã được nông dân bắt đầu trên từng cánh đồng."
-        >
+        <SectionCard title="Đợt mùa vụ thực tế">
           <DataTable
             rowKey={(row) => row._id}
-            emptyText="Chưa có đợt mùa vụ nào trong phạm vi lọc."
+            emptyText="Chưa có đợt mùa vụ nào."
             columns={[
               {
                 key: "seasonLabel",
@@ -614,7 +471,7 @@ const AdminOverview = () => {
                 render: (row) => (
                   <div>
                     <p className="font-semibold text-gray-900">{row.seasonLabel}</p>
-                    <p className="mt-1 text-xs text-gray-400">{row.field.name}</p>
+                    <p className="mt-0.5 text-xs text-gray-400">{row.field.name}</p>
                   </div>
                 ),
               },
@@ -630,22 +487,12 @@ const AdminOverview = () => {
                   const statusMeta = getStatusMeta(row.status);
                   return (
                     <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusMeta.className}`}
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${statusMeta.className}`}
                     >
                       {statusMeta.label}
                     </span>
                   );
                 },
-              },
-              {
-                key: "plots",
-                label: "Thửa / nhật ký",
-                render: (row) => (
-                  <div className="space-y-1 text-sm">
-                    <p>{row.plotCount} thửa</p>
-                    <p>{row.diaryLogCount} nhật ký</p>
-                  </div>
-                ),
               },
               {
                 key: "totalCost",
@@ -655,38 +502,6 @@ const AdminOverview = () => {
             ]}
             rows={seasonInstances}
           />
-        </SectionCard>
-
-        <SectionCard
-          title="Tổng hợp theo công việc"
-          description="Nhìn nhanh nhóm công việc nào xuất hiện nhiều hoặc tốn chi phí nhất."
-        >
-          {taskRows.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
-              Chưa có dữ liệu công việc trong phạm vi lọc.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {taskRows.map((item) => (
-                <div
-                  key={item.taskId}
-                  className="rounded-2xl border border-gray-100 bg-gray-50/80 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold text-gray-900">{item.taskName}</p>
-                      <p className="mt-1 text-xs text-gray-400">
-                        {formatNumber(item.diaryLogCount)} nhật ký
-                      </p>
-                    </div>
-                    <p className="text-sm font-semibold text-emerald-700">
-                      {formatCurrency(item.totalCost)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </SectionCard>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Loader, Plus, Pencil, Trash2, Save, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Save, X } from "lucide-react";
 import api from "../../services/api";
 import { useFeedback } from "../../hooks/useFeedback";
 import LoadingScreen from "../../components/Layout/LoadingScreen";
@@ -103,8 +103,7 @@ const AdminTasks = () => {
   return (
     <div className="p-8 h-full bg-gray-50 overflow-y-auto">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Quản Lý Công Việc</h1>
-        {/* <p className="text-gray-600 mt-1">Thêm mới, chỉnh sửa và xóa tên công việc.</p> */}
+        <h1 className="text-2xl font-bold text-gray-800">Quản lý công việc</h1>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">

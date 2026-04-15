@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import {
-  Loader,
   Plus,
   Pencil,
   Trash2,
@@ -151,8 +150,7 @@ const AdminSeasons = () => {
   return (
     <div className="p-8 h-full bg-gray-50 overflow-y-auto">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Quản Lý Mùa Vụ</h1>
-        {/* <p className="text-gray-600 mt-1">Thêm mới, chỉnh sửa và xóa tên mùa vụ.</p> */}
+        <h1 className="text-2xl font-bold text-gray-800">Quản lý mùa vụ</h1>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">

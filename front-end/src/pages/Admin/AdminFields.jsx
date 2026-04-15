@@ -104,10 +104,7 @@ const AdminFields = () => {
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Quản lý cánh đồng</h1>
-          <p className="mt-1 text-gray-500">
-            Admin tạo cánh đồng/khu vực dùng chung để nông dân gắn thửa ruộng và ghi nhật ký.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-800">Quản lý cánh đồng</h1>
         </div>
 
         <button
@@ -151,9 +148,6 @@ const AdminFields = () => {
                     <p className="mt-2 flex items-center gap-2 text-sm text-gray-500">
                       <MapPin size={14} />
                       {field.address || "Chưa cập nhật địa bàn"}
-                    </p>
-                    <p className="mt-2 text-xs text-gray-400">
-                      Tạo bởi: {field.createdByName || "Admin"}
                     </p>
                   </div>
                 </div>
