@@ -5,11 +5,15 @@ const { protect, isAdmin } = require("../middlewares/authMiddleware");
 
 router.use(protect);
 
+// Public route — farmer can get the currently active season detail
+router.get("/active", seasonDetailController.getActiveSeasonDetail);
+router.get("/member", seasonDetailController.getFarmerSeasonDetails);
+
+// Admin-only routes
 router.get("/admin/all", isAdmin, seasonDetailController.getAllSeasonDetails);
-router.get("/", seasonDetailController.getSeasonDetailsByField); // ?fieldId=...
-router.post("/", seasonDetailController.createSeasonDetail);
-router.put("/:id", seasonDetailController.updateSeasonDetail);
-router.put("/:id/finish", seasonDetailController.finishSeasonDetail);
-router.delete("/:id", seasonDetailController.deleteSeasonDetail);
+router.post("/", isAdmin, seasonDetailController.createSeasonDetail);
+router.put("/:id", isAdmin, seasonDetailController.updateSeasonDetail);
+router.put("/:id/finish", isAdmin, seasonDetailController.finishSeasonDetail);
+router.delete("/:id", isAdmin, seasonDetailController.deleteSeasonDetail);
 
 module.exports = router;

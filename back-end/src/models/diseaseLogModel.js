@@ -24,20 +24,10 @@ const diseaseLogSchema = new mongoose.Schema(
       enum: ["all_plots", "selected_plots"],
       required: true,
     },
-    season: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "SeasonDetail",
-      required: true,
-    },
-    field: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Field",
-      required: true,
-    },
-    plots: [
+    seasonPlotAssignments: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Plot",
+        ref: "SeasonPlotAssignment",
       },
     ],
     plotSnapshot: [

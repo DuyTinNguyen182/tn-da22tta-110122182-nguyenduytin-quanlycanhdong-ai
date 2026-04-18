@@ -5,7 +5,6 @@ import CropsSidebar from "../components/Crops/CropsSidebar";
 import SeasonHeader from "../components/Crops/SeasonHeader";
 import DiaryLogList from "../components/Crops/DiaryLogList";
 import DiaryLogModal from "../components/Crops/DiaryLogModal";
-import SeasonModal from "../components/Crops/SeasonModal";
 
 const getToday = () => new Date().toISOString().split("T")[0];
 
@@ -15,14 +14,6 @@ const emptyLogForm = {
   cost: "",
   date: getToday(),
   selectedPlotIds: [],
-};
-
-const emptySeasonForm = {
-  seasonId: "",
-  year: new Date().getFullYear(),
-  startDate: getToday(),
-  plotIds: [],
-  editingSeasonId: null,
 };
 
 const sortSeasons = (items = []) =>
@@ -47,17 +38,14 @@ const Crops = () => {
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
   const [plots, setPlots] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [seasonCatalogs, setSeasonCatalogs] = useState([]);
   const [taskTypes, setTaskTypes] = useState([]);
   const [loadingFieldDetail, setLoadingFieldDetail] = useState(false);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [filterPlotId, setFilterPlotId] = useState("");
   const [filterTaskId, setFilterTaskId] = useState("");
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
-  const [isSeasonModalOpen, setIsSeasonModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
   const [logForm, setLogForm] = useState(emptyLogForm);
-  const [seasonForm, setSeasonForm] = useState(emptySeasonForm);
 
   // ──────────────── Derived state ────────────────
 
@@ -82,15 +70,6 @@ const Crops = () => {
   const hasActiveSeason = sortedSeasons.some((s) => s.status === "active");
   const seasonAssignedPlots = currentSeason?.assignedPlots || [];
   const seasonLoggablePlots = currentSeason?.loggablePlots || [];
-
-  const seasonSelectablePlots = useMemo(() => {
-    const selectedIds = new Set(seasonForm.plotIds || []);
-    return plots.map((plot) => {
-      const isSelected = selectedIds.has(plot._id);
-      const canSelect = plot.status === "active" || isSelected;
-      return { ...plot, isSelected, canSelect };
-    });
-  }, [plots, seasonForm.plotIds]);
 
   const filterPlotOptions = useMemo(() => {
     const optionMap = new Map();
@@ -132,9 +111,8 @@ const Crops = () => {
   useEffect(() => {
     const loadBootstrap = async () => {
       try {
-        const [fieldRes, seasonRes, taskRes] = await Promise.all([
+        const [fieldRes, taskRes] = await Promise.all([
           api.get("/fields"),
-          api.get("/seasons"),
           api.get("/tasks"),
         ]);
 
@@ -142,12 +120,11 @@ const Crops = () => {
           (f) => Number(f.myPlotCount || 0) > 0
         );
         setFields(nextFields);
-        setSeasonCatalogs(seasonRes.data || []);
         setTaskTypes(taskRes.data || []);
 
         if (nextFields.length > 0) setSelectedField(nextFields[0]);
       } catch (error) {
-        console.error("Lỗi tải dữ liệu mùa vụ", error);
+        console.error("Lỗi tải dữ liệu cơ sở", error);
       }
     };
     loadBootstrap();
@@ -170,7 +147,7 @@ const Crops = () => {
         setLogs([]);
 
         const [seasonRes, plotRes] = await Promise.all([
-          api.get("/season-details", { params: { fieldId: selectedField._id } }),
+          api.get("/season-details/member", { params: { fieldId: selectedField._id } }),
           api.get("/plots", { params: { fieldId: selectedField._id } }),
         ]);
 
@@ -209,107 +186,11 @@ const Crops = () => {
 
   // ──────────────── Helpers ────────────────
 
-  const reloadCurrentField = async (preferredSeasonId) => {
-    if (!selectedField?._id) return;
-
-    const [seasonRes, plotRes] = await Promise.all([
-      api.get("/season-details", { params: { fieldId: selectedField._id } }),
-      api.get("/plots", { params: { fieldId: selectedField._id } }),
-    ]);
-
-    const nextSeasons = seasonRes.data || [];
-    setSeasons(nextSeasons);
-    setPlots(plotRes.data || []);
-    setSelectedSeasonId(preferredSeasonId || sortSeasons(nextSeasons)[0]?._id || "");
-  };
-
   const refreshLogs = async (seasonId) => {
     const res = await api.get("/diary-logs", { params: { seasonId } });
     setLogs(res.data || []);
   };
 
-  // ──────────────── Season handlers ────────────────
-
-  const openCreateSeasonModal = () => {
-    setSeasonForm({
-      seasonId: "",
-      year: new Date().getFullYear(),
-      startDate: getToday(),
-      plotIds: activePlots.map((p) => p._id),
-      editingSeasonId: null,
-    });
-    setIsSeasonModalOpen(true);
-  };
-
-  const openEditSeasonModal = () => {
-    if (!currentSeason) return;
-    setSeasonForm({
-      seasonId: currentSeason.seasonId || currentSeason.season?._id || "",
-      year: currentSeason.year || new Date().getFullYear(),
-      startDate: currentSeason.startDate?.split("T")[0] || getToday(),
-      plotIds: currentSeason.assignedPlotIds || [],
-      editingSeasonId: currentSeason._id,
-    });
-    setIsSeasonModalOpen(true);
-  };
-
-  const handleSaveSeason = async () => {
-    if (!selectedField?._id) {
-      toast.warning("Vui lòng chọn cánh đồng.");
-      return;
-    }
-    if (!seasonForm.seasonId) {
-      toast.warning("Vui lòng chọn mùa vụ.");
-      return;
-    }
-    if ((seasonForm.plotIds || []).length === 0) {
-      toast.warning("Cần chọn ít nhất 1 thửa tham gia vụ mùa.");
-      return;
-    }
-
-    const payload = {
-      seasonId: seasonForm.seasonId,
-      year: Number(seasonForm.year),
-      fieldId: selectedField._id,
-      startDate: seasonForm.startDate,
-      plotIds: seasonForm.plotIds,
-      status: "active",
-    };
-
-    try {
-      if (seasonForm.editingSeasonId) {
-        const res = await api.put(`/season-details/${seasonForm.editingSeasonId}`, payload);
-        await reloadCurrentField(res.data?._id || seasonForm.editingSeasonId);
-      } else {
-        const res = await api.post("/season-details", payload);
-        await reloadCurrentField(res.data?._id);
-      }
-      setIsSeasonModalOpen(false);
-      toast.success(seasonForm.editingSeasonId ? "Đã cập nhật vụ mùa." : "Đã bắt đầu vụ mới.");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Không thể lưu mùa vụ.");
-    }
-  };
-
-  const handleFinishSeason = async () => {
-    if (!currentSeason) return;
-
-    const confirmed = await confirm({
-      title: "Kết thúc vụ này?",
-      message: "Sau khi kết thúc, bạn chỉ có thể xem lại lịch sử và không thêm nhật ký mới.",
-      confirmText: "Kết thúc vụ",
-      tone: "danger",
-    });
-    if (!confirmed) return;
-
-    try {
-      const res = await api.put(`/season-details/${currentSeason._id}/finish`);
-      toast.success("Đã kết thúc vụ mùa.");
-      await reloadCurrentField(res.data?._id || currentSeason._id);
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Không thể kết thúc vụ mùa.");
-    }
-  };
 
   // ──────────────── Log handlers ────────────────
 
@@ -427,17 +308,6 @@ const Crops = () => {
     }));
   };
 
-  const toggleSeasonPlot = (plotId) => {
-    setSeasonForm((prev) => ({
-      ...prev,
-      plotIds: prev.plotIds.includes(plotId)
-        ? prev.plotIds.filter((id) => id !== plotId)
-        : [...prev.plotIds, plotId],
-    }));
-  };
-
-  const selectedSeasonCatalog = seasonCatalogs.find((s) => s._id === seasonForm.seasonId);
-
   // ──────────────── Render ────────────────
 
   return (
@@ -468,9 +338,6 @@ const Crops = () => {
               taskTypes={taskTypes}
               totalCost={totalCost}
               onSelectSeason={setSelectedSeasonId}
-              onCreateSeason={openCreateSeasonModal}
-              onEditSeason={openEditSeasonModal}
-              onFinishSeason={handleFinishSeason}
               onCreateLog={openCreateLogModal}
               onFilterPlotChange={setFilterPlotId}
               onFilterTaskChange={setFilterTaskId}
@@ -509,18 +376,6 @@ const Crops = () => {
         onFormChange={(changes) => setLogForm((prev) => ({ ...prev, ...changes }))}
         onTogglePlot={toggleLogPlot}
         onSelectAllPlots={handleSelectAllLogPlots}
-      />
-
-      <SeasonModal
-        isOpen={isSeasonModalOpen}
-        seasonForm={seasonForm}
-        seasonCatalogs={seasonCatalogs}
-        seasonSelectablePlots={seasonSelectablePlots}
-        selectedSeasonCatalog={selectedSeasonCatalog}
-        onClose={() => setIsSeasonModalOpen(false)}
-        onSave={handleSaveSeason}
-        onFormChange={(changes) => setSeasonForm((prev) => ({ ...prev, ...changes }))}
-        onTogglePlot={toggleSeasonPlot}
       />
     </div>
   );

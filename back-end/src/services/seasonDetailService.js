@@ -1,439 +1,347 @@
-const Field = require("../models/fieldModel");
-const Plot = require("../models/plotModel");
 const SeasonDetail = require("../models/seasonDetailModel");
-const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const DiaryLog = require("../models/diaryLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
+const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const {
   getSeasonMap,
   resolveSeasonId,
   getSeasonNameById,
 } = require("./seasonService");
 
-const buildSeasonQuery = (fieldId, userId) => ({ field: fieldId, user: userId });
-
-const ensureFieldExists = async (fieldId) => {
-  const field = await Field.findById(fieldId);
-  if (!field) {
-    throw new Error("Không tìm thấy cánh đồng");
-  }
-
-  return field;
-};
-
-const ensureActiveSeasonAvailablePlots = async (fieldId, userId) => {
-  const activePlotCount = await Plot.countDocuments({
-    field: fieldId,
-    user: userId,
-    status: "active",
-  });
-
-  if (!activePlotCount) {
-    throw new Error(
-      "Bạn cần có ít nhất 1 thửa ruộng đang active trong cánh đồng này trước khi bắt đầu vụ mới."
-    );
-  }
-
-  return activePlotCount;
-};
-
-const hasActiveSeasonDetails = async (fieldId, userId) => {
-  const activeSeason = await SeasonDetail.findOne({
-    field: fieldId,
-    user: userId,
-    status: "active",
-  });
-  return !!activeSeason;
-};
-
-const seasonDetailExists = async (seasonId, year, fieldId, userId) => {
-  const existing = await SeasonDetail.findOne({
-    season: seasonId,
-    year,
-    field: fieldId,
-    user: userId,
-  });
-  return !!existing;
-};
-
-const normalizePlotIds = (plotIds = []) => {
-  const nextIds = Array.isArray(plotIds) ? plotIds : [];
-  return Array.from(new Set(nextIds.filter(Boolean).map((item) => String(item))));
-};
-
-const buildLegacyPlotIds = async (seasonDoc) => {
-  const seasonId = String(seasonDoc._id);
-  const logPlotIds = await DiaryLog.distinct("plot", {
-    season: seasonId,
-    plot: { $ne: null },
-  });
-
-  if (logPlotIds.length > 0) {
-    return logPlotIds.map((item) => String(item));
-  }
-
-  if (seasonDoc.status === "active") {
-    const plots = await Plot.find({
-      field: seasonDoc.field,
-      user: seasonDoc.user,
-      status: "active",
-    })
-      .select("_id")
-      .lean();
-
-    return plots.map((item) => String(item._id));
-  }
-
-  return [];
-};
-
-const ensureSeasonAssignments = async (seasonDoc) => {
-  const existingAssignments = await SeasonPlotAssignment.find({
-    seasonDetail: seasonDoc._id,
-  }).lean();
-
-  if (existingAssignments.length > 0) {
-    return existingAssignments;
-  }
-
-  const legacyPlotIds = await buildLegacyPlotIds(seasonDoc);
-  if (legacyPlotIds.length === 0) {
-    return [];
-  }
-
-  await SeasonPlotAssignment.insertMany(
-    legacyPlotIds.map((plotId) => ({
-      seasonDetail: seasonDoc._id,
-      field: seasonDoc.field,
-      plot: plotId,
-      user: seasonDoc.user,
-      status: "active",
-    }))
-  );
-
-  return await SeasonPlotAssignment.find({ seasonDetail: seasonDoc._id }).lean();
-};
-
-const getAssignmentsWithPlots = async (seasonDetailId) => {
-  return await SeasonPlotAssignment.find({ seasonDetail: seasonDetailId })
-    .populate("plot", "name area status addressDetail")
-    .sort({ createdAt: 1 })
-    .lean();
-};
-
-const syncSeasonAssignments = async ({ seasonDoc, plotIds, userId }) => {
-  const normalizedIds = normalizePlotIds(plotIds);
-  const existingAssignments = await SeasonPlotAssignment.find({
-    seasonDetail: seasonDoc._id,
-  }).lean();
-  const existingMap = new Map(existingAssignments.map((item) => [String(item.plot), item]));
-
-  let candidateIds = normalizedIds;
-  if (candidateIds.length === 0) {
-    if (existingAssignments.length > 0) {
-      candidateIds = existingAssignments
-        .filter((item) => item.status === "active")
-        .map((item) => String(item.plot));
-    } else {
-      const activePlots = await Plot.find({
-        field: seasonDoc.field,
-        user: userId,
-        status: "active",
-      })
-        .select("_id")
-        .lean();
-      candidateIds = activePlots.map((item) => String(item._id));
-    }
-  }
-
-  if (candidateIds.length === 0) {
-    throw new Error("Cần chọn ít nhất 1 thửa tham gia vụ mùa.");
-  }
-
-  const plots = await Plot.find({
-    _id: { $in: candidateIds },
-    field: seasonDoc.field,
-    user: userId,
-  })
-    .select("_id status")
-    .lean();
-
-  if (plots.length !== candidateIds.length) {
-    throw new Error("Có thửa ruộng không hợp lệ hoặc không thuộc cánh đồng này.");
-  }
-
-  const existingIds = new Set(existingAssignments.map((item) => String(item.plot)));
-  const logsByPlot = await DiaryLog.distinct("plot", {
-    season: seasonDoc._id,
-    plot: { $ne: null },
-  });
-  const protectedPlotIds = new Set(logsByPlot.map((item) => String(item)));
-
-  candidateIds.forEach((plotId) => {
-    const plot = plots.find((item) => String(item._id) === plotId);
-    if (plot?.status !== "active" && !existingIds.has(plotId)) {
-      throw new Error("Chi co the them cac thua dang active vao vu mua.");
-    }
-  });
-
-  const operations = [];
-
-  candidateIds.forEach((plotId) => {
-    if (!existingIds.has(plotId)) {
-      operations.push({
-        insertOne: {
-          document: {
-            seasonDetail: seasonDoc._id,
-            field: seasonDoc.field,
-            plot: plotId,
-            user: userId,
-            status: "active",
-          },
-        },
-      });
-    } else if (existingMap.get(plotId)?.status !== "active") {
-      operations.push({
-        updateOne: {
-          filter: { seasonDetail: seasonDoc._id, plot: plotId },
-          update: { $set: { status: "active", updatedAt: new Date() } },
-        },
-      });
-    }
-  });
-
-  existingAssignments.forEach((assignment) => {
-    const plotId = String(assignment.plot);
-    if (candidateIds.includes(plotId)) {
-      return;
-    }
-
-    if (protectedPlotIds.has(plotId) || assignment.status === "active") {
-      operations.push({
-        updateOne: {
-          filter: { seasonDetail: seasonDoc._id, plot: plotId },
-          update: { $set: { status: "inactive", updatedAt: new Date() } },
-        },
-      });
-    }
-  });
-
-  if (operations.length > 0) {
-    await SeasonPlotAssignment.bulkWrite(operations);
-  }
-};
-
-const decorateSeasonDetail = async (seasonDoc, catalogMap) => {
-  const season = seasonDoc.toObject ? seasonDoc.toObject() : { ...seasonDoc };
+/**
+ * Decorate a season detail document with the season catalog name.
+ */
+const decorateSeasonDetail = (seasonDoc, catalogMap) => {
+  const detail = seasonDoc.toObject ? seasonDoc.toObject() : { ...seasonDoc };
   const seasonRefId =
-    season?.season && typeof season.season === "object" && season.season._id
-      ? String(season.season._id)
-      : season?.season
-        ? String(season.season)
+    detail.season && typeof detail.season === "object" && detail.season._id
+      ? String(detail.season._id)
+      : detail.season
+        ? String(detail.season)
         : null;
-  const seasonMeta = seasonRefId ? catalogMap.get(seasonRefId) || season.season || null : null;
+
+  const seasonMeta = seasonRefId
+    ? catalogMap.get(seasonRefId) || detail.season || null
+    : null;
   const seasonName = seasonMeta?.name || "Không xác định";
 
-  await ensureSeasonAssignments(seasonDoc);
-  const assignments = await getAssignmentsWithPlots(seasonDoc._id);
-  const activeAssignments = assignments.filter((item) => item.status === "active");
-  const loggableAssignments = activeAssignments.filter((item) => item.plot?.status === "active");
-
   return {
-    ...season,
+    ...detail,
     seasonId: seasonRefId,
     season: seasonMeta,
     seasonName,
-    name: `${seasonName} ${season.year}`,
-    assignments,
-    assignedPlotIds: activeAssignments.map((item) => String(item.plot?._id || item.plot)),
-    assignedPlots: activeAssignments.map((item) => item.plot).filter(Boolean),
-    loggablePlotIds: loggableAssignments.map((item) => String(item.plot?._id || item.plot)),
-    loggablePlots: loggableAssignments.map((item) => item.plot).filter(Boolean),
-    totalPlotCount: assignments.length,
-    activePlotCount: activeAssignments.length,
-    loggablePlotCount: loggableAssignments.length,
+    name: seasonName,
   };
 };
 
-const getSeasonDetailsByField = async (fieldId, userId) => {
-  await ensureFieldExists(fieldId);
-
-  const [seasonDocs, catalogMap] = await Promise.all([
-    SeasonDetail.find(buildSeasonQuery(fieldId, userId))
-      .populate("season", "name")
-      .populate("field", "name address")
-      .populate("user", "fullName email")
-      .sort({ status: -1, createdAt: -1 }),
-    getSeasonMap(),
-  ]);
-
-  return await Promise.all(seasonDocs.map((doc) => decorateSeasonDetail(doc, catalogMap)));
-};
-
+/**
+ * Get all season details (admin view).
+ */
 const getAllSeasonDetails = async () => {
   const [seasonDocs, catalogMap] = await Promise.all([
     SeasonDetail.find()
       .populate("season", "name")
-      .populate("field", "name address")
-      .populate("user", "fullName email")
-      .sort({ createdAt: -1 }),
+      .sort({ startDate: -1, createdAt: -1 }),
     getSeasonMap(),
   ]);
 
-  return await Promise.all(seasonDocs.map((doc) => decorateSeasonDetail(doc, catalogMap)));
+  return seasonDocs.map((doc) => decorateSeasonDetail(doc, catalogMap));
 };
 
-const createSeasonDetail = async (data, userId) => {
-  const { year, fieldId, startDate, status = "active" } = data;
+/**
+ * Get a single season detail by id.
+ */
+const getSeasonDetailById = async (id) => {
+  const seasonDoc = await SeasonDetail.findById(id).populate("season", "name");
+  if (!seasonDoc) {
+    throw new Error("Không tìm thấy chi tiết mùa vụ");
+  }
 
-  await ensureFieldExists(fieldId);
-  await ensureActiveSeasonAvailablePlots(fieldId, userId);
+  const catalogMap = await getSeasonMap();
+  return decorateSeasonDetail(seasonDoc, catalogMap);
+};
+
+/**
+ * Get the currently active season detail (for farmer usage later).
+ * Returns null if no active season detail exists.
+ */
+const getActiveSeasonDetail = async () => {
+  const now = new Date();
+  const seasonDoc = await SeasonDetail.findOne({
+    startDate: { $lte: now },
+    $or: [{ endDate: null }, { endDate: { $gte: now } }]
+  }).populate("season", "name");
+
+  if (!seasonDoc) {
+    return null;
+  }
+
+  const catalogMap = await getSeasonMap();
+  return decorateSeasonDetail(seasonDoc, catalogMap);
+};
+
+/**
+ * Create a new season detail (admin only).
+ */
+const createSeasonDetail = async (data) => {
+  const { startDate, endDate } = data;
 
   const seasonId = await resolveSeasonId(data);
   const catalogMap = await getSeasonMap();
   const resolvedName = catalogMap.get(seasonId)?.name || "Không xác định";
 
-  const hasActive = await hasActiveSeasonDetails(fieldId, userId);
-  if (hasActive && status === "active") {
-    throw new Error(
-      "Cánh đồng này đang có vụ canh tác chưa kết thúc. Vui lòng kết thúc vụ hiện tại trước khi bắt đầu vụ mới."
-    );
-  }
+  const now = new Date();
+  const isActive = startDate && new Date(startDate) <= now && (!endDate || new Date(endDate) >= now);
 
-  const exists = await seasonDetailExists(seasonId, year, fieldId, userId);
-  if (exists) {
-    throw new Error(`Vụ ${resolvedName} ${year} đã tồn tại cho cánh đồng này.`);
-  }
-
-  const season = await SeasonDetail.create({
-    season: seasonId,
-    year,
-    field: fieldId,
-    startDate: startDate || new Date(),
-    user: userId,
-    status,
-  });
-
-  await syncSeasonAssignments({
-    seasonDoc: season,
-    plotIds: data.plotIds,
-    userId,
-  });
-
-  const seasonDoc = await SeasonDetail.findById(season._id)
-    .populate("season", "name")
-    .populate("field", "name address")
-    .populate("user", "fullName email");
-
-  return await decorateSeasonDetail(seasonDoc, catalogMap);
-};
-
-const finishSeasonDetail = async (id, userId) => {
-  const [updatedDoc, catalogMap] = await Promise.all([
-    SeasonDetail.findOneAndUpdate(
-      { _id: id, user: userId },
-      { status: "completed", endDate: new Date() },
-      { new: true }
-    )
-      .populate("season", "name")
-      .populate("field", "name address")
-      .populate("user", "fullName email"),
-    getSeasonMap(),
-  ]);
-
-  return updatedDoc ? await decorateSeasonDetail(updatedDoc, catalogMap) : null;
-};
-
-const updateSeasonDetail = async (id, data, userId) => {
-  const season = await SeasonDetail.findOne({ _id: id, user: userId });
-  if (!season) {
-    throw new Error("Không tìm thấy mùa vụ");
-  }
-
-  if (season.status !== "active") {
-    throw new Error("Chỉ có thể chỉnh sửa vụ đang active");
-  }
-
-  await ensureFieldExists(season.field);
-  await ensureActiveSeasonAvailablePlots(season.field, userId);
-
-  const updateData = { ...data };
-  if (updateData.seasonName && !updateData.seasonId && !updateData.seasonCode) {
-    updateData.seasonId = await resolveSeasonId({ seasonName: updateData.seasonName });
-  }
-
-  if (updateData.seasonId || updateData.seasonCode) {
-    updateData.seasonId = await resolveSeasonId({
-      seasonId: updateData.seasonId,
-      seasonCode: updateData.seasonCode,
+  if (isActive) {
+    const existingActive = await SeasonDetail.findOne({
+      startDate: { $lte: now },
+      $or: [{ endDate: null }, { endDate: { $gte: now } }]
     });
-  }
-
-  if (
-    (updateData.seasonId && String(updateData.seasonId) !== String(season.season)) ||
-    (updateData.year && updateData.year !== season.year)
-  ) {
-    const newSeasonId = updateData.seasonId || season.season;
-    const newYear = updateData.year || season.year;
-
-    const exists = await SeasonDetail.findOne({
-      season: newSeasonId,
-      year: newYear,
-      field: season.field,
-      user: userId,
-      _id: { $ne: id },
-    });
-
-    if (exists) {
-      const resolvedName = await getSeasonNameById(newSeasonId);
-      throw new Error(`Vụ ${resolvedName} ${newYear} đã tồn tại cho cánh đồng này.`);
+    if (existingActive) {
+      throw new Error(
+        "Đang có một mùa vụ đang hoạt động. Vui lòng kết thúc mùa vụ hiện tại trước khi bắt đầu mùa vụ mới."
+      );
     }
   }
 
-  if (updateData.seasonId) {
-    updateData.season = updateData.seasonId;
+  // Check duplicate: same season + same startDate
+  if (startDate) {
+    const exists = await SeasonDetail.findOne({
+      season: seasonId,
+      startDate: new Date(startDate),
+    });
+    if (exists) {
+      throw new Error(
+        `Mùa vụ "${resolvedName}" với ngày bắt đầu này đã tồn tại.`
+      );
+    }
   }
 
-  const plotIds = updateData.plotIds;
-  delete updateData.plotIds;
-  delete updateData.seasonCode;
-  delete updateData.seasonId;
-  delete updateData.seasonName;
-
-  const updatedDoc = await SeasonDetail.findByIdAndUpdate(id, updateData, { new: true })
-    .populate("season", "name")
-    .populate("field", "name address")
-    .populate("user", "fullName email");
-
-  await syncSeasonAssignments({
-    seasonDoc: updatedDoc,
-    plotIds,
-    userId,
+  const seasonDetail = await SeasonDetail.create({
+    season: seasonId,
+    startDate: startDate || null,
+    endDate: endDate || null,
   });
 
-  const catalogMap = await getSeasonMap();
-  return updatedDoc ? await decorateSeasonDetail(updatedDoc, catalogMap) : null;
+  const seasonDoc = await SeasonDetail.findById(seasonDetail._id).populate(
+    "season",
+    "name"
+  );
+
+  return decorateSeasonDetail(seasonDoc, catalogMap);
 };
 
-const deleteSeasonDetail = async (id, userId) => {
-  const season = await SeasonDetail.findOneAndDelete({ _id: id, user: userId });
-  if (season) {
-    await Promise.all([
-      DiaryLog.deleteMany({ season: id }),
-      DiseaseLog.deleteMany({ season: id }),
-      SeasonPlotAssignment.deleteMany({ seasonDetail: id }),
-    ]);
+/**
+ * Update season detail (admin only).
+ */
+const updateSeasonDetail = async (id, data) => {
+  const existing = await SeasonDetail.findById(id);
+  if (!existing) {
+    throw new Error("Không tìm thấy chi tiết mùa vụ");
   }
+
+  const updateData = {};
+
+  // Resolve season id if provided
+  if (data.seasonName || data.seasonId || data.seasonCode) {
+    const newSeasonId = await resolveSeasonId({
+      seasonId: data.seasonId,
+      seasonCode: data.seasonCode,
+      seasonName: data.seasonName,
+    });
+    updateData.season = newSeasonId;
+  }
+
+  if (data.startDate !== undefined) {
+    updateData.startDate = data.startDate;
+  }
+
+  if (data.endDate !== undefined) {
+    updateData.endDate = data.endDate;
+  }
+
+  const now = new Date();
+  const finalStartDate = updateData.startDate !== undefined ? updateData.startDate : existing.startDate;
+  const finalEndDate = updateData.endDate !== undefined ? updateData.endDate : existing.endDate;
+  const isActive = finalStartDate && new Date(finalStartDate) <= now && (!finalEndDate || new Date(finalEndDate) >= now);
+
+  if (isActive) {
+    const existingActive = await SeasonDetail.findOne({
+      startDate: { $lte: now },
+      $or: [{ endDate: null }, { endDate: { $gte: now } }],
+      _id: { $ne: id },
+    });
+    if (existingActive) {
+      throw new Error(
+        "Đang có một mùa vụ đang hoạt động. Bạn không thể cập nhật lịch trình đè lên mùa vụ này."
+      );
+    }
+  }
+
+  // Check duplicate if season or startDate changed
+  const newSeasonId = updateData.season || existing.season;
+  const newStartDate = updateData.startDate !== undefined
+    ? updateData.startDate
+    : existing.startDate;
+
+  if (newStartDate) {
+    const duplicate = await SeasonDetail.findOne({
+      season: newSeasonId,
+      startDate: new Date(newStartDate),
+      _id: { $ne: id },
+    });
+
+    if (duplicate) {
+      const resolvedName = await getSeasonNameById(newSeasonId);
+      throw new Error(
+        `Mùa vụ "${resolvedName}" với ngày bắt đầu này đã tồn tại.`
+      );
+    }
+  }
+
+  const updatedDoc = await SeasonDetail.findByIdAndUpdate(id, updateData, {
+    new: true,
+  }).populate("season", "name");
+
+  const catalogMap = await getSeasonMap();
+  return updatedDoc ? decorateSeasonDetail(updatedDoc, catalogMap) : null;
+};
+
+/**
+ * Finish (complete) a season detail (admin only).
+ */
+const finishSeasonDetail = async (id) => {
+  const existing = await SeasonDetail.findById(id);
+  if (!existing) {
+    throw new Error("Không tìm thấy chi tiết mùa vụ");
+  }
+
+  // Check if it's already completed by endDate logic
+  const now = new Date();
+  if (existing.endDate && existing.endDate < now) {
+    throw new Error("Mùa vụ này đã được kết thúc trước đó");
+  }
+
+  const updatedDoc = await SeasonDetail.findByIdAndUpdate(
+    id,
+    { endDate: now },
+    { new: true }
+  ).populate("season", "name");
+
+  const catalogMap = await getSeasonMap();
+  return updatedDoc ? decorateSeasonDetail(updatedDoc, catalogMap) : null;
+};
+
+/**
+ * Delete a season detail and cascade delete related records (admin only).
+ */
+const deleteSeasonDetail = async (id) => {
+  const season = await SeasonDetail.findById(id);
+  if (!season) {
+    throw new Error("Không tìm thấy chi tiết mùa vụ");
+  }
+
+  await Promise.all([
+    DiaryLog.deleteMany({ season: id }),
+    DiseaseLog.deleteMany({ season: id }),
+    SeasonPlotAssignment.deleteMany({ seasonDetail: id }),
+  ]);
+
+  await SeasonDetail.deleteOne({ _id: id });
   return season;
+};
+
+const Plot = require("../models/plotModel");
+
+/**
+ * Get season details for a specific farmer.
+ * Auto-assigns active plots to the currently active global season.
+ */
+const getFarmerSeasonDetails = async (userId, fieldId) => {
+  if (!fieldId) throw new Error("Yêu cầu chọn cánh đồng");
+
+  // Get all global season details
+  const seasonDocs = await SeasonDetail.find()
+    .populate("season", "name")
+    .sort({ startDate: -1, createdAt: -1 });
+
+  const catalogMap = await getSeasonMap();
+  const plots = await Plot.find({ user: userId, field: fieldId }).lean();
+
+  const results = [];
+
+  for (const doc of seasonDocs) {
+    const seasonDecorated = decorateSeasonDetail(doc, catalogMap);
+    
+    // Status is provided by the virtual of seasonDetailModel (if toObject uses virtuals) 
+    // Wait, let's calculate status explicitly to be safe:
+    const now = new Date();
+    let seasonStatus = "planned";
+    if (doc.endDate && doc.endDate < now) seasonStatus = "completed";
+    else if (doc.startDate && doc.startDate <= now && (!doc.endDate || doc.endDate >= now)) seasonStatus = "active";
+    
+    seasonDecorated.status = seasonStatus;
+
+    let assignments = await SeasonPlotAssignment.find({
+      seasonDetail: doc._id,
+      user: userId,
+      field: fieldId,
+    }).populate("plot", "name area status addressDetail").lean();
+
+    // Lazy creation of assignments for active season
+    if (assignments.length === 0 && seasonStatus === "active") {
+      const activePlots = plots.filter((p) => p.status === "active");
+      if (activePlots.length > 0) {
+        const payload = activePlots.map((p) => ({
+          seasonDetail: doc._id,
+          field: fieldId,
+          plot: p._id,
+          user: userId,
+          status: "active",
+        }));
+        await SeasonPlotAssignment.insertMany(payload);
+
+        assignments = await SeasonPlotAssignment.find({
+          seasonDetail: doc._id,
+          user: userId,
+          field: fieldId,
+        }).populate("plot", "name area status addressDetail").lean();
+      }
+    }
+
+    // Skip historical/planned seasons if the farmer isn't participating at all
+    if (assignments.length === 0 && seasonStatus !== "active") {
+      continue;
+    }
+
+    const activeAssignments = assignments.filter((item) => item.status === "active");
+    const loggableAssignments = activeAssignments.filter((item) => item.plot?.status === "active");
+
+    Object.assign(seasonDecorated, {
+      assignments,
+      assignedPlotIds: activeAssignments.map((item) => String(item.plot?._id || item.plot)),
+      assignedPlots: activeAssignments.map((item) => item.plot).filter(Boolean),
+      loggablePlotIds: loggableAssignments.map((item) => String(item.plot?._id || item.plot)),
+      loggablePlots: loggableAssignments.map((item) => item.plot).filter(Boolean),
+      totalPlotCount: assignments.length,
+      activePlotCount: activeAssignments.length,
+      loggablePlotCount: loggableAssignments.length,
+    });
+
+    results.push(seasonDecorated);
+  }
+
+  return results;
 };
 
 module.exports = {
   getAllSeasonDetails,
-  getSeasonDetailsByField,
+  getSeasonDetailById,
+  getActiveSeasonDetail,
+  getFarmerSeasonDetails,
   createSeasonDetail,
+  updateSeasonDetail,
   finishSeasonDetail,
   deleteSeasonDetail,
-  hasActiveSeasonDetails,
-  seasonDetailExists,
-  updateSeasonDetail,
 };

@@ -27,8 +27,6 @@ const normalizeFilters = (query = {}) => {
 
   return {
     seasonId: query.seasonId || "",
-    year: toNumber(query.year, null),
-    fieldId: query.fieldId || "",
     status,
     recentLimit: Math.min(Math.max(toNumber(query.recentLimit, 8), 1), 20),
   };
@@ -41,16 +39,16 @@ const buildSeasonDetailMatch = (filters) => {
     match.season = filters.seasonId;
   }
 
-  if (filters.year) {
-    match.year = filters.year;
-  }
-
-  if (filters.fieldId) {
-    match.field = filters.fieldId;
-  }
-
   if (filters.status !== "all") {
-    match.status = filters.status;
+    const now = new Date();
+    if (filters.status === "active") {
+      match.startDate = { $lte: now };
+      match.$or = [{ endDate: null }, { endDate: { $gte: now } }];
+    } else if (filters.status === "completed") {
+      match.endDate = { $lt: now };
+    } else if (filters.status === "planned") {
+      match.$or = [{ startDate: null }, { startDate: { $gt: now } }];
+    }
   }
 
   return match;
@@ -88,18 +86,29 @@ const buildSystemStats = async () => {
           _id: null,
           activeSeasonCount: {
             $sum: {
-              $cond: [{ $eq: ["$status", "active"] }, 1, 0],
-            },
+              $cond: [
+                {
+                  $and: [
+                    { $lte: ["$startDate", new Date()] },
+                    { $or: [{ $eq: ["$endDate", null] }, { $gte: ["$endDate", new Date()] }] }
+                  ]
+                },
+                1, 0
+              ]
+            }
           },
           completedSeasonCount: {
             $sum: {
-              $cond: [{ $eq: ["$status", "completed"] }, 1, 0],
-            },
+              $cond: [{ $lt: ["$endDate", new Date()] }, 1, 0]
+            }
           },
           plannedSeasonCount: {
             $sum: {
-              $cond: [{ $eq: ["$status", "planned"] }, 1, 0],
-            },
+              $cond: [
+                { $or: [{ $eq: ["$startDate", null] }, { $gt: ["$startDate", new Date()] }] },
+                1, 0
+              ]
+            }
           },
         },
       },
@@ -123,10 +132,9 @@ const buildSystemStats = async () => {
 };
 
 const getOverviewOptions = async () => {
-  const [seasons, fields, years] = await Promise.all([
+  const [seasons, fields] = await Promise.all([
     Season.find().sort({ name: 1 }).lean(),
     Field.find().sort({ name: 1 }).select("_id name address").lean(),
-    SeasonDetail.distinct("year"),
   ]);
 
   return {
@@ -136,10 +144,6 @@ const getOverviewOptions = async () => {
       isVisible: item.isVisible !== false,
     })),
     fields,
-    years: years
-      .map((item) => Number(item))
-      .filter(Boolean)
-      .sort((a, b) => b - a),
     statuses: STATUS_OPTIONS,
   };
 };
@@ -152,27 +156,28 @@ const decorateSeasonInstances = (seasonDetails, assignmentsBySeason, logsBySeaso
     const assignedArea = sumBy(assignments, (item) => item.plot?.area);
     const readyPlotCount = assignments.filter((item) => item.plot?.status === "active").length;
     const totalCost = sumBy(logs, (item) => item.cost);
-    const lastActivityAt = logs[0]?.date || logs[0]?.createdAt || seasonDetail.updatedAt || null;
+    const lastActivityAt = logs[0]?.date || logs[0]?.createdAt || null;
+
+    let computedStatus = "planned";
+    const now = new Date();
+    if (seasonDetail.endDate && new Date(seasonDetail.endDate) < now) {
+      computedStatus = "completed";
+    } else if (
+      seasonDetail.startDate && 
+      new Date(seasonDetail.startDate) <= now && 
+      (!seasonDetail.endDate || new Date(seasonDetail.endDate) >= now)
+    ) {
+      computedStatus = "active";
+    }
 
     return {
       _id: seasonDetail._id,
       seasonId: seasonDetail.season?._id || seasonDetail.season,
       seasonName: seasonDetail.season?.name || "Khong xac dinh",
-      seasonLabel: `${seasonDetail.season?.name || "Khong xac dinh"} ${seasonDetail.year}`,
-      year: seasonDetail.year,
-      status: seasonDetail.status,
+      seasonLabel: seasonDetail.season?.name || "Khong xac dinh",
+      status: computedStatus,
       startDate: seasonDetail.startDate,
       endDate: seasonDetail.endDate || null,
-      field: {
-        _id: seasonDetail.field?._id || seasonDetail.field,
-        name: seasonDetail.field?.name || "Khong xac dinh",
-        address: seasonDetail.field?.address || "",
-      },
-      farmer: {
-        _id: seasonDetail.user?._id || seasonDetail.user,
-        fullName: seasonDetail.user?.fullName || "Khong xac dinh",
-        email: seasonDetail.user?.email || "",
-      },
       plotCount: assignments.length,
       readyPlotCount,
       inactiveAssignedPlotCount: assignments.length - readyPlotCount,
@@ -186,64 +191,19 @@ const decorateSeasonInstances = (seasonDetails, assignmentsBySeason, logsBySeaso
 
 const buildGroupedStats = (seasonInstances) => {
   const seasonMap = new Map();
-  const fieldMap = new Map();
-  const farmerMap = new Map();
 
   seasonInstances.forEach((item) => {
-    const seasonKey = `${item.seasonId}-${item.year}`;
-    const fieldKey = String(item.field._id);
-    const farmerKey = String(item.farmer._id);
+    const seasonKey = String(item.seasonId);
 
     if (!seasonMap.has(seasonKey)) {
       seasonMap.set(seasonKey, {
         seasonId: item.seasonId,
         seasonName: item.seasonName,
-        year: item.year,
         seasonLabel: item.seasonLabel,
         seasonInstanceCount: 0,
         activeSeasonCount: 0,
         completedSeasonCount: 0,
         plannedSeasonCount: 0,
-        fieldIds: new Set(),
-        farmerIds: new Set(),
-        plotCount: 0,
-        readyPlotCount: 0,
-        assignedArea: 0,
-        diaryLogCount: 0,
-        totalCost: 0,
-        lastActivityAt: null,
-      });
-    }
-
-    if (!fieldMap.has(fieldKey)) {
-      fieldMap.set(fieldKey, {
-        fieldId: item.field._id,
-        fieldName: item.field.name,
-        address: item.field.address,
-        seasonInstanceCount: 0,
-        activeSeasonCount: 0,
-        completedSeasonCount: 0,
-        plannedSeasonCount: 0,
-        farmerIds: new Set(),
-        plotCount: 0,
-        readyPlotCount: 0,
-        assignedArea: 0,
-        diaryLogCount: 0,
-        totalCost: 0,
-        lastActivityAt: null,
-      });
-    }
-
-    if (!farmerMap.has(farmerKey)) {
-      farmerMap.set(farmerKey, {
-        farmerId: item.farmer._id,
-        fullName: item.farmer.fullName,
-        email: item.farmer.email,
-        seasonInstanceCount: 0,
-        activeSeasonCount: 0,
-        completedSeasonCount: 0,
-        plannedSeasonCount: 0,
-        fieldIds: new Set(),
         plotCount: 0,
         readyPlotCount: 0,
         assignedArea: 0,
@@ -255,8 +215,6 @@ const buildGroupedStats = (seasonInstances) => {
 
     const seasonBucket = seasonMap.get(seasonKey);
     seasonBucket.seasonInstanceCount += 1;
-    seasonBucket.fieldIds.add(fieldKey);
-    seasonBucket.farmerIds.add(farmerKey);
     seasonBucket.plotCount += item.plotCount;
     seasonBucket.readyPlotCount += item.readyPlotCount;
     seasonBucket.assignedArea += item.assignedArea;
@@ -268,65 +226,12 @@ const buildGroupedStats = (seasonInstances) => {
     if (!seasonBucket.lastActivityAt || new Date(item.lastActivityAt || 0) > new Date(seasonBucket.lastActivityAt || 0)) {
       seasonBucket.lastActivityAt = item.lastActivityAt || seasonBucket.lastActivityAt;
     }
-
-    const fieldBucket = fieldMap.get(fieldKey);
-    fieldBucket.seasonInstanceCount += 1;
-    fieldBucket.farmerIds.add(farmerKey);
-    fieldBucket.plotCount += item.plotCount;
-    fieldBucket.readyPlotCount += item.readyPlotCount;
-    fieldBucket.assignedArea += item.assignedArea;
-    fieldBucket.diaryLogCount += item.diaryLogCount;
-    fieldBucket.totalCost += item.totalCost;
-    if (item.status === "active") fieldBucket.activeSeasonCount += 1;
-    if (item.status === "completed") fieldBucket.completedSeasonCount += 1;
-    if (item.status === "planned") fieldBucket.plannedSeasonCount += 1;
-    if (!fieldBucket.lastActivityAt || new Date(item.lastActivityAt || 0) > new Date(fieldBucket.lastActivityAt || 0)) {
-      fieldBucket.lastActivityAt = item.lastActivityAt || fieldBucket.lastActivityAt;
-    }
-
-    const farmerBucket = farmerMap.get(farmerKey);
-    farmerBucket.seasonInstanceCount += 1;
-    farmerBucket.fieldIds.add(fieldKey);
-    farmerBucket.plotCount += item.plotCount;
-    farmerBucket.readyPlotCount += item.readyPlotCount;
-    farmerBucket.assignedArea += item.assignedArea;
-    farmerBucket.diaryLogCount += item.diaryLogCount;
-    farmerBucket.totalCost += item.totalCost;
-    if (item.status === "active") farmerBucket.activeSeasonCount += 1;
-    if (item.status === "completed") farmerBucket.completedSeasonCount += 1;
-    if (item.status === "planned") farmerBucket.plannedSeasonCount += 1;
-    if (!farmerBucket.lastActivityAt || new Date(item.lastActivityAt || 0) > new Date(farmerBucket.lastActivityAt || 0)) {
-      farmerBucket.lastActivityAt = item.lastActivityAt || farmerBucket.lastActivityAt;
-    }
   });
 
   const seasonOverview = Array.from(seasonMap.values())
-    .map((item) => ({
-      ...item,
-      fieldCount: item.fieldIds.size,
-      farmerCount: item.farmerIds.size,
-      fieldIds: undefined,
-      farmerIds: undefined,
-    }))
-    .sort((a, b) => b.year - a.year || a.seasonName.localeCompare(b.seasonName));
+    .sort((a, b) => a.seasonName.localeCompare(b.seasonName));
 
-  const fieldOverview = Array.from(fieldMap.values())
-    .map((item) => ({
-      ...item,
-      farmerCount: item.farmerIds.size,
-      farmerIds: undefined,
-    }))
-    .sort((a, b) => b.totalCost - a.totalCost || b.diaryLogCount - a.diaryLogCount);
-
-  const farmerOverview = Array.from(farmerMap.values())
-    .map((item) => ({
-      ...item,
-      fieldCount: item.fieldIds.size,
-      fieldIds: undefined,
-    }))
-    .sort((a, b) => b.totalCost - a.totalCost || b.diaryLogCount - a.diaryLogCount);
-
-  return { seasonOverview, fieldOverview, farmerOverview };
+  return { seasonOverview };
 };
 
 const buildRecentActivities = (logs, seasonDetailMap, recentLimit) => {
@@ -344,8 +249,6 @@ const buildRecentActivities = (logs, seasonDetailMap, recentLimit) => {
       plotName: log.plot?.name || "",
       seasonDetailId: seasonDetail?._id || log.season,
       seasonLabel: seasonDetail?.seasonLabel || "",
-      fieldName: seasonDetail?.field?.name || "",
-      farmerName: seasonDetail?.farmer?.fullName || "",
       status: seasonDetail?.status || "",
     };
   });
@@ -388,8 +291,6 @@ const getAdminOverview = async (rawFilters, currentUser) => {
     getOverviewOptions(),
     SeasonDetail.find(seasonDetailMatch)
       .populate("season", "name")
-      .populate("field", "name address")
-      .populate("user", "fullName email")
       .sort({ startDate: -1, createdAt: -1 })
       .lean(),
   ]);
@@ -438,8 +339,6 @@ const getAdminOverview = async (rawFilters, currentUser) => {
     activeSeasonCount: seasonInstances.filter((item) => item.status === "active").length,
     completedSeasonCount: seasonInstances.filter((item) => item.status === "completed").length,
     plannedSeasonCount: seasonInstances.filter((item) => item.status === "planned").length,
-    participatingFieldCount: new Set(seasonInstances.map((item) => String(item.field._id))).size,
-    participatingFarmerCount: new Set(seasonInstances.map((item) => String(item.farmer._id))).size,
     assignedPlotCount: sumBy(seasonInstances, (item) => item.plotCount),
     readyPlotCount: sumBy(seasonInstances, (item) => item.readyPlotCount),
     inactiveAssignedPlotCount: sumBy(seasonInstances, (item) => item.inactiveAssignedPlotCount),
@@ -449,7 +348,7 @@ const getAdminOverview = async (rawFilters, currentUser) => {
     seasonWithoutDiaryCount: seasonInstances.filter((item) => item.diaryLogCount === 0).length,
   };
 
-  const { seasonOverview, fieldOverview, farmerOverview } = buildGroupedStats(seasonInstances);
+  const { seasonOverview } = buildGroupedStats(seasonInstances);
 
   return {
     filters,
@@ -459,8 +358,6 @@ const getAdminOverview = async (rawFilters, currentUser) => {
       seasonal: seasonalSummary,
     },
     seasonOverview,
-    fieldOverview,
-    farmerOverview,
     taskOverview: buildTaskOverview(logs),
     seasonInstances,
     recentActivities: buildRecentActivities(logs, seasonDetailMap, filters.recentLimit),

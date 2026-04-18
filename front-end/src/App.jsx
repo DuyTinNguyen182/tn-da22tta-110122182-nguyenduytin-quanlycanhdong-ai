@@ -21,6 +21,7 @@ import AdminOverview from "./pages/Admin/AdminOverview";
 import AdminUsers from "./pages/Admin/AdminUsers";
 import AdminFields from "./pages/Admin/AdminFields";
 import AdminSeasons from "./pages/Admin/AdminSeasons";
+import AdminSeasonDetails from "./pages/Admin/AdminSeasonDetails";
 import AdminTasks from "./pages/Admin/AdminTasks";
 
 function App() {
@@ -50,6 +51,7 @@ function App() {
               <Route path="/admin/fields" element={<AdminFields />} />
               <Route path="/admin/users" element={<AdminUsers />} />
               <Route path="/admin/seasons" element={<AdminSeasons />} />
+              <Route path="/admin/season-details" element={<AdminSeasonDetails />} />
               <Route path="/admin/tasks" element={<AdminTasks />} />
             </Route>
 

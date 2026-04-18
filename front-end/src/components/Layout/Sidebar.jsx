@@ -37,7 +37,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
               AgriSmart
             </h3>
             <p className="whitespace-nowrap text-xs text-gray-500">
-              Hợp tác xã số
+              Nông nghiệp số
             </p>
           </div>
         )}

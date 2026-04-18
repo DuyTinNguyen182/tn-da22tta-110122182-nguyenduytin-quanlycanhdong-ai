@@ -19,16 +19,16 @@
     "tungro"
   ],
   "display_names": [
-    "Bacterial Leaf Blight (Bac la)",
-    "Bacterial Leaf Streak",
-    "Bacterial Panicle Blight",
-    "Rice Blast (Dao on)",
-    "Brown Spot (Dom nau)",
-    "Dead Heart",
-    "Downy Mildew",
-    "Hispa",
-    "Healthy Rice Leaf",
-    "Tungro"
+    "Bệnh bạc lá",
+    "Bệnh sọc lá vi khuẩn",
+    "Bệnh lem lép hạt",
+    "Bệnh đạo ôn",
+    "Bệnh đốm nâu",
+    "Tim chết (dảnh héo)",
+    "Bệnh sương mai",
+    "Bọ hispa hại lá",
+    "Lá lúa khỏe",
+    "Bệnh vàng lùn (tungro)"
   ],
   "train_samples": 16261,
   "val_samples": 2870,

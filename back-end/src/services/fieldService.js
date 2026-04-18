@@ -1,10 +1,8 @@
 const mongoose = require("mongoose");
 const Field = require("../models/fieldModel");
 const Plot = require("../models/plotModel");
-const SeasonDetail = require("../models/seasonDetailModel");
-const DiaryLog = require("../models/diaryLogModel");
+
 const DiseaseLog = require("../models/diseaseLogModel");
-const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const User = require("../models/userModel");
 
 const isAdminUser = (user) => (user?.role || "").toLowerCase() === "admin";
@@ -21,26 +19,15 @@ const normalizeFieldPayload = (data = {}) => {
 };
 
 const buildFieldStatsMap = async () => {
-  const [plotStats, seasonStats] = await Promise.all([
-    Plot.aggregate([
-      {
-        $group: {
-          _id: "$field",
-          plotCount: { $sum: 1 },
-          totalArea: { $sum: "$area" },
-          farmerIds: { $addToSet: "$user" },
-        },
+  const plotStats = await Plot.aggregate([
+    {
+      $group: {
+        _id: "$field",
+        plotCount: { $sum: 1 },
+        totalArea: { $sum: "$area" },
+        farmerIds: { $addToSet: "$user" },
       },
-    ]),
-    SeasonDetail.aggregate([
-      { $match: { status: "active" } },
-      {
-        $group: {
-          _id: "$field",
-          activeSeasonCount: { $sum: 1 },
-        },
-      },
-    ]),
+    },
   ]);
 
   const plotMap = new Map(
@@ -54,11 +41,7 @@ const buildFieldStatsMap = async () => {
     ])
   );
 
-  const seasonMap = new Map(
-    seasonStats.map((item) => [String(item._id), item.activeSeasonCount || 0])
-  );
-
-  return { plotMap, seasonMap };
+  return { plotMap };
 };
 
 const buildUserPlotMap = async (currentUser) => {
@@ -89,7 +72,7 @@ const buildUserPlotMap = async (currentUser) => {
 };
 
 const enrichFields = async (fieldDocs, currentUser) => {
-  const { plotMap, seasonMap } = await buildFieldStatsMap();
+  const { plotMap } = await buildFieldStatsMap();
   const userPlotMap = await buildUserPlotMap(currentUser);
 
   return fieldDocs.map((fieldDoc) => {
@@ -109,7 +92,6 @@ const enrichFields = async (fieldDocs, currentUser) => {
       plotCount: stats.plotCount,
       totalArea: stats.totalArea,
       farmerCount: stats.farmerCount,
-      activeSeasonCount: seasonMap.get(String(field._id)) || 0,
       myPlotCount: userStats.myPlotCount,
       myTotalArea: userStats.myTotalArea,
       createdByName: field.user?.fullName || "",
@@ -181,23 +163,9 @@ const deleteFieldCascadeById = async (fieldId) => {
     throw new Error("Không tìm thấy cánh đồng");
   }
 
-  const seasonDetails = await SeasonDetail.find({ field: fieldId }).select("_id").lean();
-  const seasonIds = seasonDetails.map((item) => item._id);
-
-  if (seasonIds.length > 0) {
-    await SeasonPlotAssignment.deleteMany({ seasonDetail: { $in: seasonIds } });
-  }
-
   await Promise.all([
     Plot.deleteMany({ field: fieldId }),
-    seasonIds.length > 0 ? DiaryLog.deleteMany({ season: { $in: seasonIds } }) : Promise.resolve(),
-    DiseaseLog.deleteMany({
-      $or: [
-        { field: fieldId },
-        ...(seasonIds.length > 0 ? [{ season: { $in: seasonIds } }] : []),
-      ],
-    }),
-    SeasonDetail.deleteMany({ field: fieldId }),
+    DiseaseLog.deleteMany({ field: fieldId }),
   ]);
 
   await Field.deleteOne({ _id: fieldId });
@@ -216,7 +184,7 @@ const getFieldSummary = async (currentUser) => {
   const allFields = await getAllFields(currentUser);
 
   if (isAdminUser(currentUser)) {
-    const [farmerCount, plotStats, activeSeasonCount] = await Promise.all([
+    const [farmerCount, plotStats] = await Promise.all([
       User.countDocuments({ role: { $regex: /^farmer$/i } }),
       Plot.aggregate([
         {
@@ -227,7 +195,6 @@ const getFieldSummary = async (currentUser) => {
           },
         },
       ]),
-      SeasonDetail.countDocuments({ status: "active" }),
     ]);
 
     const totals = plotStats[0] || { plotCount: 0, totalArea: 0 };
@@ -239,14 +206,13 @@ const getFieldSummary = async (currentUser) => {
         plotCount: totals.plotCount || 0,
         totalArea: totals.totalArea || 0,
         farmerCount,
-        activeSeasonCount,
       },
       recentFields: allFields.slice(0, 5),
     };
   }
 
   const userObjectId = new mongoose.Types.ObjectId(currentUser.id);
-  const [userPlotStats, activeSeasonCount, recentPlots] = await Promise.all([
+  const [userPlotStats, recentPlots] = await Promise.all([
     Plot.aggregate([
       { $match: { user: userObjectId } },
       {
@@ -258,7 +224,6 @@ const getFieldSummary = async (currentUser) => {
         },
       },
     ]),
-    SeasonDetail.countDocuments({ user: currentUser.id, status: "active" }),
     Plot.find({ user: currentUser.id })
       .populate("field", "name")
       .sort({ createdAt: -1 })
@@ -275,7 +240,6 @@ const getFieldSummary = async (currentUser) => {
       fieldCount: totals.fieldIds?.length || 0,
       plotCount: totals.plotCount || 0,
       totalArea: totals.totalArea || 0,
-      activeSeasonCount,
     },
     recentPlots,
   };

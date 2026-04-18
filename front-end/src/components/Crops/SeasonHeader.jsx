@@ -28,9 +28,6 @@ const SeasonHeader = ({
   taskTypes,
   totalCost,
   onSelectSeason,
-  onCreateSeason,
-  onEditSeason,
-  onFinishSeason,
   onCreateLog,
   onFilterPlotChange,
   onFilterTaskChange,
@@ -57,7 +54,7 @@ const SeasonHeader = ({
     () =>
       (sortedSeasons || []).map((season) => ({
         value: season._id,
-        label: season.name,
+        label: season.startDate ? `${season.name} ${new Date(season.startDate).getFullYear()}` : season.name,
         dot: season.status === "active" ? "bg-emerald-500" : "bg-gray-300",
         badge:
           season.status === "active"
@@ -110,36 +107,8 @@ const SeasonHeader = ({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {!hasActiveSeason && (
-            <button
-              onClick={onCreateSeason}
-              disabled={activePlots.length === 0}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
-                activePlots.length === 0
-                  ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                  : "bg-emerald-600 text-white shadow-md shadow-emerald-200 hover:bg-emerald-700 hover:shadow-lg"
-              }`}
-            >
-              <PlayCircle size={16} /> Bắt đầu vụ mới
-            </button>
-          )}
-
           {currentSeason && isSeasonActive && (
             <>
-              <button
-                onClick={onEditSeason}
-                className="rounded-xl border border-gray-200 p-2 text-gray-500 transition-all hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600"
-                title="Chỉnh sửa vụ"
-              >
-                <Edit2 size={15} />
-              </button>
-              <button
-                onClick={onFinishSeason}
-                className="rounded-xl border border-orange-200 bg-orange-50 px-3.5 py-2 text-sm font-medium text-orange-600 transition-all hover:bg-orange-100 hover:shadow-sm"
-                title="Kết thúc vụ"
-              >
-                Kết thúc
-              </button>
               <button
                 onClick={onCreateLog}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-lg"

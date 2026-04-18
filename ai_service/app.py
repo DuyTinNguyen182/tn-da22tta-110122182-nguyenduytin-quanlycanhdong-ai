@@ -20,16 +20,16 @@ LEGACY_CLASS_NAMES = [
     "tungro",
 ]
 DISPLAY_NAME_MAP = {
-    "bacterial_leaf_blight": "Bacterial Leaf Blight (Bac la)",
-    "bacterial_leaf_streak": "Bacterial Leaf Streak",
-    "bacterial_panicle_blight": "Bacterial Panicle Blight",
-    "blast": "Rice Blast (Dao on)",
-    "brown_spot": "Brown Spot (Dom nau)",
-    "dead_heart": "Dead Heart",
-    "downy_mildew": "Downy Mildew",
-    "hispa": "Hispa",
-    "normal": "Healthy Rice Leaf",
-    "tungro": "Tungro",
+    "bacterial_leaf_blight": "Bệnh bạc lá",
+    "bacterial_leaf_streak": "Bệnh sọc lá vi khuẩn",
+    "bacterial_panicle_blight": "Bệnh lem lép hạt",
+    "blast": "Bệnh đạo ôn",
+    "brown_spot": "Bệnh đốm nâu",
+    "dead_heart": "Tim chết (dảnh héo)",
+    "downy_mildew": "Bệnh sương mai",
+    "hispa": "Bọ hispa hại lá",
+    "normal": "Lá lúa khỏe",
+    "tungro": "Bệnh vàng lùn (tungro)",
 }
 RESAMPLE_BILINEAR = (
     Image.Resampling.BILINEAR if hasattr(Image, "Resampling") else Image.BILINEAR

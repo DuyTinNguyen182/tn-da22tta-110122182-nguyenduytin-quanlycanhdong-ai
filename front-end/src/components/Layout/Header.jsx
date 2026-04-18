@@ -9,7 +9,7 @@ const Header = () => {
   const location = useLocation();
 
   const pageTitleMap = {
-    "/dashboard": "Tổng quan hợp tác xã",
+    "/dashboard": "Tổng quan diện tích canh tác",
     "/fields": "Thửa ruộng của tôi",
     "/crops": "Nhật ký mùa vụ",
     "/disease-logs": "Nhật ký bệnh",

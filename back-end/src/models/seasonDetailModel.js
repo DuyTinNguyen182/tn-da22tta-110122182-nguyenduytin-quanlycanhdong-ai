@@ -7,20 +7,8 @@ const seasonDetailSchema = new mongoose.Schema(
       ref: "Season",
       required: true,
     },
-    year: { type: Number, required: true },
-    field: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Field",
-      required: true,
-    },
-    startDate: { type: Date, default: Date.now },
-    endDate: { type: Date },
-    status: {
-      type: String,
-      enum: ["active", "completed", "planned"],
-      default: "active",
-    },
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now },
   },
   {
@@ -30,6 +18,13 @@ const seasonDetailSchema = new mongoose.Schema(
   }
 );
 
-seasonDetailSchema.index({ season: 1, year: 1, field: 1, user: 1 }, { unique: true });
+seasonDetailSchema.index({ season: 1, startDate: 1 }, { unique: true });
+
+seasonDetailSchema.virtual("status").get(function () {
+  const now = new Date();
+  if (this.endDate && this.endDate < now) return "completed";
+  if (this.startDate && this.startDate <= now && (!this.endDate || this.endDate >= now)) return "active";
+  return "planned";
+});
 
 module.exports = mongoose.model("SeasonDetail", seasonDetailSchema);

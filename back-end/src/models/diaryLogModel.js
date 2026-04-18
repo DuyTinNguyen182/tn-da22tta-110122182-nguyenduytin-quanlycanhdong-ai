@@ -9,28 +9,28 @@ const diaryLogSchema = new mongoose.Schema({
   description: { type: String, default: "" },
   date: { type: Date, default: Date.now },
   cost: { type: Number, default: 0 },
-  season: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "SeasonDetail",
-    required: true,
-  },
-
-  // Legacy field to keep old records compatible.
-  plot: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Plot",
-    default: null,
-  },
-
   scope: {
     type: String,
     enum: ["single_plot", "selected_plots", "all_plots"],
     default: "all_plots",
   },
+  // Các field cũ để hỗ trợ dữ liệu legacy
+  plot: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Plot",
+    default: null,
+  },
   plots: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Plot",
+    },
+  ],
+  // -----
+  seasonPlotAssignments: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SeasonPlotAssignment",
     },
   ],
   plotSnapshot: [

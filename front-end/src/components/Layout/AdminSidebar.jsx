@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   Users,
   CalendarDays,
+  CalendarRange,
 } from "lucide-react";
 
 const AdminSidebar = ({ collapsed, setCollapsed }) => {
@@ -17,7 +18,8 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
     { name: "Tổng quan", icon: LayoutDashboard, path: "/admin" },
     { name: "Cánh đồng", icon: Map, path: "/admin/fields" },
     { name: "Người dùng", icon: Users, path: "/admin/users" },
-    { name: "Mùa vụ", icon: CalendarDays, path: "/admin/seasons" },
+    { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
+    { name: "Lịch mùa vụ", icon: CalendarRange, path: "/admin/season-details" },
     { name: "Công việc", icon: Briefcase, path: "/admin/tasks" },
   ];
 

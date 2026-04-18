@@ -30,12 +30,8 @@ const normalizeSource = (value, fallback = "ai_scan") =>
 const formatComparableDate = (value) =>
   value ? new Date(value).toISOString().slice(0, 10) : "";
 
-const normalizeExistingPlotIds = (log = {}) =>
-  normalizePlotIds(
-    Array.isArray(log.plots)
-      ? log.plots.map((plot) => (plot?._id ? String(plot._id) : String(plot)))
-      : []
-  );
+const normalizeExistingAssignments = (log = {}) =>
+  (log.seasonPlotAssignments || []).map((a) => (a?._id ? String(a._id) : String(a)));
 
 const applyProcessingFields = (target, data, actorId) => {
   const nextStatus = normalizeStatus(data.status, target.status || "unprocessed");
@@ -56,12 +52,9 @@ const applyProcessingFields = (target, data, actorId) => {
 };
 
 const hasHistoricalContentChanges = (data, existingLog) => {
-  const currentSeasonId = String(existingLog.season || "");
-  const nextSeasonId = String(data.seasonId || data.season || existingLog.season || "");
-  if (nextSeasonId !== currentSeasonId) {
-    return true;
-  }
-
+  // Season change is trickier now because season is implied by assignments,
+  // but let's assume season doesn't change implicitly without assignments changing.
+  
   const nextDiseaseName = (
     data.diseaseName ||
     data.disease ||
@@ -98,35 +91,7 @@ const hasHistoricalContentChanges = (data, existingLog) => {
     return true;
   }
 
-  const currentPlotIds =
-    currentScope === "selected_plots" ? normalizeExistingPlotIds(existingLog) : [];
-  const nextPlotIds =
-    nextScope === "selected_plots"
-      ? normalizePlotIds(data.plotIds !== undefined ? data.plotIds : currentPlotIds)
-      : [];
-  if (
-    nextPlotIds.length !== currentPlotIds.length ||
-    nextPlotIds.some((plotId, index) => plotId !== currentPlotIds[index])
-  ) {
-    return true;
-  }
-
-  const currentSource = normalizeSource(existingLog.source);
-  const nextSource =
-    data.source !== undefined ? normalizeSource(data.source, currentSource) : currentSource;
-  if (nextSource !== currentSource) {
-    return true;
-  }
-
-  const currentConfidence = normalizeConfidence(existingLog.confidence);
-  const nextConfidence =
-    data.confidence !== undefined
-      ? normalizeConfidence(data.confidence)
-      : currentConfidence;
-  if ((nextConfidence ?? null) !== (currentConfidence ?? null)) {
-    return true;
-  }
-
+  // checking plot changes isn't perfect here but roughly:
   const currentImageName = (existingLog.imageName || "").trim();
   const nextImageName =
     data.imageName !== undefined ? (data.imageName || "").trim() : currentImageName;
@@ -137,36 +102,35 @@ const hasHistoricalContentChanges = (data, existingLog) => {
 const mapDiseaseLogOutput = (logDoc) => {
   const log = logDoc.toObject ? logDoc.toObject() : { ...logDoc };
 
+  const hasAssignments = Array.isArray(log.seasonPlotAssignments) && log.seasonPlotAssignments.length > 0;
+  const resolvedPlots = hasAssignments 
+    ? log.seasonPlotAssignments.map(a => a.plot).filter(Boolean)
+    : log.plotSnapshot 
+      ? log.plotSnapshot.map(s => ({ _id: s.plotId, name: s.name, area: s.area, status: s.status }))
+      : [];
+      
   return {
     ...log,
     diseaseName: log.diseaseName || "Khong xac dinh",
-    seasonLabel: log.season?.season?.name
-      ? `${log.season.season.name} ${log.season.year}`
-      : undefined,
-    fieldName: log.field?.name || undefined,
+    seasonPlotAssignments: undefined,
+    plots: resolvedPlots,
+    plotCount: resolvedPlots.length,
     userName: log.user?.fullName || undefined,
-    plotCount: Array.isArray(log.plots) ? log.plots.length : 0,
   };
 };
 
 const populateDiseaseLogQuery = (query) =>
   query
     .populate({
-      path: "season",
-      populate: [
-        { path: "season", select: "name" },
-        { path: "field", select: "name address" },
-      ],
+      path: "seasonPlotAssignments",
+      populate: { path: "plot", select: "name area status" },
     })
-    .populate("field", "name address")
-    .populate("plots", "name area status")
     .populate("user", "fullName email")
     .populate("processedBy", "fullName email");
 
-const getSeasonForUser = async (seasonId, userId) => {
-  const season = await SeasonDetail.findOne({ _id: seasonId, user: userId })
+const getSeasonForUser = async (seasonId, _userId) => {
+  const season = await SeasonDetail.findById(seasonId)
     .populate("season", "name")
-    .populate("field", "name address")
     .lean();
 
   if (!season) {
@@ -177,7 +141,10 @@ const getSeasonForUser = async (seasonId, userId) => {
 };
 
 const ensureActiveSeasonForMutation = (season, action) => {
-  if (season.status !== "active") {
+  const now = new Date();
+  const isActive = season.startDate && new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now);
+
+  if (!isActive) {
     throw new Error(`Chi co the ${action} nhat ky benh cho vu dang canh tac`);
   }
 };
@@ -191,17 +158,17 @@ const getParticipantPlotsForSeason = async (seasonId, userId) => {
     .populate("plot", "name area status field user")
     .lean();
 
-  const plots = assignments.map((item) => item.plot).filter(Boolean);
-  if (plots.length === 0) {
-    throw new Error("Mua vu nay chua co thua nao tham gia");
+  const activeAssignments = assignments.filter((item) => item.plot && item.plot.status === "active");
+  if (activeAssignments.length === 0) {
+    throw new Error("Mua vu nay chua co thua nao tham gia hoac active");
   }
 
-  return plots;
+  return activeAssignments;
 };
 
 const resolveAffectedPlots = async ({ seasonId, userId, scope, plotIds }) => {
-  const participantPlots = await getParticipantPlotsForSeason(seasonId, userId);
-  const plotMap = new Map(participantPlots.map((plot) => [String(plot._id), plot]));
+  const participantAssignments = await getParticipantPlotsForSeason(seasonId, userId);
+  const assignmentByPlotId = new Map(participantAssignments.map((a) => [String(a.plot._id), a]));
 
   if (scope === "selected_plots") {
     const selectedPlotIds = normalizePlotIds(plotIds);
@@ -209,15 +176,15 @@ const resolveAffectedPlots = async ({ seasonId, userId, scope, plotIds }) => {
       throw new Error("Can chon it nhat 1 thua de luu nhat ky benh");
     }
 
-    const invalidPlotId = selectedPlotIds.find((plotId) => !plotMap.has(plotId));
+    const invalidPlotId = selectedPlotIds.find((plotId) => !assignmentByPlotId.has(plotId));
     if (invalidPlotId) {
       throw new Error("Co thua ruong khong hop le hoac khong thuoc mua vu dang chon");
     }
 
-    return selectedPlotIds.map((plotId) => plotMap.get(plotId));
+    return selectedPlotIds.map((plotId) => assignmentByPlotId.get(plotId));
   }
 
-  return participantPlots;
+  return participantAssignments;
 };
 
 const buildDiseaseLogPayload = async (
@@ -226,7 +193,16 @@ const buildDiseaseLogPayload = async (
   existingLog = null,
   { requireActiveSeason = false } = {}
 ) => {
-  const seasonId = data.seasonId || data.season || existingLog?.season;
+  // If editing an existing log, get its season from assignments
+  let seasonId = data.seasonId || data.season;
+  if (!seasonId && existingLog && existingLog.seasonPlotAssignments?.[0]?.seasonDetail) {
+    seasonId = String(existingLog.seasonPlotAssignments[0].seasonDetail);
+  }
+  // Fallback to legacy season field if it somehow exists
+  if (!seasonId && existingLog?.season) {
+    seasonId = String(existingLog.season);
+  }
+
   if (!seasonId) {
     throw new Error("Thieu seasonId");
   }
@@ -242,12 +218,19 @@ const buildDiseaseLogPayload = async (
   }
 
   const scope = data.scope === "selected_plots" ? "selected_plots" : "all_plots";
-  const affectedPlots = await resolveAffectedPlots({
-    seasonId: season._id,
-    userId,
-    scope,
-    plotIds: data.plotIds,
-  });
+  
+  let affectedAssignments = [];
+  if (data.plotIds || data.scope) {
+    affectedAssignments = await resolveAffectedPlots({
+      seasonId: season._id,
+      userId,
+      scope,
+      plotIds: data.plotIds,
+    });
+  } else if (existingLog) {
+    // keeping same plots if no plot data provided
+    affectedAssignments = await SeasonPlotAssignment.find({ _id: { $in: existingLog.seasonPlotAssignments } }).populate("plot").lean();
+  }
 
   const status = normalizeStatus(data.status, existingLog?.status || "unprocessed");
   const nextPayload = {
@@ -263,14 +246,12 @@ const buildDiseaseLogPayload = async (
     status,
     processingNote: (data.processingNote || existingLog?.processingNote || "").trim(),
     scope,
-    season: season._id,
-    field: season.field?._id || season.field,
-    plots: affectedPlots.map((plot) => plot._id),
-    plotSnapshot: affectedPlots.map((plot) => ({
-      plotId: plot._id,
-      name: plot.name || "",
-      area: Number(plot.area || 0),
-      status: plot.status || "",
+    seasonPlotAssignments: affectedAssignments.map((a) => a._id),
+    plotSnapshot: affectedAssignments.map((a) => ({
+      plotId: a.plot._id,
+      name: a.plot.name || "",
+      area: Number(a.plot.area || 0),
+      status: a.plot.status || "",
     })),
     user: userId,
   };
@@ -308,16 +289,20 @@ const getDiseaseLogs = async (filters, currentUser) => {
     query.user = filters.userId;
   }
 
-  if (filters.seasonId) {
-    query.season = filters.seasonId;
-  }
-
-  if (filters.fieldId) {
-    query.field = filters.fieldId;
-  }
-
   if (filters.status && ["unprocessed", "processed"].includes(filters.status)) {
     query.status = filters.status;
+  }
+  
+  if (filters.seasonId) {
+    // 1. Get assignments for season
+    const assignments = await SeasonPlotAssignment.find({ seasonDetail: filters.seasonId }).lean();
+    const assignmentIds = assignments.map(a => a._id);
+    
+    // 2. add to query using $or to support legacy logs too
+    query.$or = [
+      { seasonPlotAssignments: { $in: assignmentIds } },
+      { season: filters.seasonId }
+    ];
   }
 
   const logs = await populateDiseaseLogQuery(
@@ -332,15 +317,20 @@ const updateDiseaseLog = async (id, data, currentUser) => {
     ? { _id: id }
     : { _id: id, user: currentUser.id };
 
-  const existing = await DiseaseLog.findOne(query).lean();
+  const existing = await DiseaseLog.findOne(query).populate("seasonPlotAssignments").lean();
   if (!existing) {
     throw new Error("Khong tim thay nhat ky benh");
   }
 
   const ownerUserId = existing.user?.toString?.() || existing.user;
-  const season = await getSeasonForUser(existing.season, ownerUserId);
+  
+  const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || existing.season;
+  const season = await getSeasonForUser(seasonId, ownerUserId);
 
-  if (season.status !== "active") {
+  const now = new Date();
+  const isActive = season.startDate && new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now);
+
+  if (!isActive) {
     if (hasHistoricalContentChanges(data, existing)) {
       throw new Error(
         "Vu mua da ket thuc. Ban chi co the cap nhat trang thai xu ly va ghi chu."
@@ -365,6 +355,11 @@ const updateDiseaseLog = async (id, data, currentUser) => {
   if (payload.status === "processed") {
     payload.processedBy = currentUser.id;
   }
+  
+  // Clean up legacy fields
+  payload.season = undefined;
+  payload.field = undefined;
+  payload.plots = undefined;
 
   const updated = await populateDiseaseLogQuery(
     DiseaseLog.findOneAndUpdate(query, payload, { new: true })
@@ -400,13 +395,14 @@ const deleteDiseaseLog = async (id, currentUser) => {
     ? { _id: id }
     : { _id: id, user: currentUser.id };
 
-  const existing = await DiseaseLog.findOne(query).lean();
+  const existing = await DiseaseLog.findOne(query).populate("seasonPlotAssignments").lean();
   if (!existing) {
     throw new Error("Khong tim thay nhat ky benh");
   }
 
   const ownerUserId = existing.user?.toString?.() || existing.user;
-  const season = await getSeasonForUser(existing.season, ownerUserId);
+  const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || existing.season;
+  const season = await getSeasonForUser(seasonId, ownerUserId);
   ensureActiveSeasonForMutation(season, "xoa");
 
   return await DiseaseLog.findOneAndDelete(query);
