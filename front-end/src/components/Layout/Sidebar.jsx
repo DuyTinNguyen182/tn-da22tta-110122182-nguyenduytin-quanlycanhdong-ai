@@ -16,15 +16,14 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { icon: Map, label: "Thửa ruộng của tôi", path: "/fields" },
     { icon: Sprout, label: "Nhật ký mùa vụ", path: "/crops" },
     { icon: AlertTriangle, label: "Nhật ký bệnh", path: "/disease-logs" },
-    { icon: ScanLine, label: "AI chẩn đoán", path: "/ai-scan" },
+    { icon: ScanLine, label: "AI dự đoán", path: "/ai-scan" },
     { icon: FileText, label: "AI tư vấn", path: "/ask-ai" },
   ];
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-gray-200 bg-white transition-all duration-300 ease-in-out ${
-        collapsed ? "w-20" : "w-64"
-      }`}
+      className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-gray-200 bg-white transition-all duration-300 ease-in-out ${collapsed ? "w-20" : "w-64"
+        }`}
     >
       <div className="flex h-20 flex-shrink-0 items-center border-b border-gray-100 px-6">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-lg shadow-emerald-200">
@@ -37,7 +36,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
               AgriSmart
             </h3>
             <p className="whitespace-nowrap text-xs text-gray-500">
-              Nông nghiệp số
+              Nông nghiệp thông minh
             </p>
           </div>
         )}
@@ -45,9 +44,8 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
 
       <nav className="relative flex-1 space-y-2 px-3 py-6">
         <p
-          className={`mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 transition-all duration-300 ${
-            collapsed ? "h-0 overflow-hidden opacity-0" : "h-auto opacity-100"
-          }`}
+          className={`mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 transition-all duration-300 ${collapsed ? "h-0 overflow-hidden opacity-0" : "h-auto opacity-100"
+            }`}
         >
           Menu chính
         </p>
@@ -57,12 +55,10 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              `group relative flex items-center rounded-xl px-3 py-3 transition-all ${
-                collapsed ? "justify-center" : "justify-between"
-              } ${
-                isActive
-                  ? "bg-emerald-50 font-semibold text-emerald-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-emerald-600"
+              `group relative flex items-center rounded-xl px-3 py-3 transition-all ${collapsed ? "justify-center" : "justify-between"
+              } ${isActive
+                ? "bg-emerald-50 font-semibold text-emerald-700"
+                : "text-gray-600 hover:bg-gray-50 hover:text-emerald-600"
               }`
             }
           >

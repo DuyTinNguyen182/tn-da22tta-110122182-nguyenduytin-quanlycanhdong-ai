@@ -11,10 +11,16 @@ const getAll = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const log = await diseaseLogService.createDiseaseLog(req.body, req.user.id);
+    const imageUrl = req.file?.path || "";
+    const log = await diseaseLogService.createDiseaseLog(req.body, req.user.id, imageUrl);
     res.status(201).json(log);
   } catch (error) {
-    console.error("Create Disease Log Error:", error);
+    console.error("Create Disease Log Error:", {
+      message: error.message,
+      body: req.body,
+      userId: req.user?.id,
+      stack: error.stack?.split("\n").slice(0, 4).join(" | "),
+    });
     res.status(400).json({ message: error.message });
   }
 };

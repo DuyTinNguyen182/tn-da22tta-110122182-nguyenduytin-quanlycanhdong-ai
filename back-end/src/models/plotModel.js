@@ -9,6 +9,7 @@ const plotSchema = new mongoose.Schema({
     default: "active",
   },
   addressDetail: { type: String, default: "", trim: true },
+  imageUrl: { type: String, default: "" },
   field: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Field",

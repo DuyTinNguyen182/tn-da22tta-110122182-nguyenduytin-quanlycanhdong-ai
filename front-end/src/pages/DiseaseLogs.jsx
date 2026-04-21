@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ClipboardList,
   Edit2,
+  ImageIcon,
   Plus,
   Save,
   Search,
@@ -49,6 +50,13 @@ const getStatusMeta = (status) => {
     return { label: "Đã xử lý", className: "bg-emerald-100 text-emerald-700" };
   }
   return { label: "Chưa xử lý", className: "bg-amber-100 text-amber-700" };
+};
+
+const formatSeasonLabel = (season) => {
+  if (!season) return "";
+  const year = season.startDate ? new Date(season.startDate).getFullYear() : "";
+  const baseName = season.seasonName || season.name || season.seasonLabel || "Mùa vụ";
+  return year ? `${baseName} ${year}` : baseName;
 };
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString("vi-VN") : "--");
@@ -107,7 +115,11 @@ const DiseaseLogs = () => {
       { value: "", label: "Chọn mùa vụ" },
       ...formSeasons.map((s) => ({
         value: s._id,
-        label: s.name,
+        label: (() => {
+          const year = s.startDate ? new Date(s.startDate).getFullYear() : "";
+          const base = s.seasonName || s.name || "Mùa vụ";
+          return year ? `${base} ${year}` : base;
+        })(),
         dot: s.status === "active" ? "bg-emerald-500" : "bg-gray-300",
       })),
     ],
@@ -125,7 +137,7 @@ const DiseaseLogs = () => {
 
   const loadSeasonsByField = async (fieldId) => {
     if (!fieldId) return [];
-    const res = await api.get("/season-details", { params: { fieldId } });
+    const res = await api.get("/season-details/member", { params: { fieldId } });
     return res.data || [];
   };
 
@@ -181,15 +193,19 @@ const DiseaseLogs = () => {
           : seasons.find((s) => s.status === "active")?._id || seasons[0]?._id || "";
 
       const selectedSeason = seasons.find((s) => s._id === selectedSeasonId);
-      const assignedPlots = selectedSeason?.assignedPlots || [];
-      setFormPlots(assignedPlots);
+      // Prefer loggablePlots for active, assignedPlots for others
+      const plots =
+        selectedSeason?.loggablePlots?.length
+          ? selectedSeason.loggablePlots
+          : selectedSeason?.assignedPlots || [];
+      setFormPlots(plots);
 
       setForm((prev) => ({
         ...prev,
         seasonId: selectedSeasonId,
         plotIds:
           prev.scope === "selected_plots"
-            ? prev.plotIds.filter((id) => assignedPlots.some((p) => p._id === id))
+            ? prev.plotIds.filter((id) => plots.some((p) => p._id === id))
             : [],
       }));
     };
@@ -203,13 +219,16 @@ const DiseaseLogs = () => {
     }
 
     const selectedSeason = formSeasons.find((s) => s._id === form.seasonId);
-    const assignedPlots = selectedSeason?.assignedPlots || [];
-    setFormPlots(assignedPlots);
+    const plots =
+      selectedSeason?.loggablePlots?.length
+        ? selectedSeason.loggablePlots
+        : selectedSeason?.assignedPlots || [];
+    setFormPlots(plots);
     setForm((prev) => ({
       ...prev,
       plotIds:
         prev.scope === "selected_plots"
-          ? prev.plotIds.filter((id) => assignedPlots.some((p) => p._id === id))
+          ? prev.plotIds.filter((id) => plots.some((p) => p._id === id))
           : [],
     }));
   }, [isModalOpen, form.seasonId, formSeasons]);
@@ -250,23 +269,43 @@ const DiseaseLogs = () => {
     const seasons = fieldId ? await loadSeasonsByField(fieldId) : [];
     const seasonId =
       seasons.find((s) => s.status === "active")?._id || seasons[0]?._id || "";
+    const activeSeason = seasons.find((s) => s._id === seasonId);
+    const plots =
+      activeSeason?.loggablePlots?.length
+        ? activeSeason.loggablePlots
+        : activeSeason?.assignedPlots || [];
 
     setEditingLog(null);
     setFormSeasons(seasons);
-    setFormPlots(seasons.find((s) => s._id === seasonId)?.assignedPlots || []);
+    setFormPlots(plots);
     setForm({ ...emptyForm, fieldId, seasonId });
     setIsModalOpen(true);
   };
 
   const openEditModal = async (log) => {
-    const fieldId = log.field?._id || log.field || "";
+    // Use new field names returned by the updated backend
+    const fieldId = log.fieldId || log.field?._id || log.field || "";
+    const seasonId = log.seasonId || log.season?._id || log.season || "";
+
     const seasons = fieldId ? await loadSeasonsByField(fieldId) : [];
-    const seasonId = log.season?._id || log.season || "";
     const selectedSeason = seasons.find((s) => s._id === seasonId);
+
+    // Prefer loggablePlots; for historical seasons fall back to plotSnapshot
+    const plots =
+      selectedSeason?.loggablePlots?.length
+        ? selectedSeason.loggablePlots
+        : selectedSeason?.assignedPlots?.length
+          ? selectedSeason.assignedPlots
+          : (log.plotSnapshot || []).map((s) => ({
+              _id: String(s.plotId),
+              name: s.name,
+              area: s.area,
+              status: s.status,
+            }));
 
     setEditingLog(log);
     setFormSeasons(seasons);
-    setFormPlots(selectedSeason?.assignedPlots || []);
+    setFormPlots(plots);
     setForm({
       diseaseName: log.diseaseName || "",
       description: log.description || "",
@@ -274,7 +313,7 @@ const DiseaseLogs = () => {
       fieldId,
       seasonId,
       scope: log.scope || "all_plots",
-      plotIds: (log.plots || []).map((p) => p._id),
+      plotIds: (log.plots || []).map((p) => p._id || String(p)),
       status: log.status || "unprocessed",
       processingNote: log.processingNote || "",
       source: log.source || "manual",
@@ -319,9 +358,21 @@ const DiseaseLogs = () => {
     try {
       setSaving(true);
       if (editingLog) {
+        // PUT — không có ảnh, gửi JSON bình thường
         await api.put(`/disease-logs/${editingLog._id}`, payload);
       } else {
-        await api.post("/disease-logs", payload);
+        // POST — gửi FormData để tương thích với upload middleware
+        const formData = new FormData();
+        Object.entries(payload).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            value.forEach((v) => formData.append(key, v));
+          } else if (value !== null && value !== undefined) {
+            formData.append(key, String(value));
+          }
+        });
+        await api.post("/disease-logs", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
       setIsModalOpen(false);
       setEditingLog(null);
@@ -477,6 +528,11 @@ const DiseaseLogs = () => {
               (log.plotSnapshot || []).map((item) => item.name).filter(Boolean).join(", ") ||
               "Toàn bộ thửa tham gia vụ";
             const isSeasonActive = log.season?.status === "active";
+            const seasonLabel =
+              log.seasonLabel ||
+              (log.season ? formatSeasonLabel(log.season) : null) ||
+              "Chưa có mùa vụ";
+            const plotCount = log.plotSnapshot?.length || log.plotCount || 0;
 
             return (
               <article
@@ -484,7 +540,7 @@ const DiseaseLogs = () => {
                 className="group rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2.5">
                       <h2 className="text-lg font-bold text-gray-900">{log.diseaseName}</h2>
                       <span className={`rounded-lg px-2.5 py-0.5 text-xs font-bold ${statusMeta.className}`}>
@@ -500,7 +556,7 @@ const DiseaseLogs = () => {
                         {formatDate(log.detectedAt)}
                       </span>
                       <span>{log.fieldName || "Chưa có cánh đồng"}</span>
-                      <span>{log.seasonLabel || "Chưa có mùa vụ"}</span>
+                      <span>{seasonLabel}</span>
                     </div>
                   </div>
 
@@ -529,25 +585,51 @@ const DiseaseLogs = () => {
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
-                  <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Phạm vi</p>
-                    <p className="mt-1.5 text-sm font-medium text-gray-700">
-                      {log.scope === "all_plots" ? "Toàn bộ thửa" : `${log.plotCount || 0} thửa`}
-                    </p>
-                    <p className="mt-0.5 text-xs text-gray-500">{plotNames}</p>
+                {/* Body: info + optional image */}
+                <div className="mt-4 flex gap-4">
+                  {/* Info grid */}
+                  <div className="flex-1 grid grid-cols-1 gap-3 xl:grid-cols-3">
+                    <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Phạm vi</p>
+                      <p className="mt-1.5 text-sm font-medium text-gray-700">
+                        {log.scope === "all_plots" ? "Toàn bộ thửa" : `${plotCount} thửa`}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">{plotNames}</p>
+                    </div>
+                    <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Mô tả bệnh</p>
+                      <p className="mt-1.5 text-sm text-gray-700 line-clamp-3">{log.description || "Chưa có mô tả."}</p>
+                    </div>
+                    <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Ghi chú xữ lý</p>
+                      <p className="mt-1.5 text-sm text-gray-700 line-clamp-3">{log.processingNote || "Chưa có ghi chú."}</p>
+                      {log.status === "processed" && log.processedAt && (
+                        <p className="mt-1 text-xs text-emerald-600">Xử lý ngày {formatDate(log.processedAt)}</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Mô tả bệnh</p>
-                    <p className="mt-1.5 text-sm text-gray-700">{log.description || "Chưa có mô tả."}</p>
-                  </div>
-                  <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Ghi chú xử lý</p>
-                    <p className="mt-1.5 text-sm text-gray-700">{log.processingNote || "Chưa có ghi chú."}</p>
-                    {log.status === "processed" && log.processedAt && (
-                      <p className="mt-1 text-xs text-emerald-600">Xử lý ngày {formatDate(log.processedAt)}</p>
-                    )}
-                  </div>
+
+                  {/* Image thumbnail if from AI scan */}
+                  {log.imageUrl && (
+                    <a
+                      href={log.imageUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group/img relative flex-shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+                      title="Xem ảnh quét AI"
+                    >
+                      <img
+                        src={log.imageUrl}
+                        alt={log.diseaseName}
+                        className="h-full w-28 object-cover transition-transform group-hover/img:scale-105"
+                        style={{ minHeight: "120px", maxHeight: "140px" }}
+                        onError={(e) => { e.currentTarget.style.display = "none"; }}
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover/img:bg-black/20">
+                        <ImageIcon size={18} className="text-white opacity-0 drop-shadow transition-opacity group-hover/img:opacity-100" />
+                      </div>
+                    </a>
+                  )}
                 </div>
               </article>
             );

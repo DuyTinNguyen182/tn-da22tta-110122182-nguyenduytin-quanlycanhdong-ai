@@ -27,6 +27,7 @@ const normalizePlotPayload = (data = {}, fallbackStatus = "active") => {
   return { name, area, status, addressDetail };
 };
 
+
 const ensureFieldExists = async (fieldId) => {
   const field = await Field.findById(fieldId);
   if (!field) {
@@ -49,18 +50,19 @@ const getPlotsByField = async (fieldId, currentUser) => {
     .sort({ createdAt: 1 });
 };
 
-const createPlot = async (data, userId) => {
+const createPlot = async (data, userId, imageUrl = "") => {
   await ensureFieldExists(data.fieldId);
   const payload = normalizePlotPayload(data);
 
   return await Plot.create({
     ...payload,
+    imageUrl,
     field: data.fieldId,
     user: userId,
   });
 };
 
-const updatePlot = async (id, data, currentUser) => {
+const updatePlot = async (id, data, currentUser, imageUrl = null) => {
   const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
   const existingPlot = await Plot.findOne(query);
   if (!existingPlot) {
@@ -69,11 +71,17 @@ const updatePlot = async (id, data, currentUser) => {
 
   const updateData = normalizePlotPayload(data, existingPlot.status);
 
+  // Chỉ ghi đè imageUrl nếu upload ảnh mới
+  if (imageUrl !== null) {
+    updateData.imageUrl = imageUrl;
+  }
+
   return await Plot.findByIdAndUpdate(existingPlot._id, updateData, { new: true }).populate(
     "field",
     "name address"
   );
 };
+
 
 const deletePlot = async (id, currentUser) => {
   const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };

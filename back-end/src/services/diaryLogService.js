@@ -5,11 +5,23 @@ const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const { resolveTaskId } = require("./taskService");
 
 const normalizePlotIds = (plotIds = []) => {
-  if (!Array.isArray(plotIds)) {
-    return [];
-  }
+  const values = Array.isArray(plotIds)
+    ? plotIds
+    : plotIds === undefined || plotIds === null || plotIds === ""
+      ? []
+      : [plotIds];
 
-  return Array.from(new Set(plotIds.filter(Boolean).map((item) => String(item))));
+  return Array.from(
+    new Set(
+      values
+        .filter(Boolean)
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object" && item._id) return String(item._id);
+          return String(item);
+        })
+    )
+  );
 };
 
 const getSeasonForUser = async (seasonId, _userId) => {

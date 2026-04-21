@@ -16,7 +16,8 @@ const getByField = async (req, res) => {
 
 const create = async (req, res) => {
   try {
-    const result = await plotService.createPlot(req.body, req.user.id);
+    const imageUrl = req.file?.path || "";
+    const result = await plotService.createPlot(req.body, req.user.id, imageUrl);
     res.status(201).json(result);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -26,7 +27,8 @@ const create = async (req, res) => {
 const update = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await plotService.updatePlot(id, req.body, req.user);
+    const imageUrl = req.file?.path || null;
+    const result = await plotService.updatePlot(id, req.body, req.user, imageUrl);
     res.json(result);
   } catch (error) {
     res.status(400).json({ message: error.message });

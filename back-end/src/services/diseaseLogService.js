@@ -5,11 +5,23 @@ const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const isAdminUser = (user) => (user?.role || "").toLowerCase() === "admin";
 
 const normalizePlotIds = (plotIds = []) => {
-  if (!Array.isArray(plotIds)) {
-    return [];
-  }
+  const values = Array.isArray(plotIds)
+    ? plotIds
+    : plotIds === undefined || plotIds === null || plotIds === ""
+      ? []
+      : [plotIds];
 
-  return Array.from(new Set(plotIds.filter(Boolean).map((item) => String(item)))).sort();
+  return Array.from(
+    new Set(
+      values
+        .filter(Boolean)
+        .map((item) => {
+          if (typeof item === "string") return item;
+          if (item && typeof item === "object" && item._id) return String(item._id);
+          return String(item);
+        })
+    )
+  ).sort();
 };
 
 const normalizeConfidence = (value) => {
@@ -96,7 +108,11 @@ const hasHistoricalContentChanges = (data, existingLog) => {
   const nextImageName =
     data.imageName !== undefined ? (data.imageName || "").trim() : currentImageName;
 
-  return nextImageName !== currentImageName;
+  const currentImageUrl = (existingLog.imageUrl || "").trim();
+  const nextImageUrl =
+    data.imageUrl !== undefined ? (data.imageUrl || "").trim() : currentImageUrl;
+
+  return nextImageName !== currentImageName || nextImageUrl !== currentImageUrl;
 };
 
 const mapDiseaseLogOutput = (logDoc) => {
@@ -108,7 +124,21 @@ const mapDiseaseLogOutput = (logDoc) => {
     : log.plotSnapshot 
       ? log.plotSnapshot.map(s => ({ _id: s.plotId, name: s.name, area: s.area, status: s.status }))
       : [];
-      
+
+  // Extract field and season from the first valid assignment
+  const firstAssignment = hasAssignments ? log.seasonPlotAssignments[0] : null;
+  const seasonDetail = firstAssignment?.seasonDetail || null;
+  const fieldObj = firstAssignment?.field || seasonDetail?.field || null;
+
+  const fieldId = fieldObj?._id || null;
+  const fieldName = fieldObj?.name || null;
+  const seasonId = seasonDetail?._id || null;
+  const seasonBaseName = seasonDetail?.season?.name || seasonDetail?.seasonName || null;
+  const seasonYear = seasonDetail?.startDate ? new Date(seasonDetail.startDate).getFullYear() : null;
+  const seasonLabel = seasonBaseName
+    ? seasonYear ? `${seasonBaseName} ${seasonYear}` : seasonBaseName
+    : null;
+
   return {
     ...log,
     diseaseName: log.diseaseName || "Khong xac dinh",
@@ -116,6 +146,10 @@ const mapDiseaseLogOutput = (logDoc) => {
     plots: resolvedPlots,
     plotCount: resolvedPlots.length,
     userName: log.user?.fullName || undefined,
+    fieldId,
+    fieldName,
+    seasonId,
+    seasonLabel,
   };
 };
 
@@ -123,26 +157,43 @@ const populateDiseaseLogQuery = (query) =>
   query
     .populate({
       path: "seasonPlotAssignments",
-      populate: { path: "plot", select: "name area status" },
+      populate: [
+        { path: "plot", select: "name area status" },
+        {
+          path: "seasonDetail",
+          select: "startDate endDate seasonName",
+          populate: { path: "season", select: "name" },
+        },
+        { path: "field", select: "name" },
+      ],
     })
     .populate("user", "fullName email")
     .populate("processedBy", "fullName email");
 
 const getSeasonForUser = async (seasonId, _userId) => {
-  const season = await SeasonDetail.findById(seasonId)
-    .populate("season", "name")
-    .lean();
+  // Use non-lean to preserve virtuals (e.g. status), then convert
+  const seasonDoc = await SeasonDetail.findById(seasonId).populate("season", "name");
 
-  if (!season) {
+  if (!seasonDoc) {
     throw new Error("Khong tim thay mua vu");
   }
 
+  // Convert to plain object but manually carry virtual status
+  const season = seasonDoc.toObject({ virtuals: true });
   return season;
 };
 
 const ensureActiveSeasonForMutation = (season, action) => {
-  const now = new Date();
-  const isActive = season.startDate && new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now);
+  // Use virtual status (already computed by toObject({virtuals:true})) or fall back to date check
+  const statusFromVirtual = season.status;
+  const isActive = statusFromVirtual
+    ? statusFromVirtual === "active"
+    : (() => {
+        const now = new Date();
+        return season.startDate
+          ? new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now)
+          : true; // no startDate → treat as always-active (admin-created without dates)
+      })();
 
   if (!isActive) {
     throw new Error(`Chi co the ${action} nhat ky benh cho vu dang canh tac`);
@@ -191,7 +242,8 @@ const buildDiseaseLogPayload = async (
   data,
   userId,
   existingLog = null,
-  { requireActiveSeason = false } = {}
+  { requireActiveSeason = false } = {},
+  imageUrl = ""
 ) => {
   // If editing an existing log, get its season from assignments
   let seasonId = data.seasonId || data.season;
@@ -217,7 +269,7 @@ const buildDiseaseLogPayload = async (
     throw new Error("Ten benh la bat buoc");
   }
 
-  const scope = data.scope === "selected_plots" ? "selected_plots" : "all_plots";
+  const scope = ["selected_plots", "single_plot"].includes(data.scope) ? "selected_plots" : "all_plots";
   
   let affectedAssignments = [];
   if (data.plotIds || data.scope) {
@@ -254,6 +306,8 @@ const buildDiseaseLogPayload = async (
       status: a.plot.status || "",
     })),
     user: userId,
+    // Lưu imageUrl nếu có (từ Cloudinary), giữ nguyên nếu không upload mới
+    imageUrl: imageUrl || existingLog?.imageUrl || "",
   };
 
   if (status === "processed") {
@@ -266,10 +320,10 @@ const buildDiseaseLogPayload = async (
   return nextPayload;
 };
 
-const createDiseaseLog = async (data, userId) => {
+const createDiseaseLog = async (data, userId, imageUrl = "") => {
   const payload = await buildDiseaseLogPayload(data, userId, null, {
     requireActiveSeason: true,
-  });
+  }, imageUrl);
 
   if (payload.status === "processed") {
     payload.processedBy = userId;
@@ -327,8 +381,15 @@ const updateDiseaseLog = async (id, data, currentUser) => {
   const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || existing.season;
   const season = await getSeasonForUser(seasonId, ownerUserId);
 
-  const now = new Date();
-  const isActive = season.startDate && new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now);
+  // Use virtual status (populated via toObject({ virtuals: true }) in getSeasonForUser)
+  const isActive = season.status
+    ? season.status === "active"
+    : (() => {
+        const now = new Date();
+        return season.startDate
+          ? new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now)
+          : true;
+      })();
 
   if (!isActive) {
     if (hasHistoricalContentChanges(data, existing)) {

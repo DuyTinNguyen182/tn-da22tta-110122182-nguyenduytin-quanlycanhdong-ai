@@ -11,6 +11,7 @@ const diseaseLogSchema = new mongoose.Schema(
       default: "ai_scan",
     },
     imageName: { type: String, default: "" },
+    imageUrl: { type: String, default: "" },
     detectedAt: { type: Date, default: Date.now },
     status: {
       type: String,

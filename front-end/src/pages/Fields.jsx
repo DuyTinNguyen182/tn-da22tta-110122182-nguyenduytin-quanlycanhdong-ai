@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
   Edit2,
+  Image,
   Layers,
   LayoutGrid,
   MapPin,
@@ -22,6 +23,7 @@ const emptyPlotForm = {
   area: "",
   status: "active",
   addressDetail: "",
+  imageFile: null,
 };
 
 const statusOptions = [
@@ -47,6 +49,8 @@ const Fields = () => {
   const [isPlotModalOpen, setIsPlotModalOpen] = useState(false);
   const [editingPlot, setEditingPlot] = useState(null);
   const [plotForm, setPlotForm] = useState(emptyPlotForm);
+  const [imagePreview, setImagePreview] = useState(null);
+  const imageInputRef = useRef(null);
 
   const fetchFields = async (preferredFieldId) => {
     try {
@@ -99,6 +103,7 @@ const Fields = () => {
   const openCreatePlotModal = () => {
     setEditingPlot(null);
     setPlotForm(emptyPlotForm);
+    setImagePreview(null);
     setIsPlotModalOpen(true);
   };
 
@@ -109,8 +114,23 @@ const Fields = () => {
       area: plot.area || "",
       status: plot.status || "active",
       addressDetail: plot.addressDetail || "",
+      imageFile: null,
     });
+    setImagePreview(plot.imageUrl || null);
     setIsPlotModalOpen(true);
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPlotForm((prev) => ({ ...prev, imageFile: file }));
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveImage = () => {
+    setPlotForm((prev) => ({ ...prev, imageFile: null }));
+    setImagePreview(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
   };
 
   const handleSavePlot = async () => {
@@ -127,15 +147,32 @@ const Fields = () => {
     }
 
     try {
+      const formData = new FormData();
+      formData.append("name", plotForm.name.trim());
+      formData.append("area", plotForm.area);
+      formData.append("status", plotForm.status);
+      formData.append("addressDetail", plotForm.addressDetail || "");
+      if (!editingPlot) {
+        formData.append("fieldId", selectedField._id);
+      }
+      if (plotForm.imageFile) {
+        formData.append("image", plotForm.imageFile);
+      }
+
       if (editingPlot) {
-        await api.put(`/plots/${editingPlot._id}`, plotForm);
+        await api.put(`/plots/${editingPlot._id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       } else {
-        await api.post("/plots", { ...plotForm, fieldId: selectedField._id });
+        await api.post("/plots", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
       }
 
       setIsPlotModalOpen(false);
       setPlotForm(emptyPlotForm);
       setEditingPlot(null);
+      setImagePreview(null);
       await fetchFields(selectedField._id);
     } catch (error) {
       toast.error(error.response?.data?.message || "Không thể lưu thửa ruộng");
@@ -321,7 +358,15 @@ const Fields = () => {
                       >
                         <div className="flex items-center gap-3">
                           <div className="rounded-lg bg-gray-50 p-2 text-emerald-600">
-                            <Tractor size={16} />
+                            {plot.imageUrl ? (
+                              <img
+                                src={plot.imageUrl}
+                                alt={plot.name}
+                                className="h-10 w-10 rounded-lg object-cover ring-1 ring-gray-200"
+                              />
+                            ) : (
+                              <Tractor size={16} />
+                            )}
                           </div>
                           <p className="text-sm font-semibold text-gray-800">{plot.name}</p>
                         </div>
@@ -467,6 +512,51 @@ const Fields = () => {
                   }
                   className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                   placeholder="Ấp 2, gần kênh Ngang, lô trong cùng"
+                />
+              </div>
+
+              {/* Ảnh thửa ruộng */}
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
+                  <Image size={13} /> Ảnh thửa ruộng
+                </label>
+                {imagePreview ? (
+                  <div className="relative overflow-hidden rounded-xl border border-emerald-200 bg-emerald-50/40">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="h-40 w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute right-2 top-2 rounded-full bg-white/90 p-1 text-gray-600 shadow-sm hover:bg-red-50 hover:text-red-500"
+                    >
+                      <X size={14} />
+                    </button>
+                    <p className="px-3 py-1.5 text-xs text-gray-500">
+                      {plotForm.imageFile ? plotForm.imageFile.name : "Ảnh hiện tại"}
+                    </p>
+                  </div>
+                ) : (
+                  <label
+                    htmlFor="plot-image-upload"
+                    className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/60 py-6 text-center transition-colors hover:border-emerald-300 hover:bg-emerald-50/40"
+                  >
+                    <Image size={22} className="text-gray-300" />
+                    <p className="text-xs font-medium text-gray-400">
+                      Nhấp để chọn ảnh
+                    </p>
+                    <p className="text-[11px] text-gray-300">JPG, PNG, WebP — tối đa 10MB</p>
+                  </label>
+                )}
+                <input
+                  id="plot-image-upload"
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={handleImageChange}
                 />
               </div>
 
