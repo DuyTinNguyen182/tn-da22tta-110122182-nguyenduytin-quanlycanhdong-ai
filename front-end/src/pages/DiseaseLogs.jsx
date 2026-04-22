@@ -103,7 +103,7 @@ const DiseaseLogs = () => {
       { value: "", label: "Tất cả mùa vụ" },
       ...filterSeasons.map((s) => ({
         value: s._id,
-        label: s.name,
+        label: formatSeasonLabel(s),
         dot: s.status === "active" ? "bg-emerald-500" : "bg-gray-300",
       })),
     ],
@@ -297,11 +297,11 @@ const DiseaseLogs = () => {
         : selectedSeason?.assignedPlots?.length
           ? selectedSeason.assignedPlots
           : (log.plotSnapshot || []).map((s) => ({
-              _id: String(s.plotId),
-              name: s.name,
-              area: s.area,
-              status: s.status,
-            }));
+            _id: String(s.plotId),
+            name: s.name,
+            area: s.area,
+            status: s.status,
+          }));
 
     setEditingLog(log);
     setFormSeasons(seasons);
@@ -527,7 +527,7 @@ const DiseaseLogs = () => {
             const plotNames =
               (log.plotSnapshot || []).map((item) => item.name).filter(Boolean).join(", ") ||
               "Toàn bộ thửa tham gia vụ";
-            const isSeasonActive = log.season?.status === "active";
+            const isSeasonActive = log.seasonStatus === "active";
             const seasonLabel =
               log.seasonLabel ||
               (log.season ? formatSeasonLabel(log.season) : null) ||
@@ -573,11 +573,10 @@ const DiseaseLogs = () => {
                       type="button"
                       onClick={() => handleDelete(log._id)}
                       disabled={!isSeasonActive}
-                      className={`rounded-lg p-2 transition-colors ${
-                        isSeasonActive
-                          ? "text-gray-400 hover:bg-red-50 hover:text-red-600"
-                          : "cursor-not-allowed text-gray-300"
-                      }`}
+                      className={`rounded-lg p-2 transition-colors ${isSeasonActive
+                        ? "text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        : "cursor-not-allowed text-gray-300"
+                        }`}
                       title={isSeasonActive ? "Xóa" : "Vụ đã kết thúc"}
                     >
                       <Trash2 size={15} />
@@ -700,16 +699,20 @@ const DiseaseLogs = () => {
                   />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500">Mùa vụ</label>
-                  <CustomDropdown
-                    value={form.seasonId}
-                    onChange={(val) =>
-                      setForm((prev) => ({ ...prev, seasonId: val, plotIds: [] }))
-                    }
-                    options={formSeasonOptions}
-                    placeholder="Chọn mùa vụ"
-                    className="w-full"
-                  />
+                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500">Mùa vụ đang canh tác</label>
+                  {(() => {
+                    const currentSeason = formSeasons.find((s) => s._id === form.seasonId);
+                    return currentSeason ? (
+                      <div className="flex min-h-[42px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5">
+                        <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+                        <span className="text-sm font-semibold text-emerald-800">{formatSeasonLabel(currentSeason)}</span>
+                      </div>
+                    ) : (
+                      <div className="flex min-h-[42px] items-center rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-400">
+                        Không có mùa vụ đang canh tác
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500">Trạng thái xử lý</label>
@@ -783,11 +786,10 @@ const DiseaseLogs = () => {
                             onClick={() => {
                               if (!isHistoricalEdit) togglePlot(plot._id);
                             }}
-                            className={`flex items-center gap-3 rounded-xl border p-3 transition-all duration-200 ${
-                              checked
-                                ? "border-emerald-300 bg-white shadow-sm shadow-emerald-50"
-                                : "border-gray-200 bg-white"
-                            } ${isHistoricalEdit ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-gray-300"}`}
+                            className={`flex items-center gap-3 rounded-xl border p-3 transition-all duration-200 ${checked
+                              ? "border-emerald-300 bg-white shadow-sm shadow-emerald-50"
+                              : "border-gray-200 bg-white"
+                              } ${isHistoricalEdit ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-gray-300"}`}
                           >
                             <CustomCheckbox
                               checked={checked}
@@ -824,11 +826,10 @@ const DiseaseLogs = () => {
                   type="button"
                   onClick={handleSubmit}
                   disabled={saving}
-                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all ${
-                    saving
-                      ? "cursor-not-allowed bg-gray-300"
-                      : "bg-emerald-600 shadow-md shadow-emerald-200 hover:bg-emerald-700 hover:shadow-lg"
-                  }`}
+                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all ${saving
+                    ? "cursor-not-allowed bg-gray-300"
+                    : "bg-emerald-600 shadow-md shadow-emerald-200 hover:bg-emerald-700 hover:shadow-lg"
+                    }`}
                 >
                   <Save size={15} />
                   {saving ? "Đang lưu..." : editingLog ? "Cập nhật" : "Lưu nhật ký"}

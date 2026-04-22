@@ -14,7 +14,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
   const menuItems = [
     { icon: LayoutDashboard, label: "Tổng quan", path: "/dashboard" },
     { icon: Map, label: "Thửa ruộng của tôi", path: "/fields" },
-    { icon: Sprout, label: "Nhật ký mùa vụ", path: "/crops" },
+    { icon: Sprout, label: "Nhật ký canh tác", path: "/crops" },
     { icon: AlertTriangle, label: "Nhật ký bệnh", path: "/disease-logs" },
     { icon: ScanLine, label: "AI dự đoán", path: "/ai-scan" },
     { icon: FileText, label: "AI tư vấn", path: "/ask-ai" },

@@ -116,7 +116,9 @@ const hasHistoricalContentChanges = (data, existingLog) => {
 };
 
 const mapDiseaseLogOutput = (logDoc) => {
-  const log = logDoc.toObject ? logDoc.toObject() : { ...logDoc };
+  // Pass { virtuals: true } so Mongoose propagates it to all nested populated docs
+  // (e.g. seasonDetail inside seasonPlotAssignments will include its 'status' virtual)
+  const log = logDoc.toObject ? logDoc.toObject({ virtuals: true }) : { ...logDoc };
 
   const hasAssignments = Array.isArray(log.seasonPlotAssignments) && log.seasonPlotAssignments.length > 0;
   const resolvedPlots = hasAssignments 
@@ -128,7 +130,7 @@ const mapDiseaseLogOutput = (logDoc) => {
   // Extract field and season from the first valid assignment
   const firstAssignment = hasAssignments ? log.seasonPlotAssignments[0] : null;
   const seasonDetail = firstAssignment?.seasonDetail || null;
-  const fieldObj = firstAssignment?.field || seasonDetail?.field || null;
+  const fieldObj = firstAssignment?.field || null;
 
   const fieldId = fieldObj?._id || null;
   const fieldName = fieldObj?.name || null;
@@ -138,6 +140,18 @@ const mapDiseaseLogOutput = (logDoc) => {
   const seasonLabel = seasonBaseName
     ? seasonYear ? `${seasonBaseName} ${seasonYear}` : seasonBaseName
     : null;
+
+  // 'status' virtual is now included directly via toObject({ virtuals: true })
+  // Fallback: compute from dates if virtual is still missing (shouldn't happen)
+  const seasonStatus = seasonDetail?.status ?? (() => {
+    if (!seasonDetail) return null;
+    const now = new Date();
+    const start = seasonDetail.startDate ? new Date(seasonDetail.startDate) : null;
+    const end = seasonDetail.endDate ? new Date(seasonDetail.endDate) : null;
+    if (end && end < now) return "completed";
+    if (start && start <= now && (!end || end >= now)) return "active";
+    return start ? "planned" : "active";
+  })();
 
   return {
     ...log,
@@ -150,6 +164,7 @@ const mapDiseaseLogOutput = (logDoc) => {
     fieldName,
     seasonId,
     seasonLabel,
+    seasonStatus,
   };
 };
 
