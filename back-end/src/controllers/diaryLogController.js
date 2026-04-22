@@ -7,7 +7,11 @@ exports.getBySeason = async (req, res) => {
       return res.status(400).json({ message: "Vui lòng cung cấp ID vụ mùa (seasonId)" });
     }
 
-    const logs = await diaryLogService.getLogsBySeason(req.query.seasonId, req.user.id);
+    const logs = await diaryLogService.getLogsBySeason(
+      req.query.seasonId,
+      req.user.id,
+      req.query.fieldId || null
+    );
     res.json(logs);
   } catch (error) {
     res.status(500).json({ message: error.message });

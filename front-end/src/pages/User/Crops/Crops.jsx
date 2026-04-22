@@ -173,7 +173,12 @@ const Crops = () => {
     const loadLogs = async () => {
       try {
         setLoadingLogs(true);
-        const res = await api.get("/diary-logs", { params: { seasonId: selectedSeasonId } });
+        const res = await api.get("/diary-logs", {
+          params: {
+            seasonId: selectedSeasonId,
+            ...(selectedField?._id ? { fieldId: selectedField._id } : {}),
+          },
+        });
         setLogs(res.data || []);
       } catch (error) {
         console.error("Lỗi tải nhật ký mùa vụ", error);
@@ -182,12 +187,17 @@ const Crops = () => {
       }
     };
     loadLogs();
-  }, [selectedSeasonId]);
+  }, [selectedSeasonId, selectedField?._id]);
 
   // ──────────────── Helpers ────────────────
 
   const refreshLogs = async (seasonId) => {
-    const res = await api.get("/diary-logs", { params: { seasonId } });
+    const res = await api.get("/diary-logs", {
+      params: {
+        seasonId,
+        ...(selectedField?._id ? { fieldId: selectedField._id } : {}),
+      },
+    });
     setLogs(res.data || []);
   };
 
@@ -254,6 +264,7 @@ const Crops = () => {
       cost: Number(logForm.cost || 0),
       date: logForm.date,
       seasonId: currentSeason._id,
+      fieldId: selectedField?._id || null,
       scope,
       plotId: scope === "single_plot" ? logForm.selectedPlotIds[0] : null,
       plotIds: scope === "all_plots" ? allPlotIds : logForm.selectedPlotIds,

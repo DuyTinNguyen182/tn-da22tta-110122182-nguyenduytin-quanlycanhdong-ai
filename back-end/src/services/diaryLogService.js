@@ -33,11 +33,44 @@ const getSeasonForUser = async (seasonId, _userId) => {
   return season;
 };
 
-const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds }) => {
+const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds, fieldId }) => {
+  const requestedPlotIds =
+    scope === "single_plot"
+      ? normalizePlotIds([plotId])
+      : normalizePlotIds(plotIds);
+
+  let targetFieldId = fieldId ? String(fieldId) : null;
+
+  if (!targetFieldId && requestedPlotIds.length > 0) {
+    const requestedPlots = await Plot.find({
+      _id: { $in: requestedPlotIds },
+      user: userId,
+      status: "active",
+    })
+      .select("_id field")
+      .lean();
+
+    if (requestedPlots.length !== requestedPlotIds.length) {
+      throw new Error("Có thửa không hợp lệ hoặc không thuộc người dùng hiện tại.");
+    }
+
+    const fieldIds = Array.from(new Set(requestedPlots.map((p) => String(p.field))));
+    if (fieldIds.length !== 1) {
+      throw new Error("Các thửa được chọn phải thuộc cùng một cánh đồng.");
+    }
+
+    targetFieldId = fieldIds[0];
+  }
+
+  if (scope === "all_plots" && !targetFieldId) {
+    throw new Error("Thiếu thông tin cánh đồng khi áp dụng cho toàn bộ thửa.");
+  }
+
   const assignments = await SeasonPlotAssignment.find({
     seasonDetail: season._id,
     user: userId,
     status: "active",
+    ...(targetFieldId ? { field: targetFieldId } : {}),
   })
     .populate("plot", "name area status field user")
     .lean();
@@ -58,10 +91,7 @@ const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds }) => {
     };
   }
 
-  const normalizedIds =
-    scope === "single_plot"
-      ? normalizePlotIds([plotId])
-      : normalizePlotIds(plotIds);
+  const normalizedIds = requestedPlotIds;
 
   if (normalizedIds.length === 0) {
     throw new Error("Cần chọn ít nhất 1 thửa để lưu nhật ký.");
@@ -125,20 +155,27 @@ const mapLogOutput = (logDoc) => {
   };
 };
 
-const getLogsBySeason = async (seasonId, userId) => {
+const getLogsBySeason = async (seasonId, userId, fieldId = null) => {
   await getSeasonForUser(seasonId, userId);
 
-  const assignments = await SeasonPlotAssignment.find({ seasonDetail: seasonId }).lean();
+  const assignments = await SeasonPlotAssignment.find({
+    seasonDetail: seasonId,
+    user: userId,
+    ...(fieldId ? { field: fieldId } : {}),
+  }).lean();
   const assignmentIds = assignments.map(a => a._id);
 
-  // Fallback to also search by old 'season' field if keeping legacy logs without migrating
-  const logs = await DiaryLog.find({
-    $or: [
-      { seasonPlotAssignments: { $in: assignmentIds } },
-      { season: seasonId } // remove this and 'season' from model natively later
-    ],
-    user: userId 
-  })
+  const logQuery = {
+    user: userId,
+    $or: [{ seasonPlotAssignments: { $in: assignmentIds } }],
+  };
+
+  if (!fieldId) {
+    // Legacy fallback for very old records that still only store season.
+    logQuery.$or.push({ season: seasonId });
+  }
+
+  const logs = await DiaryLog.find(logQuery)
     .populate("task", "name")
     .populate({
       path: "seasonPlotAssignments",
@@ -185,6 +222,7 @@ const createLog = async (data, userId) => {
     scope: requestedScope,
     plotId: data.plotId || data.plot || null,
     plotIds: data.plotIds,
+    fieldId: data.fieldId || null,
   });
 
   const created = await DiaryLog.create({
@@ -257,6 +295,7 @@ const updateLog = async (id, data, userId) => {
     scope,
     plotId: updateData.plotId !== undefined ? updateData.plotId : existingPlotIdsStr[0] || null,
     plotIds: updateData.plotIds !== undefined ? updateData.plotIds : existingPlotIdsStr,
+    fieldId: updateData.fieldId !== undefined ? updateData.fieldId : null,
   });
 
   if (updateData.taskId || updateData.task || updateData.title || updateData.taskName) {
@@ -270,6 +309,7 @@ const updateLog = async (id, data, userId) => {
   delete updateData.seasonId;
   delete updateData.plotId;
   delete updateData.plotIds;
+  delete updateData.fieldId;
   delete updateData.taskId;
   delete updateData.taskCode;
   delete updateData.taskName;

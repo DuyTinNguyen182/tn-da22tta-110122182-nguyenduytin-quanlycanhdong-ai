@@ -351,27 +351,38 @@ const createDiseaseLog = async (data, userId, imageUrl = "") => {
 
 const getDiseaseLogs = async (filters, currentUser) => {
   const query = {};
+  const assignmentFilters = {};
 
   if (!isAdminUser(currentUser)) {
     query.user = currentUser.id;
+    assignmentFilters.user = currentUser.id;
   } else if (filters.userId) {
     query.user = filters.userId;
+    assignmentFilters.user = filters.userId;
   }
 
   if (filters.status && ["unprocessed", "processed"].includes(filters.status)) {
     query.status = filters.status;
   }
-  
+
+  if (filters.fieldId) {
+    assignmentFilters.field = filters.fieldId;
+  }
+
   if (filters.seasonId) {
-    // 1. Get assignments for season
-    const assignments = await SeasonPlotAssignment.find({ seasonDetail: filters.seasonId }).lean();
+    assignmentFilters.seasonDetail = filters.seasonId;
+  }
+
+  if (filters.seasonId || filters.fieldId) {
+    const assignments = await SeasonPlotAssignment.find(assignmentFilters).lean();
     const assignmentIds = assignments.map(a => a._id);
-    
-    // 2. add to query using $or to support legacy logs too
-    query.$or = [
-      { seasonPlotAssignments: { $in: assignmentIds } },
-      { season: filters.seasonId }
-    ];
+
+    query.$or = [{ seasonPlotAssignments: { $in: assignmentIds } }];
+
+    if (filters.seasonId && !filters.fieldId) {
+      // Legacy fallback for old records that still store only season.
+      query.$or.push({ season: filters.seasonId });
+    }
   }
 
   const logs = await populateDiseaseLogQuery(

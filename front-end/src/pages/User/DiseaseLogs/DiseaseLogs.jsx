@@ -161,13 +161,12 @@ const DiseaseLogs = () => {
   useEffect(() => {
     const bootstrap = async () => {
       try {
-        const fieldList = await loadFields();
-        const defaultFieldId = fieldList[0]?._id || "";
-        const seasons = defaultFieldId ? await loadSeasonsByField(defaultFieldId) : [];
+        await loadFields();
 
-        setFilters({ fieldId: defaultFieldId, seasonId: "", status: "" });
-        setFilterSeasons(seasons);
-        await loadDiseaseLogs({ fieldId: defaultFieldId, seasonId: "", status: "" });
+        const defaultFilters = { fieldId: "", seasonId: "", status: "" };
+        setFilters(defaultFilters);
+        setFilterSeasons([]);
+        await loadDiseaseLogs(defaultFilters);
       } catch (error) {
         console.error("Lỗi khởi tạo trang nhật ký bệnh", error);
         setLoading(false);
@@ -420,14 +419,22 @@ const DiseaseLogs = () => {
     setForm(emptyForm);
   };
 
+  const handleResetFilters = async () => {
+    const defaultFilters = { fieldId: "", seasonId: "", status: "" };
+    setKeyword("");
+    setFilters(defaultFilters);
+    setFilterSeasons([]);
+    await loadDiseaseLogs(defaultFilters);
+  };
+
   // ── Render ──
 
   return (
-    <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-50 p-8">
+    <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-50 p-4 lg:p-5">
       {/* Header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Nhật ký bệnh</h1>
+          <h1 className="text-xl font-bold text-gray-900">Nhật ký bệnh</h1>
           <p className="mt-1 max-w-2xl text-sm text-gray-500">
             Ghi nhận bệnh theo mùa vụ, cánh đồng và phạm vi thửa bị ảnh hưởng.
           </p>
@@ -435,38 +442,38 @@ const DiseaseLogs = () => {
         <button
           type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-lg"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-md"
         >
-          <Plus size={17} /> Thêm nhật ký
+          <Plus size={16} /> Thêm nhật ký
         </button>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Tổng bản ghi</p>
-          <p className="mt-2 text-3xl font-bold text-gray-900">{summary.total}</p>
+          <p className="mt-1.5 text-2xl font-bold text-gray-900">{summary.total}</p>
         </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Chưa xử lý</p>
-          <p className="mt-2 text-3xl font-bold text-amber-600">{summary.unprocessed}</p>
+          <p className="mt-1.5 text-2xl font-bold text-amber-600">{summary.unprocessed}</p>
         </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Đã xử lý</p>
-          <p className="mt-2 text-3xl font-bold text-emerald-600">{summary.processed}</p>
+          <p className="mt-1.5 text-2xl font-bold text-emerald-600">{summary.processed}</p>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="mt-5 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-1 items-center gap-3 xl:grid-cols-[1.2fr_1fr_1fr_auto]">
+      <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
+        <div className="grid grid-cols-1 items-center gap-2.5 xl:grid-cols-[1.2fr_1fr_1fr_auto_auto]">
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               placeholder="Tìm theo tên bệnh, cánh đồng..."
-              className="w-full rounded-xl border border-gray-200 bg-gray-50/80 py-2.5 pl-9 pr-4 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50/80 py-2 pl-9 pr-4 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
             />
           </div>
 
@@ -505,18 +512,26 @@ const DiseaseLogs = () => {
             options={filterStatusOptions}
             placeholder="Trạng thái"
             size="default"
-            className="min-w-[160px]"
+            className="min-w-[140px]"
           />
+
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="inline-flex min-w-[70px] items-center justify-center rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-600 transition-all hover:border-gray-300 hover:bg-gray-50"
+          >
+            Reset
+          </button>
         </div>
       </div>
 
       {/* Log list */}
-      <div className="mt-5 space-y-4">
+      <div className="mt-4 space-y-3">
         {loading ? (
           <LoadingScreen message="Đang tải nhật ký bệnh..." />
         ) : filteredLogs.length === 0 ? (
-          <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-200 bg-white p-12 text-center shadow-sm">
-            <div className="mb-3 rounded-2xl bg-gray-100 p-4">
+          <div className="flex flex-col items-center rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center shadow-sm">
+            <div className="mb-2.5 rounded-2xl bg-gray-100 p-3.5">
               <ShieldAlert size={28} className="text-gray-300" />
             </div>
             <p className="font-medium text-gray-500">Chưa có nhật ký bệnh nào phù hợp.</p>
@@ -537,7 +552,7 @@ const DiseaseLogs = () => {
             return (
               <article
                 key={log._id}
-                className="group rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                className="group rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
@@ -585,23 +600,23 @@ const DiseaseLogs = () => {
                 </div>
 
                 {/* Body: info + optional image */}
-                <div className="mt-4 flex gap-4">
+                <div className="mt-3 flex gap-3">
                   {/* Info grid */}
-                  <div className="flex-1 grid grid-cols-1 gap-3 xl:grid-cols-3">
-                    <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
+                  <div className="grid flex-1 grid-cols-1 gap-2.5 xl:grid-cols-3">
+                    <div className="rounded-xl bg-gray-50/80 p-3 ring-1 ring-gray-100">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Phạm vi</p>
-                      <p className="mt-1.5 text-sm font-medium text-gray-700">
+                      <p className="mt-1 text-sm font-medium text-gray-700">
                         {log.scope === "all_plots" ? "Toàn bộ thửa" : `${plotCount} thửa`}
                       </p>
                       <p className="mt-0.5 text-xs text-gray-500 line-clamp-2">{plotNames}</p>
                     </div>
-                    <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
+                    <div className="rounded-xl bg-gray-50/80 p-3 ring-1 ring-gray-100">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Mô tả bệnh</p>
-                      <p className="mt-1.5 text-sm text-gray-700 line-clamp-3">{log.description || "Chưa có mô tả."}</p>
+                      <p className="mt-1 text-sm text-gray-700 line-clamp-3">{log.description || "Chưa có mô tả."}</p>
                     </div>
-                    <div className="rounded-xl bg-gray-50/80 p-3.5 ring-1 ring-gray-100">
+                    <div className="rounded-xl bg-gray-50/80 p-3 ring-1 ring-gray-100">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Ghi chú xữ lý</p>
-                      <p className="mt-1.5 text-sm text-gray-700 line-clamp-3">{log.processingNote || "Chưa có ghi chú."}</p>
+                      <p className="mt-1 text-sm text-gray-700 line-clamp-3">{log.processingNote || "Chưa có ghi chú."}</p>
                       {log.status === "processed" && log.processedAt && (
                         <p className="mt-1 text-xs text-emerald-600">Xử lý ngày {formatDate(log.processedAt)}</p>
                       )}
@@ -620,8 +635,8 @@ const DiseaseLogs = () => {
                       <img
                         src={log.imageUrl}
                         alt={log.diseaseName}
-                        className="h-full w-28 object-cover transition-transform group-hover/img:scale-105"
-                        style={{ minHeight: "120px", maxHeight: "140px" }}
+                        className="h-full w-24 object-cover transition-transform group-hover/img:scale-105"
+                        style={{ minHeight: "108px", maxHeight: "124px" }}
                         onError={(e) => { e.currentTarget.style.display = "none"; }}
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-all group-hover/img:bg-black/20">
@@ -664,15 +679,15 @@ const DiseaseLogs = () => {
               </button>
             </div>
 
-            <div className="max-h-[calc(90vh-84px)] overflow-y-auto p-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="max-h-[calc(90vh-84px)] overflow-y-auto p-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500">Tên bệnh</label>
                   <input
                     value={form.diseaseName}
                     onChange={(e) => setForm((prev) => ({ ...prev, diseaseName: e.target.value }))}
                     disabled={isHistoricalEdit}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm font-medium outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-50"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm font-medium outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-50"
                     placeholder="Đạo ôn lá, bạc lá..."
                   />
                 </div>
@@ -683,7 +698,7 @@ const DiseaseLogs = () => {
                     value={form.detectedAt}
                     onChange={(e) => setForm((prev) => ({ ...prev, detectedAt: e.target.value }))}
                     disabled={isHistoricalEdit}
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm font-medium outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-50"
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm font-medium outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-50"
                   />
                 </div>
                 <div>
@@ -703,12 +718,12 @@ const DiseaseLogs = () => {
                   {(() => {
                     const currentSeason = formSeasons.find((s) => s._id === form.seasonId);
                     return currentSeason ? (
-                      <div className="flex min-h-[42px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5">
+                      <div className="flex min-h-[38px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
                         <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
                         <span className="text-sm font-semibold text-emerald-800">{formatSeasonLabel(currentSeason)}</span>
                       </div>
                     ) : (
-                      <div className="flex min-h-[42px] items-center rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-sm text-gray-400">
+                      <div className="flex min-h-[38px] items-center rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-400">
                         Không có mùa vụ đang canh tác
                       </div>
                     );
@@ -742,39 +757,39 @@ const DiseaseLogs = () => {
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="mt-3 grid grid-cols-1 gap-3 xl:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500">Mô tả bệnh</label>
                   <textarea
-                    rows={4}
+                    rows={3}
                     value={form.description}
                     onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
                     disabled={isHistoricalEdit}
-                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-50"
+                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 disabled:opacity-50"
                     placeholder="Biểu hiện bệnh, vị trí, mức độ..."
                   />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500">Ghi chú xử lý</label>
                   <textarea
-                    rows={4}
+                    rows={3}
                     value={form.processingNote}
                     onChange={(e) => setForm((prev) => ({ ...prev, processingNote: e.target.value }))}
-                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
                     placeholder="Cách xử lý, cần theo dõi thêm không..."
                   />
                 </div>
               </div>
 
               {form.scope === "selected_plots" && (
-                <div className="mt-4">
+                <div className="mt-3.5">
                   <div className="mb-2 flex items-center gap-2">
                     <ClipboardList size={14} className="text-gray-500" />
                     <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Chọn thửa bị ảnh hưởng</p>
                   </div>
-                  <div className="grid max-h-56 gap-2 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50/50 p-2.5 md:grid-cols-2">
+                  <div className="grid max-h-48 gap-2 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50/50 p-2 md:grid-cols-2">
                     {formPlots.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-500">
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-500">
                         Chưa có thửa nào tham gia mùa vụ này.
                       </div>
                     ) : (
@@ -786,7 +801,7 @@ const DiseaseLogs = () => {
                             onClick={() => {
                               if (!isHistoricalEdit) togglePlot(plot._id);
                             }}
-                            className={`flex items-center gap-3 rounded-xl border p-3 transition-all duration-200 ${checked
+                            className={`flex items-center gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ${checked
                               ? "border-emerald-300 bg-white shadow-sm shadow-emerald-50"
                               : "border-gray-200 bg-white"
                               } ${isHistoricalEdit ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-gray-300"}`}
@@ -814,11 +829,11 @@ const DiseaseLogs = () => {
                 </div>
               )}
 
-              <div className="mt-5 flex justify-end gap-3">
+              <div className="mt-4 flex justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="rounded-xl px-4 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-100"
+                  className="rounded-xl px-3.5 py-2 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-100"
                 >
                   Hủy
                 </button>
@@ -826,7 +841,7 @@ const DiseaseLogs = () => {
                   type="button"
                   onClick={handleSubmit}
                   disabled={saving}
-                  className={`inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition-all ${saving
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition-all ${saving
                     ? "cursor-not-allowed bg-gray-300"
                     : "bg-emerald-600 shadow-md shadow-emerald-200 hover:bg-emerald-700 hover:shadow-lg"
                     }`}
