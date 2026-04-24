@@ -1,14 +1,15 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  BookText,
   Briefcase,
+  CalendarDays,
+  CalendarRange,
   ChevronLeft,
   LayoutDashboard,
   Map,
   ShieldCheck,
   Users,
-  CalendarDays,
-  CalendarRange,
 } from "lucide-react";
 
 const AdminSidebar = ({ collapsed, setCollapsed }) => {
@@ -21,6 +22,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
     { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
     { name: "Lịch mùa vụ", icon: CalendarRange, path: "/admin/season-details" },
     { name: "Công việc", icon: Briefcase, path: "/admin/tasks" },
+    { name: "Khuyến nghị mùa vụ", icon: BookText, path: "/admin/season-recommendations" },
   ];
 
   return (
@@ -35,7 +37,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             <ShieldCheck className="text-white" size={20} />
           </div>
           {!collapsed && (
-            <h1 className="text-lg font-bold tracking-tight text-white whitespace-nowrap">
+            <h1 className="whitespace-nowrap text-lg font-bold tracking-tight text-white">
               Admin
             </h1>
           )}
@@ -69,9 +71,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
               }`}
             >
               <item.icon size={20} className="stroke-[1.5] flex-shrink-0" />
-              {!collapsed && (
-                <span className="ml-3 whitespace-nowrap text-sm">{item.name}</span>
-              )}
+              {!collapsed && <span className="ml-3 whitespace-nowrap text-sm">{item.name}</span>}
 
               {collapsed && (
                 <div className="pointer-events-none absolute left-full top-1/2 z-[100] ml-4 -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-800 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-xl transition-all duration-200 group-hover:opacity-100">

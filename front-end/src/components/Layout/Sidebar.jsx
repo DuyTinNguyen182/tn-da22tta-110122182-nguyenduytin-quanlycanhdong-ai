@@ -2,6 +2,7 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import {
   AlertTriangle,
+  BookText,
   ChevronLeft,
   FileText,
   LayoutDashboard,
@@ -18,12 +19,14 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { icon: AlertTriangle, label: "Nhật ký bệnh", path: "/disease-logs" },
     { icon: ScanLine, label: "AI dự đoán", path: "/ai-scan" },
     { icon: FileText, label: "AI tư vấn", path: "/ask-ai" },
+    { icon: BookText, label: "Khuyến nghị mùa vụ", path: "/season-recommendations" },
   ];
 
   return (
     <aside
-      className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-gray-200 bg-white transition-all duration-300 ease-in-out ${collapsed ? "w-20" : "w-64"
-        }`}
+      className={`fixed left-0 top-0 z-50 flex h-screen flex-col border-r border-gray-200 bg-white transition-all duration-300 ease-in-out ${
+        collapsed ? "w-20" : "w-64"
+      }`}
     >
       <div className="flex h-20 flex-shrink-0 items-center border-b border-gray-100 px-6">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-lg shadow-emerald-200">
@@ -32,20 +35,17 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
 
         {!collapsed && (
           <div className="ml-3 flex flex-col overflow-hidden">
-            <h3 className="whitespace-nowrap text-xl font-bold text-gray-800">
-              AgriSmart
-            </h3>
-            <p className="whitespace-nowrap text-xs text-gray-500">
-              Nông nghiệp thông minh
-            </p>
+            <h3 className="whitespace-nowrap text-xl font-bold text-gray-800">AgriSmart</h3>
+            <p className="whitespace-nowrap text-xs text-gray-500">Nông nghiệp thông minh</p>
           </div>
         )}
       </div>
 
       <nav className="relative flex-1 space-y-2 px-3 py-6">
         <p
-          className={`mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 transition-all duration-300 ${collapsed ? "h-0 overflow-hidden opacity-0" : "h-auto opacity-100"
-            }`}
+          className={`mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-400 transition-all duration-300 ${
+            collapsed ? "h-0 overflow-hidden opacity-0" : "h-auto opacity-100"
+          }`}
         >
           Menu chính
         </p>
@@ -55,18 +55,18 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
             key={item.path}
             to={item.path}
             className={({ isActive }) =>
-              `group relative flex items-center rounded-xl px-3 py-3 transition-all ${collapsed ? "justify-center" : "justify-between"
-              } ${isActive
-                ? "bg-emerald-50 font-semibold text-emerald-700"
-                : "text-gray-600 hover:bg-gray-50 hover:text-emerald-600"
+              `group relative flex items-center rounded-xl px-3 py-3 transition-all ${
+                collapsed ? "justify-center" : "justify-between"
+              } ${
+                isActive
+                  ? "bg-emerald-50 font-semibold text-emerald-700"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-emerald-600"
               }`
             }
           >
             <div className="flex items-center">
               <item.icon size={20} className="stroke-[1.5]" />
-              {!collapsed && (
-                <span className="ml-3 whitespace-nowrap text-sm">{item.label}</span>
-              )}
+              {!collapsed && <span className="ml-3 whitespace-nowrap text-sm">{item.label}</span>}
             </div>
 
             {collapsed && (

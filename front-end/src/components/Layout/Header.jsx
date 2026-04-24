@@ -13,6 +13,7 @@ const Header = () => {
     "/fields": "Thửa ruộng của tôi",
     "/crops": "Nhật ký mùa vụ",
     "/disease-logs": "Nhật ký bệnh",
+    "/season-recommendations": "Khuyến nghị mùa vụ",
     "/ai-scan": "AI chẩn đoán bệnh lúa",
     "/ask-ai": "AI tư vấn canh tác",
     "/account": "Tài khoản cá nhân",
@@ -28,9 +29,7 @@ const Header = () => {
   return (
     <header className="sticky top-0 z-40 flex h-20 w-full items-center justify-between border-b border-gray-200 bg-white/90 px-8 backdrop-blur-sm">
       <div className="min-w-0">
-        <h1 className="truncate text-lg font-bold text-gray-900 md:text-xl">
-          {pageTitle}
-        </h1>
+        <h1 className="truncate text-lg font-bold text-gray-900 md:text-xl">{pageTitle}</h1>
       </div>
 
       <div className="flex items-center gap-4">
@@ -41,9 +40,7 @@ const Header = () => {
               className="ml-1 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
             >
               <div className="hidden text-right leading-tight md:block">
-                <p className="text-sm font-bold text-gray-800">
-                  {user.fullName || "Người dùng"}
-                </p>
+                <p className="text-sm font-bold text-gray-800">{user.fullName || "Người dùng"}</p>
                 <p className="text-[11px] text-gray-500">
                   {(user.role || "").toLowerCase() === "admin"
                     ? "Ban quản lý hợp tác xã"

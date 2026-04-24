@@ -8,6 +8,8 @@ const pageTitleMap = {
   "/admin/fields": "Quản lý cánh đồng",
   "/admin/users": "Quản lý người dùng",
   "/admin/seasons": "Quản lý mùa vụ",
+  "/admin/season-details": "Lịch mùa vụ",
+  "/admin/season-recommendations": "Khuyến nghị mùa vụ",
   "/admin/tasks": "Quản lý công việc",
 };
 
@@ -24,13 +26,13 @@ const AdminHeader = () => {
   };
 
   return (
-    <header className="h-16 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-8 sticky top-0 z-40 w-full text-white">
-      <h2 className="text-lg font-semibold text-white truncate">{pageTitle}</h2>
+    <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-gray-800 bg-gray-900 px-8 text-white">
+      <h2 className="truncate text-lg font-semibold text-white">{pageTitle}</h2>
 
       {user ? (
         <div className="flex items-center gap-3">
-          <div className="hidden md:flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-800 rounded-full flex items-center justify-center border border-gray-700 text-sm font-semibold text-white">
+          <div className="hidden items-center gap-3 md:flex">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-700 bg-gray-800 text-sm font-semibold text-white">
               {user.fullName ? user.fullName.charAt(0).toUpperCase() : "A"}
             </div>
             <span className="text-sm font-medium text-gray-300">
@@ -40,7 +42,7 @@ const AdminHeader = () => {
 
           <button
             onClick={handleLogout}
-            className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors"
+            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-800 hover:text-red-400"
             title="Đăng xuất"
           >
             <LogOut size={18} />
