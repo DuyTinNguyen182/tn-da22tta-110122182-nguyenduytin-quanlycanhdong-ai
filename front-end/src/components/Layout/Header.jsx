@@ -13,6 +13,7 @@ const Header = () => {
     "/fields": "Thửa ruộng của tôi",
     "/crops": "Nhật ký mùa vụ",
     "/disease-logs": "Nhật ký bệnh",
+    "/announcements": "Thông báo và cảnh báo",
     "/season-recommendations": "Khuyến nghị mùa vụ",
     "/ai-scan": "AI chẩn đoán bệnh lúa",
     "/ask-ai": "AI tư vấn canh tác",
@@ -40,7 +41,9 @@ const Header = () => {
               className="ml-1 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
             >
               <div className="hidden text-right leading-tight md:block">
-                <p className="text-sm font-bold text-gray-800">{user.fullName || "Người dùng"}</p>
+                <p className="text-sm font-bold text-gray-800">
+                  {user.fullName || "Người dùng"}
+                </p>
                 <p className="text-[11px] text-gray-500">
                   {(user.role || "").toLowerCase() === "admin"
                     ? "Ban quản lý hợp tác xã"

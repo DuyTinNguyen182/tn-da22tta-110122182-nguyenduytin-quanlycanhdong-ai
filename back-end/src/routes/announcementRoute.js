@@ -1,0 +1,14 @@
+const express = require("express");
+const router = express.Router();
+const announcementController = require("../controllers/announcementController");
+const { protect, isAdmin } = require("../middlewares/authMiddleware");
+
+router.use(protect);
+
+router.get("/", announcementController.getVisible);
+router.get("/admin", isAdmin, announcementController.getAdminList);
+router.post("/admin", isAdmin, announcementController.create);
+router.put("/admin/:id", isAdmin, announcementController.update);
+router.delete("/admin/:id", isAdmin, announcementController.remove);
+
+module.exports = router;

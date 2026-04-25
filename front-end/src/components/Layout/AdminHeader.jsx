@@ -9,6 +9,7 @@ const pageTitleMap = {
   "/admin/users": "Quản lý người dùng",
   "/admin/seasons": "Quản lý mùa vụ",
   "/admin/season-details": "Lịch mùa vụ",
+  "/admin/announcements": "Thông báo và cảnh báo",
   "/admin/season-recommendations": "Khuyến nghị mùa vụ",
   "/admin/tasks": "Quản lý công việc",
 };

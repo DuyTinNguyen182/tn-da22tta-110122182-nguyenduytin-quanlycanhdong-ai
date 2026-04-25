@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  Bell,
   BookText,
   Briefcase,
   CalendarDays,
@@ -22,6 +23,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
     { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
     { name: "Lịch mùa vụ", icon: CalendarRange, path: "/admin/season-details" },
     { name: "Công việc", icon: Briefcase, path: "/admin/tasks" },
+    { name: "Thông báo & cảnh báo", icon: Bell, path: "/admin/announcements" },
     { name: "Khuyến nghị mùa vụ", icon: BookText, path: "/admin/season-recommendations" },
   ];
 
