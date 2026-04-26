@@ -1,12 +1,24 @@
 const Task = require("../models/taskModel");
 const DiaryLog = require("../models/diaryLogModel");
+const TaskDetail = require("../models/taskDetailModel");
 
 const normalizeTaskOutput = (taskDoc) => {
   const task = taskDoc.toObject ? taskDoc.toObject() : { ...taskDoc };
   const name = (task.name || task.label || "").trim();
+  const taskDetails = Array.isArray(task.taskDetails) ? task.taskDetails : [];
+
   return {
     _id: String(task._id),
     name,
+    taskDetails: taskDetails
+      .map((detail) => ({
+        _id: String(detail._id),
+        name: (detail.name || "").trim(),
+        taskId: String(detail.task || task._id),
+      }))
+      .filter((detail) => detail.name),
+    taskDetailCount: taskDetails.length,
+    hasTaskDetails: taskDetails.length > 0,
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };
@@ -27,8 +39,27 @@ const ensureUniqueName = async (name, excludeId = null) => {
 };
 
 const getTasks = async () => {
-  const tasks = await Task.find().sort({ name: 1 });
-  return tasks.map(normalizeTaskOutput).filter((task) => task.name);
+  const [tasks, taskDetails] = await Promise.all([
+    Task.find().sort({ name: 1 }),
+    TaskDetail.find().sort({ name: 1 }).lean(),
+  ]);
+
+  const taskDetailsByTaskId = new Map();
+  taskDetails.forEach((detail) => {
+    const key = String(detail.task);
+    if (!taskDetailsByTaskId.has(key)) {
+      taskDetailsByTaskId.set(key, []);
+    }
+    taskDetailsByTaskId.get(key).push(detail);
+  });
+
+  return tasks
+    .map((task) => {
+      const nextTask = task.toObject ? task.toObject() : { ...task };
+      nextTask.taskDetails = taskDetailsByTaskId.get(String(task._id)) || [];
+      return normalizeTaskOutput(nextTask);
+    })
+    .filter((task) => task.name);
 };
 
 const createTask = async (payload = {}) => {
@@ -68,6 +99,11 @@ const deleteTask = async (id) => {
   const inUseCount = await DiaryLog.countDocuments({ task: id });
   if (inUseCount > 0) {
     throw new Error("Không thể xóa công việc đang được sử dụng trong nhật ký");
+  }
+
+  const taskDetailCount = await TaskDetail.countDocuments({ task: id });
+  if (taskDetailCount > 0) {
+    throw new Error("Không thể xóa công việc đang có chi tiết công việc");
   }
 
   await Task.deleteOne({ _id: id });

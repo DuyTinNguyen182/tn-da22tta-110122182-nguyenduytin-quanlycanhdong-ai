@@ -10,6 +10,7 @@ const getToday = () => new Date().toISOString().split("T")[0];
 
 const emptyLogForm = {
   taskType: null,
+  taskDetail: null,
   description: "",
   cost: "",
   date: getToday(),
@@ -29,6 +30,23 @@ const getLogPlots = (log) => {
   return [];
 };
 
+const matchesTaskFilter = (log, filterValue) => {
+  if (!filterValue) return true;
+
+  if (filterValue.startsWith("task-detail:")) {
+    return log.taskDetailId === filterValue.replace("task-detail:", "");
+  }
+
+  if (filterValue.startsWith("task:")) {
+    return log.taskId === filterValue.replace("task:", "");
+  }
+
+  return log.taskId === filterValue || log.taskDetailId === filterValue;
+};
+
+const getTaskDetailsForTask = (task) =>
+  Array.isArray(task?.taskDetails) ? task.taskDetails.filter(Boolean) : [];
+
 const Crops = () => {
   const { toast, confirm } = useFeedback();
   const [fields, setFields] = useState([]);
@@ -46,8 +64,6 @@ const Crops = () => {
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
   const [logForm, setLogForm] = useState(emptyLogForm);
-
-  // ──────────────── Derived state ────────────────
 
   const activePlots = useMemo(() => plots.filter((p) => p.status === "active"), [plots]);
 
@@ -70,6 +86,10 @@ const Crops = () => {
   const hasActiveSeason = sortedSeasons.some((s) => s.status === "active");
   const seasonAssignedPlots = currentSeason?.assignedPlots || [];
   const seasonLoggablePlots = currentSeason?.loggablePlots || [];
+  const availableTaskDetails = useMemo(
+    () => getTaskDetailsForTask(logForm.taskType),
+    [logForm.taskType]
+  );
 
   const filterPlotOptions = useMemo(() => {
     const optionMap = new Map();
@@ -84,7 +104,7 @@ const Crops = () => {
 
   const filteredLogs = useMemo(() => {
     const next = logs.filter((log) => {
-      const matchTask = filterTaskId ? log.taskId === filterTaskId : true;
+      const matchTask = matchesTaskFilter(log, filterTaskId);
       const matchPlot = filterPlotId
         ? getLogPlots(log).some((p) => p?._id === filterPlotId || p === filterPlotId)
         : true;
@@ -106,19 +126,12 @@ const Crops = () => {
     [filteredLogs]
   );
 
-  // ──────────────── Data loading ────────────────
-
   useEffect(() => {
     const loadBootstrap = async () => {
       try {
-        const [fieldRes, taskRes] = await Promise.all([
-          api.get("/fields"),
-          api.get("/tasks"),
-        ]);
+        const [fieldRes, taskRes] = await Promise.all([api.get("/fields"), api.get("/tasks")]);
 
-        const nextFields = (fieldRes.data || []).filter(
-          (f) => Number(f.myPlotCount || 0) > 0
-        );
+        const nextFields = (fieldRes.data || []).filter((f) => Number(f.myPlotCount || 0) > 0);
         setFields(nextFields);
         setTaskTypes(taskRes.data || []);
 
@@ -189,8 +202,6 @@ const Crops = () => {
     loadLogs();
   }, [selectedSeasonId, selectedField?._id]);
 
-  // ──────────────── Helpers ────────────────
-
   const refreshLogs = async (seasonId) => {
     const res = await api.get("/diary-logs", {
       params: {
@@ -201,14 +212,12 @@ const Crops = () => {
     setLogs(res.data || []);
   };
 
-
-  // ──────────────── Log handlers ────────────────
-
   const openCreateLogModal = () => {
     if (!isSeasonActive) return;
     setEditingLog(null);
     setLogForm({
       taskType: null,
+      taskDetail: null,
       description: "",
       cost: "",
       date: getToday(),
@@ -223,9 +232,13 @@ const Crops = () => {
       taskTypes.find((t) => t.name === log.taskName) ||
       null;
 
+    const foundTaskDetail =
+      getTaskDetailsForTask(foundTask).find((detail) => detail._id === log.taskDetailId) || null;
+
     setEditingLog(log);
     setLogForm({
       taskType: foundTask,
+      taskDetail: foundTaskDetail,
       description: log.description || "",
       cost: log.cost || "",
       date: log.date ? log.date.split("T")[0] : getToday(),
@@ -236,11 +249,32 @@ const Crops = () => {
     setIsLogModalOpen(true);
   };
 
+  const handleTaskChange = (task) => {
+    const nextTaskDetails = getTaskDetailsForTask(task);
+
+    setLogForm((prev) => {
+      const canKeepCurrentDetail =
+        prev.taskDetail && nextTaskDetails.some((detail) => detail._id === prev.taskDetail._id);
+
+      return {
+        ...prev,
+        taskType: task,
+        taskDetail: canKeepCurrentDetail ? prev.taskDetail : null,
+      };
+    });
+  };
+
   const handleSaveLog = async () => {
     if (!currentSeason?._id || !logForm.taskType?._id) {
       toast.warning("Vui lòng chọn công việc.");
       return;
     }
+
+    if (availableTaskDetails.length > 0 && !logForm.taskDetail?._id) {
+      toast.warning("Vui lòng chọn chi tiết công việc.");
+      return;
+    }
+
     if (logForm.selectedPlotIds.length === 0) {
       toast.warning("Vui lòng chọn ít nhất 1 thửa áp dụng.");
       return;
@@ -260,6 +294,7 @@ const Crops = () => {
 
     const payload = {
       taskId: logForm.taskType._id,
+      taskDetailId: logForm.taskDetail?._id || null,
       description: logForm.description,
       cost: Number(logForm.cost || 0),
       date: logForm.date,
@@ -318,8 +353,6 @@ const Crops = () => {
       selectedPlotIds: prev.selectedPlotIds.length === allPlotIds.length ? [] : allPlotIds,
     }));
   };
-
-  // ──────────────── Render ────────────────
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-gray-50 font-sans">
@@ -381,9 +414,12 @@ const Crops = () => {
         editingLog={editingLog}
         logForm={logForm}
         taskTypes={taskTypes}
+        taskDetails={availableTaskDetails}
         seasonLoggablePlots={seasonLoggablePlots}
         onClose={() => setIsLogModalOpen(false)}
         onSave={handleSaveLog}
+        onTaskChange={handleTaskChange}
+        onTaskDetailChange={(taskDetail) => setLogForm((prev) => ({ ...prev, taskDetail }))}
         onFormChange={(changes) => setLogForm((prev) => ({ ...prev, ...changes }))}
         onTogglePlot={toggleLogPlot}
         onSelectAllPlots={handleSelectAllLogPlots}

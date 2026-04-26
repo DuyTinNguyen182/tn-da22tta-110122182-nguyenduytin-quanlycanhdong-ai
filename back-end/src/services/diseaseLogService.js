@@ -215,11 +215,12 @@ const ensureActiveSeasonForMutation = (season, action) => {
   }
 };
 
-const getParticipantPlotsForSeason = async (seasonId, userId) => {
+const getParticipantPlotsForSeason = async (seasonId, userId, fieldId = null) => {
   const assignments = await SeasonPlotAssignment.find({
     seasonDetail: seasonId,
     user: userId,
     status: "active",
+    ...(fieldId ? { field: fieldId } : {}),
   })
     .populate("plot", "name area status field user")
     .lean();
@@ -232,8 +233,8 @@ const getParticipantPlotsForSeason = async (seasonId, userId) => {
   return activeAssignments;
 };
 
-const resolveAffectedPlots = async ({ seasonId, userId, scope, plotIds }) => {
-  const participantAssignments = await getParticipantPlotsForSeason(seasonId, userId);
+const resolveAffectedPlots = async ({ seasonId, userId, fieldId, scope, plotIds }) => {
+  const participantAssignments = await getParticipantPlotsForSeason(seasonId, userId, fieldId);
   const assignmentByPlotId = new Map(participantAssignments.map((a) => [String(a.plot._id), a]));
 
   if (scope === "selected_plots") {
@@ -262,8 +263,12 @@ const buildDiseaseLogPayload = async (
 ) => {
   // If editing an existing log, get its season from assignments
   let seasonId = data.seasonId || data.season;
+  let fieldId = data.fieldId || data.field || null;
   if (!seasonId && existingLog && existingLog.seasonPlotAssignments?.[0]?.seasonDetail) {
     seasonId = String(existingLog.seasonPlotAssignments[0].seasonDetail);
+  }
+  if (!fieldId && existingLog && existingLog.seasonPlotAssignments?.[0]?.field) {
+    fieldId = String(existingLog.seasonPlotAssignments[0].field);
   }
   // Fallback to legacy season field if it somehow exists
   if (!seasonId && existingLog?.season) {
@@ -272,6 +277,9 @@ const buildDiseaseLogPayload = async (
 
   if (!seasonId) {
     throw new Error("Thieu seasonId");
+  }
+  if (!fieldId) {
+    throw new Error("Thieu fieldId");
   }
 
   const season = await getSeasonForUser(seasonId, userId);
@@ -291,12 +299,18 @@ const buildDiseaseLogPayload = async (
     affectedAssignments = await resolveAffectedPlots({
       seasonId: season._id,
       userId,
+      fieldId,
       scope,
       plotIds: data.plotIds,
     });
   } else if (existingLog) {
-    // keeping same plots if no plot data provided
-    affectedAssignments = await SeasonPlotAssignment.find({ _id: { $in: existingLog.seasonPlotAssignments } }).populate("plot").lean();
+    // keeping same plots if no plot data provided, but still constrain to the selected field
+    affectedAssignments = await SeasonPlotAssignment.find({
+      _id: { $in: existingLog.seasonPlotAssignments },
+      ...(fieldId ? { field: fieldId } : {}),
+    })
+      .populate("plot")
+      .lean();
   }
 
   const status = normalizeStatus(data.status, existingLog?.status || "unprocessed");

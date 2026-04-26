@@ -2,7 +2,7 @@ const DiaryLog = require("../models/diaryLogModel");
 const Plot = require("../models/plotModel");
 const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
-const { resolveTaskId } = require("./taskService");
+const { resolveTaskSelection } = require("./taskDetailService");
 
 const normalizePlotIds = (plotIds = []) => {
   const values = Array.isArray(plotIds)
@@ -122,28 +122,46 @@ const buildPlotSnapshot = (plots) =>
 
 const mapLogOutput = (logDoc) => {
   const log = logDoc.toObject ? logDoc.toObject() : { ...logDoc };
-  const task = log.task || null;
-  
-  // Backward compatibility with legacy logs: if seasonPlotAssignments is missing but we have plotSnapshot
-  const hasAssignments = Array.isArray(log.seasonPlotAssignments) && log.seasonPlotAssignments.length > 0;
-  
-  // Resolve plots either from assignments or fallback to snapshot
-  const resolvedPlots = hasAssignments 
-    ? log.seasonPlotAssignments.map(a => a.plot).filter(Boolean)
-    : log.plotSnapshot 
-      ? log.plotSnapshot.map(s => ({ _id: s.plotId, name: s.name, area: s.area, status: s.status }))
+  const taskDetail = log.taskDetail || null;
+  const taskFromDetail = taskDetail?.task || null;
+  const task = taskFromDetail || log.task || null;
+
+  const hasAssignments =
+    Array.isArray(log.seasonPlotAssignments) && log.seasonPlotAssignments.length > 0;
+
+  const resolvedPlots = hasAssignments
+    ? log.seasonPlotAssignments.map((assignment) => assignment.plot).filter(Boolean)
+    : log.plotSnapshot
+      ? log.plotSnapshot.map((snapshot) => ({
+          _id: snapshot.plotId,
+          name: snapshot.name,
+          area: snapshot.area,
+          status: snapshot.status,
+        }))
       : [];
 
   const scope = log.scope || (resolvedPlots.length > 1 ? "selected_plots" : "single_plot");
+  const taskId = task?._id ? String(task._id) : typeof task === "string" ? String(task) : null;
+  const taskDetailId = taskDetail?._id
+    ? String(taskDetail._id)
+    : typeof taskDetail === "string"
+      ? String(taskDetail)
+      : null;
+  const taskName = task?.name || task?.label || "Khác";
+  const taskDetailName = taskDetail?.name || "";
+  const title = taskDetailName || taskName || "Nhật ký mùa vụ";
 
   return {
     ...log,
-    taskId: task?._id ? String(task._id) : typeof task === "string" ? task : null,
-    taskName: task?.name || task?.label || "Khác",
-    title: task?.name || task?.label || "Nhật ký mùa vụ",
+    taskId,
+    taskName,
+    taskDetailId,
+    taskDetailName,
+    title,
+    taskLabel: taskDetailName ? `${taskName} - ${taskDetailName}` : taskName,
     scope,
     plots: resolvedPlots,
-    seasonPlotAssignments: undefined, // remove from output for cleaner response
+    seasonPlotAssignments: undefined,
     plotCount: resolvedPlots.length,
     appliesToAllPlots: scope === "all_plots",
     plotLabel:
@@ -155,6 +173,19 @@ const mapLogOutput = (logDoc) => {
   };
 };
 
+const buildDiaryLogPopulate = (query) =>
+  query
+    .populate("task", "name")
+    .populate({
+      path: "taskDetail",
+      select: "name task",
+      populate: { path: "task", select: "name" },
+    })
+    .populate({
+      path: "seasonPlotAssignments",
+      populate: { path: "plot", select: "name area status" },
+    });
+
 const getLogsBySeason = async (seasonId, userId, fieldId = null) => {
   await getSeasonForUser(seasonId, userId);
 
@@ -163,7 +194,7 @@ const getLogsBySeason = async (seasonId, userId, fieldId = null) => {
     user: userId,
     ...(fieldId ? { field: fieldId } : {}),
   }).lean();
-  const assignmentIds = assignments.map(a => a._id);
+  const assignmentIds = assignments.map((assignment) => assignment._id);
 
   const logQuery = {
     user: userId,
@@ -171,37 +202,35 @@ const getLogsBySeason = async (seasonId, userId, fieldId = null) => {
   };
 
   if (!fieldId) {
-    // Legacy fallback for very old records that still only store season.
     logQuery.$or.push({ season: seasonId });
   }
 
-  const logs = await DiaryLog.find(logQuery)
-    .populate("task", "name")
-    .populate({
-      path: "seasonPlotAssignments",
-      populate: { path: "plot", select: "name area status" }
-    })
-    // Also try to populate legacy fields for old logs
-    .populate("plot", "name area status")
-    .populate("plots", "name area status")
-    .sort({ date: -1, createdAt: -1 });
+  const logs = await buildDiaryLogPopulate(
+    DiaryLog.find(logQuery)
+      .populate("plot", "name area status")
+      .populate("plots", "name area status")
+      .sort({ date: -1, createdAt: -1 })
+  );
 
   return logs.map(mapLogOutput);
 };
 
 const createLog = async (data, userId) => {
   const seasonValue = data.seasonId || data.season;
-  const taskId = await resolveTaskId({
+  const resolvedTask = await resolveTaskSelection({
     taskId: data.taskId || data.task,
+    taskDetailId: data.taskDetailId || data.taskDetail,
     title: data.title,
     taskName: data.taskName,
   });
 
   const season = await getSeasonForUser(seasonValue, userId);
-  
-  // computed status check
+
   const now = new Date();
-  const isActive = season.startDate && new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now);
+  const isActive =
+    season.startDate &&
+    new Date(season.startDate) <= now &&
+    (!season.endDate || new Date(season.endDate) >= now);
 
   if (!isActive) {
     throw new Error("Chỉ có thể thêm nhật ký cho vụ đang active");
@@ -226,45 +255,38 @@ const createLog = async (data, userId) => {
   });
 
   const created = await DiaryLog.create({
-    task: taskId,
+    task: resolvedTask.task,
+    taskDetail: resolvedTask.taskDetail,
     description: data.description,
     date: data.date,
     cost: data.cost,
     scope: resolved.scope,
-    seasonPlotAssignments: resolved.assignments.map(a => a._id),
+    seasonPlotAssignments: resolved.assignments.map((assignment) => assignment._id),
     plotSnapshot: buildPlotSnapshot(resolved.plots),
     user: userId,
   });
 
-  const log = await DiaryLog.findById(created._id)
-    .populate("task", "name")
-    .populate({
-      path: "seasonPlotAssignments",
-      populate: { path: "plot", select: "name area status" }
-    });
-
+  const log = await buildDiaryLogPopulate(DiaryLog.findById(created._id));
   return mapLogOutput(log);
 };
 
 const updateLog = async (id, data, userId) => {
-  const existingLog = await DiaryLog.findOne({ _id: id, user: userId })
-    .populate({
-      path: "seasonPlotAssignments",
-      populate: { path: "plot" }
-    });
+  const existingLog = await buildDiaryLogPopulate(
+    DiaryLog.findOne({ _id: id, user: userId })
+  );
 
   if (!existingLog) {
     throw new Error("Không tìm thấy nhật ký");
   }
 
-  // Derive season ID from assignments or legacy field
-  const seasonId = existingLog.seasonPlotAssignments?.[0]?.seasonDetail 
-    || existingLog.season;
-    
+  const seasonId = existingLog.seasonPlotAssignments?.[0]?.seasonDetail || existingLog.season;
   const season = await getSeasonForUser(seasonId, userId);
-  
+
   const now = new Date();
-  const isActive = season.startDate && new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now);
+  const isActive =
+    season.startDate &&
+    new Date(season.startDate) <= now &&
+    (!season.endDate || new Date(season.endDate) >= now);
 
   if (!isActive) {
     throw new Error("Không thể chỉnh sửa nhật ký của vụ đã kết thúc");
@@ -272,9 +294,9 @@ const updateLog = async (id, data, userId) => {
 
   const updateData = { ...data };
 
-  // Fetch current explicitly assigned plots
   const existingPlotIdsStr = (existingLog.seasonPlotAssignments || [])
-    .map(a => String(a.plot?._id));
+    .map((assignment) => String(assignment.plot?._id))
+    .filter(Boolean);
 
   let scope =
     updateData.scope ||
@@ -293,17 +315,29 @@ const updateLog = async (id, data, userId) => {
     season,
     userId,
     scope,
-    plotId: updateData.plotId !== undefined ? updateData.plotId : existingPlotIdsStr[0] || null,
+    plotId:
+      updateData.plotId !== undefined ? updateData.plotId : existingPlotIdsStr[0] || null,
     plotIds: updateData.plotIds !== undefined ? updateData.plotIds : existingPlotIdsStr,
     fieldId: updateData.fieldId !== undefined ? updateData.fieldId : null,
   });
 
-  if (updateData.taskId || updateData.task || updateData.title || updateData.taskName) {
-    updateData.task = await resolveTaskId({
+  if (
+    updateData.taskId ||
+    updateData.task ||
+    updateData.taskDetailId ||
+    updateData.taskDetail ||
+    updateData.title ||
+    updateData.taskName
+  ) {
+    const resolvedTask = await resolveTaskSelection({
       taskId: updateData.taskId || updateData.task,
+      taskDetailId: updateData.taskDetailId || updateData.taskDetail,
       title: updateData.title,
       taskName: updateData.taskName,
     });
+
+    updateData.task = resolvedTask.task;
+    updateData.taskDetail = resolvedTask.taskDetail;
   }
 
   delete updateData.seasonId;
@@ -313,32 +347,27 @@ const updateLog = async (id, data, userId) => {
   delete updateData.taskId;
   delete updateData.taskCode;
   delete updateData.taskName;
+  delete updateData.taskDetailId;
   delete updateData.title;
   delete updateData.type;
 
   updateData.scope = resolved.scope;
-  updateData.seasonPlotAssignments = resolved.assignments.map(a => a._id);
+  updateData.seasonPlotAssignments = resolved.assignments.map((assignment) => assignment._id);
   updateData.plotSnapshot = buildPlotSnapshot(resolved.plots);
-  updateData.season = undefined; // Drop legacy field on update
+  updateData.season = undefined;
 
-  const updated = await DiaryLog.findOneAndUpdate(
-    { _id: id, user: userId },
-    updateData,
-    { new: true }
-  )
-    .populate("task", "name")
-    .populate({
-      path: "seasonPlotAssignments",
-      populate: { path: "plot", select: "name area status" }
-    });
+  const updated = await buildDiaryLogPopulate(
+    DiaryLog.findOneAndUpdate({ _id: id, user: userId }, updateData, { new: true })
+  );
 
   return updated ? mapLogOutput(updated) : null;
 };
 
 const deleteLog = async (id, userId) => {
-  const existingLog = await DiaryLog.findOne({ _id: id, user: userId })
-    .populate("seasonPlotAssignments");
-    
+  const existingLog = await DiaryLog.findOne({ _id: id, user: userId }).populate(
+    "seasonPlotAssignments"
+  );
+
   if (!existingLog) {
     throw new Error("Không tìm thấy nhật ký");
   }
@@ -346,7 +375,10 @@ const deleteLog = async (id, userId) => {
   const seasonId = existingLog.seasonPlotAssignments?.[0]?.seasonDetail || existingLog.season;
   const season = await getSeasonForUser(seasonId, userId);
   const now = new Date();
-  const isActive = season.startDate && new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now);
+  const isActive =
+    season.startDate &&
+    new Date(season.startDate) <= now &&
+    (!season.endDate || new Date(season.endDate) >= now);
 
   if (!isActive) {
     throw new Error("Không thể xóa nhật ký của vụ đã kết thúc");

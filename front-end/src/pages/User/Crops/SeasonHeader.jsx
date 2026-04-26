@@ -1,26 +1,23 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
   DollarSign,
-  Edit2,
   Filter,
   Layers,
-  PlayCircle,
   Plus,
   Sprout,
   X,
 } from "lucide-react";
 import CustomDropdown from "./CustomDropdown";
+import TaskFilterDropdown from "./TaskFilterDropdown";
 
 const SeasonHeader = ({
   selectedField,
-  activePlots,
   sortedSeasons,
   selectedSeasonId,
   currentSeason,
   isSeasonActive,
-  hasActiveSeason,
   seasonAssignedPlots,
   filterPlotId,
   filterTaskId,
@@ -42,6 +39,7 @@ const SeasonHeader = ({
         setShowPlotPopover(false);
       }
     };
+
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -54,7 +52,9 @@ const SeasonHeader = ({
     () =>
       (sortedSeasons || []).map((season) => ({
         value: season._id,
-        label: season.startDate ? `${season.name} ${new Date(season.startDate).getFullYear()}` : season.name,
+        label: season.startDate
+          ? `${season.name} ${new Date(season.startDate).getFullYear()}`
+          : season.name,
         dot: season.status === "active" ? "bg-emerald-500" : "bg-gray-300",
         badge:
           season.status === "active"
@@ -67,7 +67,7 @@ const SeasonHeader = ({
   const plotFilterOptions = useMemo(
     () => [
       { value: "", label: "Tất cả thửa" },
-      ...(filterPlotOptions || []).map((p) => ({ value: p._id, label: p.name })),
+      ...(filterPlotOptions || []).map((plot) => ({ value: plot._id, label: plot.name })),
     ],
     [filterPlotOptions]
   );
@@ -75,7 +75,14 @@ const SeasonHeader = ({
   const taskFilterOptions = useMemo(
     () => [
       { value: "", label: "Tất cả việc" },
-      ...(taskTypes || []).map((t) => ({ value: t._id, label: t.name })),
+      ...(taskTypes || []).map((task) => ({
+        value: `task:${task._id}`,
+        label: task.name,
+        children: (task.taskDetails || []).map((detail) => ({
+          value: `task-detail:${detail._id}`,
+          label: detail.name,
+        })),
+      })),
     ],
     [taskTypes]
   );
@@ -93,12 +100,9 @@ const SeasonHeader = ({
 
   return (
     <div className="z-10 border-b border-gray-200 bg-white px-5 py-3 shadow-sm lg:px-6">
-      {/* Row 1: Field name + Season actions */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <h1 className="truncate text-xl font-bold text-gray-800">
-            {selectedField.name}
-          </h1>
+        <div className="flex min-w-0 items-center gap-3">
+          <h1 className="truncate text-xl font-bold text-gray-800">{selectedField.name}</h1>
           {selectedField.address && (
             <span className="hidden truncate text-xs text-gray-400 lg:block">
               {selectedField.address}
@@ -108,21 +112,17 @@ const SeasonHeader = ({
 
         <div className="flex shrink-0 items-center gap-2">
           {currentSeason && isSeasonActive && (
-            <>
-              <button
-                onClick={onCreateLog}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-lg"
-              >
-                <Plus size={16} /> Ghi nhật ký
-              </button>
-            </>
+            <button
+              onClick={onCreateLog}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-lg"
+            >
+              <Plus size={16} /> Ghi nhật ký
+            </button>
           )}
         </div>
       </div>
 
-      {/* Row 2: Season selector + Filters + Cost */}
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
-        {/* Season Dropdown */}
         {sortedSeasons.length > 0 ? (
           <CustomDropdown
             value={selectedSeasonId}
@@ -139,7 +139,6 @@ const SeasonHeader = ({
           </span>
         )}
 
-        {/* Assigned plots popover */}
         {currentSeason && seasonAssignedPlots.length > 0 && (
           <div className="relative" ref={popoverRef}>
             <button
@@ -190,19 +189,15 @@ const SeasonHeader = ({
           </div>
         )}
 
-        {/* Loggable plots badge */}
         {currentSeason && isSeasonActive && (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-3 py-1.5 text-[11px] font-bold text-green-600 ring-1 ring-green-100">
             <CheckCircle2 size={12} />
-            {currentSeason.loggablePlotCount || 0}/{currentSeason.activePlotCount || 0} sẵn
-            sàng
+            {currentSeason.loggablePlotCount || 0}/{currentSeason.activePlotCount || 0} sẵn sàng
           </span>
         )}
 
-        {/* Separator */}
         <div className="mx-0.5 h-6 w-px bg-gray-200" />
 
-        {/* Filters */}
         <CustomDropdown
           value={filterPlotId}
           onChange={onFilterPlotChange}
@@ -213,13 +208,10 @@ const SeasonHeader = ({
           className="min-w-[140px]"
         />
 
-        <CustomDropdown
+        <TaskFilterDropdown
           value={filterTaskId}
           onChange={onFilterTaskChange}
           options={taskFilterOptions}
-          icon={Filter}
-          size="small"
-          variant="filter"
           className="min-w-[140px]"
         />
 
@@ -233,7 +225,6 @@ const SeasonHeader = ({
           </button>
         )}
 
-        {/* Cost summary */}
         <div className="ml-auto flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-50 to-green-50 px-4 py-2 ring-1 ring-emerald-100">
           <DollarSign size={15} className="text-emerald-500" />
           <span className="text-sm font-bold text-emerald-700">

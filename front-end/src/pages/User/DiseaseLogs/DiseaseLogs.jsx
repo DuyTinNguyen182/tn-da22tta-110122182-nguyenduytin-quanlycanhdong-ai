@@ -346,6 +346,7 @@ const DiseaseLogs = () => {
       diseaseName: form.diseaseName,
       description: form.description,
       detectedAt: form.detectedAt,
+      fieldId: form.fieldId,
       seasonId: form.seasonId,
       scope: form.scope,
       plotIds: form.scope === "selected_plots" ? form.plotIds : [],
@@ -518,9 +519,9 @@ const DiseaseLogs = () => {
           <button
             type="button"
             onClick={handleResetFilters}
-            className="inline-flex min-w-[70px] items-center justify-center rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-600 transition-all hover:border-gray-300 hover:bg-gray-50"
+            className="inline-flex min-w-[40px] items-center justify-center rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-600 transition-all hover:border-gray-300 hover:bg-gray-50"
           >
-            Reset
+            <X size={15} />
           </button>
         </div>
       </div>

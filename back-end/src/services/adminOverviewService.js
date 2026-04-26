@@ -234,17 +234,34 @@ const buildGroupedStats = (seasonInstances) => {
   return { seasonOverview };
 };
 
+const getLogTaskInfo = (log) => {
+  const taskDetail = log.taskDetail || null;
+  const task = taskDetail?.task || log.task || null;
+
+  return {
+    taskId: task?._id || task || null,
+    taskName: task?.name || "Khong xac dinh",
+    taskDetailId: taskDetail?._id || taskDetail || null,
+    taskDetailName: taskDetail?.name || "",
+    activityName: taskDetail?.name || task?.name || "Khong xac dinh",
+  };
+};
+
 const buildRecentActivities = (logs, seasonDetailMap, recentLimit) => {
   return logs.slice(0, recentLimit).map((log) => {
     const seasonDetail = seasonDetailMap.get(String(log.season));
+    const taskInfo = getLogTaskInfo(log);
 
     return {
       _id: log._id,
       date: log.date,
       cost: Number(log.cost || 0),
       description: log.description || "",
-      taskId: log.task?._id || log.task,
-      taskName: log.task?.name || "Khong xac dinh",
+      taskId: taskInfo.taskId,
+      taskName: taskInfo.taskName,
+      taskDetailId: taskInfo.taskDetailId,
+      taskDetailName: taskInfo.taskDetailName,
+      activityName: taskInfo.activityName,
       plotId: log.plot?._id || log.plot || null,
       plotName: log.plot?.name || "",
       seasonDetailId: seasonDetail?._id || log.season,
@@ -258,11 +275,12 @@ const buildTaskOverview = (logs) => {
   const taskMap = new Map();
 
   logs.forEach((log) => {
-    const taskId = String(log.task?._id || log.task || "unknown");
+    const taskInfo = getLogTaskInfo(log);
+    const taskId = String(taskInfo.taskId || "unknown");
     if (!taskMap.has(taskId)) {
       taskMap.set(taskId, {
         taskId,
-        taskName: log.task?.name || "Khong xac dinh",
+        taskName: taskInfo.taskName,
         diaryLogCount: 0,
         totalCost: 0,
       });
@@ -307,6 +325,11 @@ const getAdminOverview = async (rawFilters, currentUser) => {
           .lean(),
         DiaryLog.find({ season: { $in: seasonDetailIds } })
           .populate("task", "name")
+          .populate({
+            path: "taskDetail",
+            select: "name task",
+            populate: { path: "task", select: "name" },
+          })
           .populate("plot", "name")
           .sort({ date: -1, createdAt: -1 })
           .lean(),

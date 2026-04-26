@@ -97,10 +97,13 @@ const DiaryLogList = ({
                 <div className="flex items-start justify-between gap-3">
                   {/* Left: task name + meta */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2.5">
-                      <h3 className="truncate text-sm font-bold text-gray-800">
-                        {log.taskName || log.title}
-                      </h3>
+                    <div className="flex items-center gap-2.5">                      
+                      {log.taskDetailName && (
+                        <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-100">
+                          {log.taskName}
+                        </span>
+                      )}
+                      <h3 className="truncate text-sm font-bold text-gray-800">{log.title || log.taskName}</h3>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
                       <span className="flex items-center gap-1">

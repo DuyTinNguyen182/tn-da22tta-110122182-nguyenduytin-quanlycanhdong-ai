@@ -4,7 +4,12 @@ const diaryLogSchema = new mongoose.Schema({
   task: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Task",
-    required: true,
+    default: null,
+  },
+  taskDetail: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "TaskDetail",
+    default: null,
   },
   description: { type: String, default: "" },
   date: { type: Date, default: Date.now },
@@ -14,7 +19,6 @@ const diaryLogSchema = new mongoose.Schema({
     enum: ["single_plot", "selected_plots", "all_plots"],
     default: "all_plots",
   },
-  // Các field cũ để hỗ trợ dữ liệu legacy
   plot: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Plot",
@@ -26,7 +30,6 @@ const diaryLogSchema = new mongoose.Schema({
       ref: "Plot",
     },
   ],
-  // -----
   seasonPlotAssignments: [
     {
       type: mongoose.Schema.Types.ObjectId,
@@ -45,7 +48,6 @@ const diaryLogSchema = new mongoose.Schema({
       status: { type: String, default: "" },
     },
   ],
-
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   createdAt: { type: Date, default: Date.now },
 });

@@ -460,6 +460,7 @@ const AIScan = () => {
       diseaseName: result.disease || "Không xác định",
       confidence: result.confidence,
       description: buildDiagnosisDescriptionText(result),
+      fieldId: selectedField?._id || "",
       seasonId: selectedSeason,
       date: detectedDate,
       scope,

@@ -1,5 +1,5 @@
 import React from "react";
-import { DollarSign, Calendar, X, FileText } from "lucide-react";
+import { DollarSign, Calendar, X, FileText, ListChecks } from "lucide-react";
 import CustomCheckbox from "./CustomCheckbox";
 
 const DiaryLogModal = ({
@@ -7,9 +7,12 @@ const DiaryLogModal = ({
   editingLog,
   logForm,
   taskTypes,
+  taskDetails,
   seasonLoggablePlots,
   onClose,
   onSave,
+  onTaskChange,
+  onTaskDetailChange,
   onFormChange,
   onTogglePlot,
   onSelectAllPlots,
@@ -20,10 +23,11 @@ const DiaryLogModal = ({
     seasonLoggablePlots.length > 0 &&
     logForm.selectedPlotIds.length === seasonLoggablePlots.length;
 
+  const hasTaskDetails = taskDetails.length > 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4 backdrop-blur-sm">
       <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-dropdown-enter">
-        {/* Header */}
         <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-700 px-5 py-4">
           <div>
             <h3 className="text-base font-bold text-white">
@@ -41,9 +45,7 @@ const DiaryLogModal = ({
           </button>
         </div>
 
-        {/* Body */}
         <div className="overflow-y-auto p-5">
-          {/* Task type selection */}
           <label className="mb-2.5 block text-xs font-bold uppercase tracking-wider text-gray-500">
             Công việc
           </label>
@@ -54,7 +56,7 @@ const DiaryLogModal = ({
                 <button
                   key={task._id}
                   type="button"
-                  onClick={() => onFormChange({ taskType: task })}
+                  onClick={() => onTaskChange(task)}
                   className={`rounded-xl border px-3.5 py-2 text-xs font-semibold transition-all duration-200 ${
                     isSelected
                       ? "border-emerald-400 bg-emerald-50 text-emerald-700 shadow-sm shadow-emerald-100 ring-2 ring-emerald-200"
@@ -67,7 +69,37 @@ const DiaryLogModal = ({
             })}
           </div>
 
-          {/* Date + Cost */}
+          {logForm.taskType && hasTaskDetails && (
+            <div className="mb-5">
+              <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
+                <ListChecks size={12} className="text-gray-400" />
+                Chi tiết công việc
+              </label>
+              <div className="grid gap-2 rounded-xl border border-gray-100 bg-gray-50/50 p-2.5">
+                {taskDetails.map((detail) => {
+                  const isSelected = logForm.taskDetail?._id === detail._id;
+                  return (
+                    <button
+                      key={detail._id}
+                      type="button"
+                      onClick={() => onTaskDetailChange(detail)}
+                      className={`rounded-xl border px-3.5 py-2 text-left text-sm font-medium transition-all duration-200 ${
+                        isSelected
+                          ? "border-emerald-400 bg-white text-emerald-700 shadow-sm shadow-emerald-100 ring-2 ring-emerald-200"
+                          : "border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:bg-emerald-50/50 hover:text-emerald-600"
+                      }`}
+                    >
+                      {detail.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-amber-600">
+                Chọn chi tiết công việc phù hợp.
+              </p>
+            </div>
+          )}
+
           <div className="mb-5 grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
@@ -95,13 +127,12 @@ const DiaryLogModal = ({
                   placeholder="0"
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">
-                  ₫
+                  đ
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Plot selection */}
           <div className="mb-5">
             <div className="mb-2 flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
@@ -146,7 +177,6 @@ const DiaryLogModal = ({
             </div>
           </div>
 
-          {/* Description */}
           <div>
             <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
               <FileText size={12} className="text-gray-400" />
@@ -162,7 +192,6 @@ const DiaryLogModal = ({
           </div>
         </div>
 
-        {/* Footer */}
         <div className="flex gap-3 border-t border-gray-100 bg-gray-50/80 px-5 py-3.5">
           <button
             onClick={onClose}

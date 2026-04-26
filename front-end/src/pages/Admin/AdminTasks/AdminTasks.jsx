@@ -144,6 +144,7 @@ const AdminTasks = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Tên công việc</th>
+                  <th className="px-5 py-3 text-left text-xs font-bold text-gray-500 uppercase">Số chi tiết</th>
                   <th className="px-5 py-3 text-right text-xs font-bold text-gray-500 uppercase">Thao tác</th>
                 </tr>
               </thead>

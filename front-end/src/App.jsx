@@ -27,6 +27,7 @@ import AdminSeasonDetails from "./pages/Admin/AdminSeasonDetails/AdminSeasonDeta
 import AdminSeasonRecommendations from "./pages/Admin/AdminSeasonRecommendations/AdminSeasonRecommendations";
 import AdminAnnouncements from "./pages/Admin/AdminAnnouncements/AdminAnnouncements";
 import AdminTasks from "./pages/Admin/AdminTasks/AdminTasks";
+import AdminTaskDetails from "./pages/Admin/AdminTaskDetails/AdminTaskDetails";
 
 function App() {
   return (
@@ -64,6 +65,7 @@ function App() {
               />
               <Route path="/admin/announcements" element={<AdminAnnouncements />} />
               <Route path="/admin/tasks" element={<AdminTasks />} />
+              <Route path="/admin/task-details" element={<AdminTaskDetails />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/login" />} />

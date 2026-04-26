@@ -12,6 +12,7 @@ const pageTitleMap = {
   "/admin/announcements": "Thông báo và cảnh báo",
   "/admin/season-recommendations": "Khuyến nghị mùa vụ",
   "/admin/tasks": "Quản lý công việc",
+  "/admin/task-details": "Quản lý chi tiết công việc",
 };
 
 const AdminHeader = () => {

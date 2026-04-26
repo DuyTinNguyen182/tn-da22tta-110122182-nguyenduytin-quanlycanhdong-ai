@@ -15,6 +15,7 @@ const seasonDetailRoutes = require("./src/routes/seasonDetailRoute");
 const diaryLogRoutes = require("./src/routes/diaryLogRoute");
 const diseaseLogRoutes = require("./src/routes/diseaseLogRoute");
 const taskRoutes = require("./src/routes/taskRoute");
+const taskDetailRoutes = require("./src/routes/taskDetailRoute");
 const aiRoutes = require("./src/routes/aiRoute");
 const adminOverviewRoutes = require("./src/routes/adminOverviewRoute");
 
@@ -45,6 +46,7 @@ app.use("/api/season-details", seasonDetailRoutes);
 app.use("/api/diary-logs", diaryLogRoutes);
 app.use("/api/disease-logs", diseaseLogRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/task-details", taskDetailRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/admin", adminOverviewRoutes);
 
