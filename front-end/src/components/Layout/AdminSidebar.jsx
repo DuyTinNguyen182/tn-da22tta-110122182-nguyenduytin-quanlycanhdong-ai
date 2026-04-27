@@ -18,7 +18,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
   const location = useLocation();
 
   const navItems = [
-    { name: "Tổng quan", icon: LayoutDashboard, path: "/admin" },
+    { name: "Thống kê", icon: LayoutDashboard, path: "/admin" },
     { name: "Cánh đồng", icon: Map, path: "/admin/fields" },
     { name: "Người dùng", icon: Users, path: "/admin/users" },
     { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
