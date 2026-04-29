@@ -272,16 +272,16 @@ const AdminOverview = () => {
   }
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-8">
-      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6">
+    <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-6">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
         <section className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">
-                <Filter size={14} />
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xl font-bold uppercase tracking-[0.1em] text-emerald-700">
+                <Filter size={18} />
                 Bộ lọc thống kê
               </div>
-              <h2 className="mt-3 text-2xl font-bold text-gray-900">Lọc dữ liệu cần xem</h2>
+              {/* <h2 className="mt-3 text-2xl font-bold text-gray-900">Lọc dữ liệu cần xem</h2> */}
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -314,7 +314,7 @@ const AdminOverview = () => {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-6 2xl:grid-cols-6">
             <div>
               <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
                 Cánh đồng

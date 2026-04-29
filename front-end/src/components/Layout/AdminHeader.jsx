@@ -2,25 +2,26 @@ import React from "react";
 import { LogOut } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import HeaderOverview from "./HeaderOverview";
 
-const pageTitleMap = {
-  "/admin": "Tổng quan",
-  "/admin/fields": "Quản lý cánh đồng",
-  "/admin/users": "Quản lý người dùng",
-  "/admin/seasons": "Quản lý mùa vụ",
-  "/admin/season-details": "Lịch mùa vụ",
-  "/admin/announcements": "Thông báo và cảnh báo",
-  "/admin/season-recommendations": "Khuyến nghị mùa vụ",
-  "/admin/tasks": "Quản lý công việc",
-  "/admin/task-details": "Quản lý chi tiết công việc",
-};
+// const pageTitleMap = {
+//   "/admin": "Tổng quan",
+//   "/admin/fields": "Quản lý cánh đồng",
+//   "/admin/users": "Quản lý người dùng",
+//   "/admin/seasons": "Quản lý mùa vụ",
+//   "/admin/season-details": "Lịch mùa vụ",
+//   "/admin/announcements": "Thông báo và cảnh báo",
+//   "/admin/season-recommendations": "Khuyến nghị mùa vụ",
+//   "/admin/tasks": "Quản lý công việc",
+//   "/admin/task-details": "Quản lý chi tiết công việc",
+// };
 
 const AdminHeader = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const pageTitle = pageTitleMap[location.pathname] || "Quản trị hệ thống";
+  // const pageTitle = pageTitleMap[location.pathname] || "Quản trị hệ thống";
 
   const handleLogout = async () => {
     await logout();
@@ -28,8 +29,17 @@ const AdminHeader = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-gray-800 bg-gray-900 px-8 text-white">
-      <h2 className="truncate text-lg font-semibold text-white">{pageTitle}</h2>
+    <header className="sticky top-0 z-40 flex min-h-20 w-full items-center gap-4 border-b border-gray-800 bg-gray-900 px-6 py-3 text-white md:px-8">
+      <div className="flex min-w-0 flex-1 items-center gap-4">
+        {/* <h2 className="truncate text-lg font-semibold text-white">{pageTitle}</h2> */}
+
+        <div className="hidden min-w-0 flex-1 lg:block">
+          <HeaderOverview
+            className="text-white [--tw-ring-color:rgba(255,255,255,0.12)]"
+            showSource={false}
+          />
+        </div>
+      </div>
 
       {user ? (
         <div className="flex items-center gap-3">

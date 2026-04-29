@@ -2,25 +2,12 @@ import React from "react";
 import { LogIn, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import HeaderOverview from "./HeaderOverview";
 
 const Header = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const pageTitleMap = {
-    "/dashboard": "Tổng quan diện tích canh tác",
-    "/fields": "Thửa ruộng của tôi",
-    "/crops": "Nhật ký mùa vụ",
-    "/disease-logs": "Nhật ký bệnh",
-    "/announcements": "Thông báo và cảnh báo",
-    "/season-recommendations": "Khuyến nghị mùa vụ",
-    "/ai-scan": "AI chẩn đoán bệnh lúa",
-    "/ask-ai": "AI tư vấn canh tác",
-    "/account": "Tài khoản cá nhân",
-  };
-
-  const pageTitle = pageTitleMap[location.pathname] || "Nông nghiệp số";
 
   const handleLogout = async () => {
     await logout();
@@ -28,10 +15,10 @@ const Header = () => {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-20 w-full items-center justify-between border-b border-gray-200 bg-white/90 px-8 backdrop-blur-sm">
-      <div className="min-w-0">
-        <h1 className="truncate text-lg font-bold text-gray-900 md:text-xl">{pageTitle}</h1>
-      </div>
+    <header
+      className={`sticky top-0 z-40 flex min-h-20 w-full items-center gap-4 border-b border-gray-200 bg-white/90 px-6 py-2 backdrop-blur-sm md:px-8 } ${location.pathname === "/" ? "hidden" : ""}`}
+    >
+      <HeaderOverview className="flex-1" />
 
       <div className="flex items-center gap-4">
         {user ? (
