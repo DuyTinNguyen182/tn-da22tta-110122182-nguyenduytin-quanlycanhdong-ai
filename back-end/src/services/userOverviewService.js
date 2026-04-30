@@ -33,7 +33,7 @@ const Task = require("../models/taskModel");
 const TaskDetail = require("../models/taskDetailModel");
 const DiaryLog = require("../models/diaryLogModel");
 
-const MIN_YEAR = 2020;
+const MIN_YEAR = 2023;
 
 const normalizeYear = (value) => {
   if (value === undefined || value === null || value === "") {

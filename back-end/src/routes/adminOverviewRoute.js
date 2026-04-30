@@ -10,5 +10,6 @@ router.get("/overview", adminOverviewController.getOverview);
 router.get("/current-season", adminOverviewController.getCurrentSeasonInfo);
 router.get("/plot-statistics/options", adminOverviewController.getPlotStatisticsOptions);
 router.get("/plot-statistics", adminOverviewController.getPlotTaskStatistics);
+router.post("/plot-statistics/warnings", adminOverviewController.sendPlotTaskWarnings);
 
 module.exports = router;

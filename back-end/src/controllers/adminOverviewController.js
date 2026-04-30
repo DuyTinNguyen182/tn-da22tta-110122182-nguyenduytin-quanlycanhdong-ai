@@ -33,6 +33,16 @@ const getPlotTaskStatistics = async (req, res) => {
   }
 };
 
+const sendPlotTaskWarnings = async (req, res) => {
+  try {
+    const result = await adminPlotStatisticsService.sendPlotTaskWarnings(req.body, req.user);
+    res.json(result);
+  } catch (error) {
+    const statusCode = error.message?.includes("admin") ? 403 : 400;
+    res.status(statusCode).json({ message: error.message });
+  }
+};
+
 const getCurrentSeasonInfo = async (_req, res) => {
   try {
     const info = await adminOverviewService.getCurrentSeasonInfo();
@@ -46,5 +56,6 @@ module.exports = {
   getOverview,
   getPlotStatisticsOptions,
   getPlotTaskStatistics,
+  sendPlotTaskWarnings,
   getCurrentSeasonInfo,
 };

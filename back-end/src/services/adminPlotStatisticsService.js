@@ -5,8 +5,10 @@ const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Task = require("../models/taskModel");
 const TaskDetail = require("../models/taskDetailModel");
+const { buildPlotWarningEmailTemplate } = require("../templates/plotWarningEmailTemplate");
+const { sendMail } = require("./mailService");
 
-const MIN_YEAR = 2020;
+const MIN_YEAR = 2023;
 
 const isAdminUser = (user) => (user?.role || "").toLowerCase() === "admin";
 
@@ -135,13 +137,16 @@ const sortRows = (rows, statusFilter) => {
   return rows;
 };
 
+const getFarmerGroupKey = (row) =>
+  String(row?.farmerId || row?.farmerEmail || "")
+    .trim()
+    .toLowerCase();
+
 const getSelectedActivityMeta = async (filters) => {
   const [selectedTask, selectedTaskDetail] = await Promise.all([
     filters.taskId ? Task.findById(filters.taskId).lean() : null,
     filters.taskDetailId
-      ? TaskDetail.findById(filters.taskDetailId)
-          .populate("task", "name")
-          .lean()
+      ? TaskDetail.findById(filters.taskDetailId).populate("task", "name").lean()
       : null,
   ]);
 
@@ -183,7 +188,7 @@ const getSelectedActivityMeta = async (filters) => {
   };
 };
 
-const getAdminPlotTaskStatistics = async (rawFilters, currentUser) => {
+const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
   if (!isAdminUser(currentUser)) {
     throw new Error("Chỉ admin mới được xem thống kê theo thửa ruộng");
   }
@@ -201,14 +206,6 @@ const getAdminPlotTaskStatistics = async (rawFilters, currentUser) => {
   if (seasonDetailIds.length === 0) {
     return {
       filters,
-      summary: {
-        totalPlotCount: 0,
-        doneCount: 0,
-        pendingCount: 0,
-        visibleCount: 0,
-        completionRate: 0,
-        matchedSeasonCount: 0,
-      },
       selectedActivity,
       rows: [],
     };
@@ -234,14 +231,6 @@ const getAdminPlotTaskStatistics = async (rawFilters, currentUser) => {
   if (assignmentIds.length === 0) {
     return {
       filters,
-      summary: {
-        totalPlotCount: 0,
-        doneCount: 0,
-        pendingCount: 0,
-        visibleCount: 0,
-        completionRate: 0,
-        matchedSeasonCount: seasonDetails.length,
-      },
       selectedActivity,
       rows: [],
     };
@@ -316,39 +305,166 @@ const getAdminPlotTaskStatistics = async (rawFilters, currentUser) => {
       status: matchedLog ? "done" : "pending",
       statusLabel: matchedLog ? "Đã làm" : "Chưa làm",
       warningAvailable: !matchedLog && Boolean(assignment.user?.email),
+      recipientKey: getFarmerGroupKey({
+        farmerId: assignment.user?._id ? String(assignment.user._id) : "",
+        farmerEmail: assignment.user?.email || "",
+      }),
     };
   });
 
+  return {
+    filters,
+    selectedActivity,
+    rows: sortRows(rows, "all"),
+  };
+};
+
+const buildStatisticsSummary = (rows, filters = {}) => {
   const doneCount = rows.filter((item) => item.status === "done").length;
-  const pendingCount = rows.length - doneCount;
+  const pendingRows = rows.filter((item) => item.status === "pending");
   const filteredRows =
     filters.status === "all" ? rows : rows.filter((item) => item.status === filters.status);
 
+  const pendingFarmerKeySet = new Set(
+    pendingRows.map((row) => getFarmerGroupKey(row)).filter(Boolean)
+  );
+  const pendingFarmerWithEmailKeySet = new Set(
+    pendingRows
+      .filter((row) => row.farmerEmail)
+      .map((row) => getFarmerGroupKey(row))
+      .filter(Boolean)
+  );
+
   return {
-    filters,
+    filteredRows: sortRows([...filteredRows], filters.status),
     summary: {
       totalPlotCount: rows.length,
       doneCount,
-      pendingCount,
+      pendingCount: pendingRows.length,
       visibleCount: filteredRows.length,
       completionRate: rows.length ? Number(((doneCount / rows.length) * 100).toFixed(1)) : 0,
       matchedSeasonCount: new Set(rows.map((item) => item.seasonDetailId)).size,
+      pendingFarmerCount: pendingFarmerKeySet.size,
+      pendingFarmerWithEmailCount: pendingFarmerWithEmailKeySet.size,
     },
-    selectedActivity,
-    rows: sortRows(filteredRows, filters.status),
+  };
+};
+
+const groupPendingRowsByFarmer = (rows) => {
+  const groups = new Map();
+
+  rows
+    .filter((row) => row.status === "pending")
+    .forEach((row) => {
+      const groupKey = getFarmerGroupKey(row);
+      if (!groupKey || !row.farmerEmail) {
+        return;
+      }
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          groupKey,
+          farmerId: row.farmerId || "",
+          farmerName: row.farmerName || "Nông dân",
+          farmerEmail: row.farmerEmail,
+          farmerPhone: row.farmerPhone || "",
+          rows: [],
+        });
+      }
+
+      groups.get(groupKey).rows.push(row);
+    });
+
+  return groups;
+};
+
+const getAdminPlotTaskStatistics = async (rawFilters, currentUser) => {
+  const dataset = await buildPlotStatisticsDataset(rawFilters, currentUser);
+  const { filteredRows, summary } = buildStatisticsSummary(dataset.rows, dataset.filters);
+
+  return {
+    filters: dataset.filters,
+    summary,
+    selectedActivity: dataset.selectedActivity,
+    rows: filteredRows,
+  };
+};
+
+const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
+  if (!isAdminUser(currentUser)) {
+    throw new Error("Chỉ admin mới được gửi cảnh báo");
+  }
+
+  const sendAll = payload.sendAll === true;
+  const recipientKey = String(payload.recipientKey || "")
+    .trim()
+    .toLowerCase();
+
+  if (!sendAll && !recipientKey) {
+    throw new Error("Vui lòng chọn nông dân cần gửi cảnh báo");
+  }
+
+  const dataset = await buildPlotStatisticsDataset(payload.filters || {}, currentUser);
+
+  if (!dataset.selectedActivity.taskId && !dataset.selectedActivity.taskDetailId) {
+    throw new Error("Vui lòng chọn công việc trước khi gửi cảnh báo");
+  }
+
+  const groupedRecipients = groupPendingRowsByFarmer(dataset.rows);
+
+  if (groupedRecipients.size === 0) {
+    throw new Error("Không có nông dân nào đủ điều kiện nhận cảnh báo");
+  }
+
+  const targets = sendAll
+    ? Array.from(groupedRecipients.values())
+    : [groupedRecipients.get(recipientKey)].filter(Boolean);
+
+  if (targets.length === 0) {
+    throw new Error("Không tìm thấy nông dân phù hợp để gửi cảnh báo");
+  }
+
+  const recipients = [];
+
+  for (const target of targets) {
+    const emailContent = buildPlotWarningEmailTemplate({
+      farmerName: target.farmerName,
+      rows: target.rows,
+      selectedActivity: dataset.selectedActivity,
+      adminName: currentUser?.fullName || "",
+    });
+
+    await sendMail({
+      to: target.farmerEmail,
+      subject: emailContent.subject,
+      text: emailContent.text,
+      html: emailContent.html,
+    });
+
+    recipients.push({
+      recipientKey: target.groupKey,
+      farmerId: target.farmerId,
+      farmerName: target.farmerName,
+      farmerEmail: target.farmerEmail,
+      pendingPlotCount: target.rows.length,
+      plotNames: target.rows.map((row) => row.plotName),
+    });
+  }
+
+  return {
+    sendAll,
+    activityLabel:
+      dataset.selectedActivity.activityLabel || dataset.rows[0]?.activityLabel || "Công việc",
+    sentFarmerCount: recipients.length,
+    sentPlotCount: recipients.reduce((total, item) => total + item.pendingPlotCount, 0),
+    recipients,
   };
 };
 
 const getAdminPlotStatisticsOptions = async () => {
   const [fields, seasons, tasks] = await Promise.all([
-    Field.find()
-      .sort({ name: 1 })
-      .select("_id name")
-      .lean(),
-    Season.find({ isVisible: { $ne: false } })
-      .sort({ name: 1 })
-      .select("_id name")
-      .lean(),
+    Field.find().sort({ name: 1 }).select("_id name").lean(),
+    Season.find({ isVisible: { $ne: false } }).sort({ name: 1 }).select("_id name").lean(),
     Task.find().sort({ name: 1 }).lean(),
   ]);
 
@@ -363,6 +479,7 @@ const getAdminPlotStatisticsOptions = async () => {
     if (!taskDetailsByTaskId.has(key)) {
       taskDetailsByTaskId.set(key, []);
     }
+
     taskDetailsByTaskId.get(key).push({
       _id: String(detail._id),
       name: detail.name || "",
@@ -399,4 +516,5 @@ const getAdminPlotStatisticsOptions = async () => {
 module.exports = {
   getAdminPlotTaskStatistics,
   getAdminPlotStatisticsOptions,
+  sendPlotTaskWarnings,
 };

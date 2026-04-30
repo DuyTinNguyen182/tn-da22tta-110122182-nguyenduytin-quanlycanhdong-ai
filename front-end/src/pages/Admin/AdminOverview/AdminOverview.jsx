@@ -5,7 +5,7 @@ import {
   CalendarDays,
   Filter,
   ListChecks,
-  Map,
+  Map as MapIcon,
   RefreshCw,
   ShieldAlert,
   Sprout,
@@ -41,6 +41,21 @@ const buildQueryParams = (filters) => {
   return params;
 };
 
+const getFarmerGroupKey = (row) =>
+  String(row?.recipientKey || row?.farmerId || row?.farmerEmail || "")
+    .trim()
+    .toLowerCase();
+
+const buildWarningSessionKey = (recipientKey, filters) =>
+  JSON.stringify({
+    recipientKey: String(recipientKey || "").trim().toLowerCase(),
+    fieldId: filters?.fieldId || "",
+    seasonId: filters?.seasonId || "",
+    year: filters?.year || "",
+    taskId: filters?.taskId || "",
+    taskDetailId: filters?.taskDetailId || "",
+  });
+
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa thực hiện";
 
@@ -70,9 +85,13 @@ const formatCurrentSeasonBanner = (currentSeason) => {
   return {
     content: (
       <>
-        Mùa vụ hiện tại: <span className="font-bold">{currentSeason.seasonName} {start.getFullYear()}</span>.&nbsp;
-        Ngày bắt đầu: <span className="font-semibold">{start.toLocaleDateString("vi-VN")}</span>.&nbsp;
-        Mùa vụ đã bắt đầu được <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span> ngày.
+        Mùa vụ hiện tại:{" "}
+        <span className="font-bold">
+          {currentSeason.seasonName} {start.getFullYear()}
+        </span>
+        . Ngày bắt đầu:{" "}
+        <span className="font-semibold">{start.toLocaleDateString("vi-VN")}</span>. Mùa vụ đã bắt
+        đầu được <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span> ngày.
       </>
     ),
     className: "bg-emerald-50 text-emerald-900",
@@ -96,9 +115,13 @@ const AdminOverview = () => {
   const [filterForm, setFilterForm] = useState(buildDefaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(buildDefaultFilters);
   const [currentSeason, setCurrentSeason] = useState(null);
+  const [sendingRecipientKey, setSendingRecipientKey] = useState("");
+  const [sendingAllWarnings, setSendingAllWarnings] = useState(false);
+  const [sentWarningKeys, setSentWarningKeys] = useState(() => new Set());
 
   useEffect(() => {
-    api.get("/admin/current-season")
+    api
+      .get("/admin/current-season")
       .then((res) => setCurrentSeason(res.data))
       .catch(() => setCurrentSeason(null));
   }, []);
@@ -234,6 +257,8 @@ const AdminOverview = () => {
     visibleCount: 0,
     completionRate: 0,
     matchedSeasonCount: 0,
+    pendingFarmerCount: 0,
+    pendingFarmerWithEmailCount: 0,
   };
   const selectedActivity = statistics?.selectedActivity || {};
   const selectedTaskLabel = selectedActivity.activityLabel || "Tất cả công việc";
@@ -241,6 +266,41 @@ const AdminOverview = () => {
     summary.matchedSeasonCount > 0
       ? `${summary.matchedSeasonCount} lịch mùa vụ`
       : "Chưa có lịch mùa vụ phù hợp";
+
+  const pendingFarmerGroups = useMemo(() => {
+    const groups = new Map();
+
+    rows
+      .filter((row) => row.status === "pending")
+      .forEach((row) => {
+        const groupKey = getFarmerGroupKey(row);
+        if (!groupKey) return;
+
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, {
+            recipientKey: groupKey,
+            farmerId: row.farmerId || "",
+            farmerName: row.farmerName || "Nông dân",
+            farmerEmail: row.farmerEmail || "",
+            farmerPhone: row.farmerPhone || "",
+            rows: [],
+          });
+        }
+
+        groups.get(groupKey).rows.push(row);
+      });
+
+    return groups;
+  }, [rows]);
+
+  const warnableFarmerGroups = useMemo(
+    () => Array.from(pendingFarmerGroups.values()).filter((item) => item.farmerEmail),
+    [pendingFarmerGroups]
+  );
+
+  const warnedFarmerCountInSession = warnableFarmerGroups.filter((group) =>
+    sentWarningKeys.has(buildWarningSessionKey(group.recipientKey, appliedFilters))
+  ).length;
 
   const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
   const paginatedRows = useMemo(() => {
@@ -278,24 +338,131 @@ const AdminOverview = () => {
     }));
   };
 
+  const ensureTaskSelected = () => {
+    if (!appliedFilters.taskId) {
+      toast.warning("Vui lòng chọn công việc trước khi gửi cảnh báo.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const markRecipientAsSent = (recipientKey) => {
+    const sessionKey = buildWarningSessionKey(recipientKey, appliedFilters);
+    setSentWarningKeys((prev) => {
+      const next = new Set(prev);
+      next.add(sessionKey);
+      return next;
+    });
+  };
+
   const handleWarning = async (row) => {
+    if (!ensureTaskSelected()) return;
+
+    const group = pendingFarmerGroups.get(getFarmerGroupKey(row));
+
+    if (!group) {
+      toast.warning("Nông dân này hiện không còn việc tồn đọng phù hợp để cảnh báo.");
+      return;
+    }
+
+    if (!group.farmerEmail) {
+      toast.warning("Nông dân này chưa có email để gửi cảnh báo.");
+      return;
+    }
+
+    const isAlreadySentInSession = sentWarningKeys.has(
+      buildWarningSessionKey(group.recipientKey, appliedFilters)
+    );
+
     const confirmed = await confirm({
-      title: "Gửi cảnh báo sau này?",
-      message: `Thửa "${row.plotName}" của ${row.farmerName} đang chưa thực hiện "${selectedTaskLabel}". Mình đã gắn sẵn nút này để bước tiếp theo có thể nối thêm gửi email.`,
-      confirmText: "Đã hiểu",
+      title: isAlreadySentInSession ? "Gửi lại cảnh báo cho nông dân này?" : "Gửi cảnh báo cho nông dân này?",
+      message: `${group.farmerName} đang có ${group.rows.length} thửa chưa thực hiện "${selectedTaskLabel}".`,
+      confirmText: isAlreadySentInSession ? "Gửi lại email" : "Gửi email",
+      cancelText: "Hủy",
       tone: "primary",
     });
 
     if (!confirmed) return;
 
-    if (!row.warningAvailable) {
-      toast.warning("Nông dân này chưa có email để gửi cảnh báo sau này.");
+    try {
+      setSendingRecipientKey(group.recipientKey);
+
+      const res = await api.post("/admin/plot-statistics/warnings", {
+        filters: appliedFilters,
+        recipientKey: group.recipientKey,
+      });
+
+      markRecipientAsSent(group.recipientKey);
+
+      const recipient = res.data?.recipients?.[0];
+      toast.success(
+        recipient
+          ? `Đã gửi email cảnh báo cho ${recipient.farmerName} (${recipient.pendingPlotCount} thửa).`
+          : `Đã gửi email cảnh báo cho ${group.farmerName}.`
+      );
+    } catch (error) {
+      console.error("Lỗi gửi cảnh báo cho nông dân:", error);
+      toast.error(error.response?.data?.message || "Không thể gửi email cảnh báo");
+    } finally {
+      setSendingRecipientKey("");
+    }
+  };
+
+  const handleWarningAll = async () => {
+    if (!ensureTaskSelected()) return;
+
+    if (warnableFarmerGroups.length === 0) {
+      toast.warning("Không có nông dân nào đủ điều kiện nhận cảnh báo trong bộ lọc hiện tại.");
       return;
     }
 
-    toast.info(
-      `Đã đánh dấu thửa "${row.plotName}" cho tính năng gửi cảnh báo qua email ở bước tiếp theo.`
+    const totalPendingPlots = warnableFarmerGroups.reduce(
+      (total, group) => total + group.rows.length,
+      0
     );
+
+    const hasSentAnyInSession = warnableFarmerGroups.some((group) =>
+      sentWarningKeys.has(buildWarningSessionKey(group.recipientKey, appliedFilters))
+    );
+
+    const confirmed = await confirm({
+      title: hasSentAnyInSession ? "Gửi lại cảnh báo cho tất cả?" : "Gửi cảnh báo cho tất cả?",
+      message: `Hệ thống sẽ gửi ${warnableFarmerGroups.length} email cho ${warnableFarmerGroups.length} nông dân và gộp ${totalPendingPlots} thửa chưa làm theo đúng người nhận.`,
+      confirmText: hasSentAnyInSession ? "Gửi lại tất cả" : "Gửi tất cả",
+      cancelText: "Hủy",
+      tone: "primary",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setSendingAllWarnings(true);
+
+      const res = await api.post("/admin/plot-statistics/warnings", {
+        filters: appliedFilters,
+        sendAll: true,
+      });
+
+      setSentWarningKeys((prev) => {
+        const next = new Set(prev);
+        warnableFarmerGroups.forEach((group) => {
+          next.add(buildWarningSessionKey(group.recipientKey, appliedFilters));
+        });
+        return next;
+      });
+
+      toast.success(
+        `Đã gửi ${res.data?.sentFarmerCount || 0} email cảnh báo cho ${
+          res.data?.sentFarmerCount || 0
+        } nông dân.`
+      );
+    } catch (error) {
+      console.error("Lỗi gửi cảnh báo hàng loạt:", error);
+      toast.error(error.response?.data?.message || "Không thể gửi cảnh báo hàng loạt");
+    } finally {
+      setSendingAllWarnings(false);
+    }
   };
 
   if (loading && !statistics) {
@@ -307,7 +474,9 @@ const AdminOverview = () => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-6">
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
-        <div className={`mb-0 rounded-xl px-6 py-4 text-base font-medium shadow-sm ${seasonBanner.className}`}>
+        <div
+          className={`mb-0 rounded-xl px-6 py-4 text-base font-medium shadow-sm ${seasonBanner.className}`}
+        >
           {seasonBanner.content}
         </div>
 
@@ -318,7 +487,6 @@ const AdminOverview = () => {
                 <Filter size={18} />
                 Bộ lọc thống kê
               </div>
-              {/* <h2 className="mt-3 text-2xl font-bold text-gray-900">Lọc dữ liệu cần xem</h2> */}
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -361,7 +529,7 @@ const AdminOverview = () => {
                 onChange={(value) => setFilterForm((prev) => ({ ...prev, fieldId: value }))}
                 options={fieldOptions}
                 placeholder="Chọn cánh đồng"
-                icon={Map}
+                icon={MapIcon}
                 variant="filter"
               />
             </div>
@@ -473,7 +641,12 @@ const AdminOverview = () => {
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
               Nông dân cần nhắc
             </p>
-            <p className="mt-3 text-3xl font-bold text-amber-600">{summary.pendingCount}</p>
+            <p className="mt-3 text-3xl font-bold text-amber-600">
+              {summary.pendingFarmerCount}
+            </p>
+            {/* <p className="mt-2 text-sm text-gray-500">
+              Đã gửi trong phiên này: {warnedFarmerCountInSession}/{summary.pendingFarmerCount || 0}
+            </p> */}
           </div>
         </section>
 
@@ -492,6 +665,20 @@ const AdminOverview = () => {
                 <span className="h-2 w-2 rounded-full bg-amber-500"></span>
                 Chưa làm
               </span>
+              <button
+                type="button"
+                onClick={handleWarningAll}
+                disabled={
+                  sendingAllWarnings ||
+                  warnableFarmerGroups.length === 0 ||
+                  loading ||
+                  !appliedFilters.taskId
+                }
+                className="ml-1 inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 font-semibold text-white shadow-md shadow-amber-200 transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none"
+              >
+                <BellRing size={15} />
+                {sendingAllWarnings ? "Đang gửi..." : "Cảnh báo tất cả"}
+              </button>
             </div>
           </div>
 
@@ -525,79 +712,105 @@ const AdminOverview = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedRows.map((row) => (
-                      <tr key={row.assignmentId} className="border-t border-gray-100 align-top">
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-gray-900">{row.plotName}</p>
-                          <p className="mt-1 text-sm text-gray-500">
-                            Diện tích: {Number(row.plotArea || 0).toLocaleString("vi-VN")} m2
-                          </p>
-                        </td>
+                    {paginatedRows.map((row) => {
+                      const farmerGroup = pendingFarmerGroups.get(getFarmerGroupKey(row));
+                      const isPending = row.status === "pending";
+                      const isSendingRow =
+                        sendingRecipientKey &&
+                        sendingRecipientKey === getFarmerGroupKey(row);
+                      const canWarn =
+                        isPending && Boolean(farmerGroup?.farmerEmail) && Boolean(appliedFilters.taskId);
+                      const isSentInSession = sentWarningKeys.has(
+                        buildWarningSessionKey(getFarmerGroupKey(row), appliedFilters)
+                      );
 
-                        <td className="px-5 py-4">
-                          <div className="inline-flex items-center gap-2 rounded-2xl bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-                            <Map size={14} />
-                            {row.fieldName}
-                          </div>
-                        </td>
+                      return (
+                        <tr key={row.assignmentId} className="border-t border-gray-100 align-top">
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-gray-900">{row.plotName}</p>
+                            <p className="mt-1 text-sm text-gray-500">
+                              Diện tích: {Number(row.plotArea || 0).toLocaleString("vi-VN")} m2
+                            </p>
+                          </td>
 
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-gray-900">{row.seasonLabel}</p>
-                          <p className="mt-1 text-sm text-gray-500">Năm: {row.year || "--"}</p>
-                        </td>
+                          <td className="px-5 py-4">
+                            <div className="inline-flex items-center gap-2 rounded-2xl bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
+                              <MapIcon size={14} />
+                              {row.fieldName}
+                            </div>
+                          </td>
 
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-gray-900">{row.activityLabel}</p>
-                          <p className="mt-1 text-sm text-gray-500">
-                            {row.taskDetailName ? row.taskName : "Công việc tổng"}
-                          </p>
-                        </td>
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-gray-900">{row.seasonLabel}</p>
+                            <p className="mt-1 text-sm text-gray-500">Năm: {row.year || "--"}</p>
+                          </td>
 
-                        <td className="px-5 py-4">
-                          <p
-                            className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-                              row.performedAt
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
-                          >
-                            {formatDate(row.performedAt)}
-                          </p>
-                        </td>
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-gray-900">{row.activityLabel}</p>
+                            <p className="mt-1 text-sm text-gray-500">
+                              {row.taskDetailName ? row.taskName : "Công việc chung"}
+                            </p>
+                          </td>
 
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-gray-900">{row.farmerName}</p>
-                          <p className="mt-1 text-sm text-gray-500">{row.farmerEmail || "--"}</p>
-                          <p className="mt-1 text-sm text-gray-400">{row.farmerPhone || "--"}</p>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getStatusClasses(row.status)}`}
-                          >
-                            {getStatusText(row.status)}
-                          </span>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => handleWarning(row)}
-                              disabled={row.status === "done"}
-                              className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${
-                                row.status === "done"
-                                  ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                                  : "bg-amber-500 text-white shadow-md shadow-amber-200 hover:bg-amber-600"
+                          <td className="px-5 py-4">
+                            <p
+                              className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
+                                row.performedAt
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-gray-100 text-gray-600"
                               }`}
                             >
-                              <BellRing size={15} />
-                              {row.status === "done" ? "Đã xong" : "Cảnh báo"}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {formatDate(row.performedAt)}
+                            </p>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-gray-900">{row.farmerName}</p>
+                            <p className="mt-1 text-sm text-gray-500">{row.farmerEmail || "--"}</p>
+                            <p className="mt-1 text-sm text-gray-400">{row.farmerPhone || "--"}</p>
+                            {/* {isSentInSession ? (
+                              <p className="mt-2 text-xs font-medium text-sky-700">
+                                Đã gửi trong phiên hiện tại.
+                              </p>
+                            ) : null} */}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getStatusClasses(row.status)}`}
+                            >
+                              {getStatusText(row.status)}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleWarning(row)}
+                                disabled={!canWarn || sendingAllWarnings || Boolean(sendingRecipientKey)}
+                                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                                  !canWarn || sendingAllWarnings || Boolean(sendingRecipientKey)
+                                    ? "cursor-not-allowed bg-gray-100 text-gray-400"
+                                    : isSentInSession
+                                      ? "bg-sky-600 text-white shadow-md shadow-sky-200 hover:bg-sky-700"
+                                      : "bg-amber-500 text-white shadow-md shadow-amber-200 hover:bg-amber-600"
+                                }`}
+                              >
+                                <BellRing size={15} />
+                                {!isPending
+                                  ? "Đã xong"
+                                  : isSendingRow
+                                    ? "Đang gửi..."
+                                    : isSentInSession
+                                      ? "Đã gửi"
+                                      : "Cảnh báo"}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
