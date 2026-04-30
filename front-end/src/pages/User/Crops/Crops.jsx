@@ -51,7 +51,6 @@ const Crops = () => {
   const { toast, confirm } = useFeedback();
   const [fields, setFields] = useState([]);
   const [selectedField, setSelectedField] = useState(null);
-  const [fieldKeyword, setFieldKeyword] = useState("");
   const [seasons, setSeasons] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
   const [plots, setPlots] = useState([]);
@@ -66,14 +65,6 @@ const Crops = () => {
   const [logForm, setLogForm] = useState(emptyLogForm);
 
   const activePlots = useMemo(() => plots.filter((p) => p.status === "active"), [plots]);
-
-  const filteredFields = useMemo(() => {
-    const kw = fieldKeyword.trim().toLowerCase();
-    if (!kw) return fields;
-    return fields.filter(
-      (f) => f.name?.toLowerCase().includes(kw) || f.address?.toLowerCase().includes(kw)
-    );
-  }, [fieldKeyword, fields]);
 
   const sortedSeasons = useMemo(() => sortSeasons(seasons), [seasons]);
 
@@ -357,10 +348,8 @@ const Crops = () => {
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-gray-50 font-sans">
       <CropsSidebar
-        fields={filteredFields}
+        fields={fields}
         selectedField={selectedField}
-        fieldKeyword={fieldKeyword}
-        onFieldKeywordChange={setFieldKeyword}
         onSelectField={setSelectedField}
       />
 

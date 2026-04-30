@@ -1,11 +1,9 @@
 import React from "react";
-import { MapPin, Search, Sprout } from "lucide-react";
+import { MapPin, Sprout } from "lucide-react";
 
 const CropsSidebar = ({
   fields,
   selectedField,
-  fieldKeyword,
-  onFieldKeywordChange,
   onSelectField,
 }) => {
   return (
@@ -16,15 +14,6 @@ const CropsSidebar = ({
             <Sprout size={16} className="text-emerald-600" />
           </div>
           <h2 className="text-base font-bold text-gray-800">Cánh đồng</h2>
-        </div>
-        <div className="relative mt-3">
-          <Search className="absolute left-3 top-2.5 text-gray-400" size={15} />
-          <input
-            value={fieldKeyword}
-            onChange={(e) => onFieldKeywordChange(e.target.value)}
-            placeholder="Tìm cánh đồng..."
-            className="w-full rounded-xl border border-gray-100 bg-gray-50/80 py-2 pl-9 pr-3 text-sm outline-none transition-all focus:border-emerald-200 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-          />
         </div>
       </div>
 

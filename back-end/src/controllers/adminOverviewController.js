@@ -33,8 +33,18 @@ const getPlotTaskStatistics = async (req, res) => {
   }
 };
 
+const getCurrentSeasonInfo = async (_req, res) => {
+  try {
+    const info = await adminOverviewService.getCurrentSeasonInfo();
+    res.json(info || {});
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getOverview,
   getPlotStatisticsOptions,
   getPlotTaskStatistics,
+  getCurrentSeasonInfo,
 };

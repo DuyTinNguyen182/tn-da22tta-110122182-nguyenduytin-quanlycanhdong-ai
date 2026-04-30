@@ -18,6 +18,16 @@ import { useFeedback } from "../../../hooks/useFeedback";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
 
+const normalizeText = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const emptyPlotForm = {
   name: "",
   area: "",
@@ -42,6 +52,7 @@ const statusOptions = [
 const Fields = () => {
   const { toast, confirm } = useFeedback();
   const [fields, setFields] = useState([]);
+  const [fieldKeyword, setFieldKeyword] = useState("");
   const [plots, setPlots] = useState([]);
   const [selectedField, setSelectedField] = useState(null);
   const [loadingFields, setLoadingFields] = useState(true);
@@ -206,6 +217,18 @@ const Fields = () => {
     [plots]
   );
 
+  const filteredFields = useMemo(() => {
+    const keyword = normalizeText(fieldKeyword);
+    if (!keyword) return fields;
+
+    return fields.filter((field) => {
+      const haystack = normalizeText([field.name, field.address].filter(Boolean).join(" "));
+      return haystack.includes(keyword);
+    });
+  }, [fieldKeyword, fields]);
+
+  const visibleFields = filteredFields;
+
   if (loadingFields && fields.length === 0) {
     return <LoadingScreen fullScreen={true} message="Đang chuẩn bị không gian canh tác..." />;
   }
@@ -223,6 +246,15 @@ const Fields = () => {
           <p className="mt-2 text-xs text-gray-400">
             Chọn cánh đồng để quản lý các thửa ruộng.
           </p>
+          <div className="relative mt-3">
+            <MapPin size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={fieldKeyword}
+              onChange={(e) => setFieldKeyword(e.target.value)}
+              placeholder="Tìm cánh đồng..."
+              className="w-full rounded-xl border border-gray-100 bg-gray-50/80 py-2 pl-9 pr-3 text-sm outline-none transition-all focus:border-emerald-200 focus:bg-white focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
         </div>
 
         <div className="flex-1 space-y-1 overflow-y-auto p-2">
@@ -233,16 +265,20 @@ const Fields = () => {
               </div>
               <p className="text-sm">Đang tải...</p>
             </div>
-          ) : fields.length === 0 ? (
+          ) : visibleFields.length === 0 ? (
             <div className="flex flex-col items-center py-10 text-center text-gray-400">
               <div className="mb-3 rounded-2xl bg-gray-100 p-4">
                 <MapPin size={24} className="text-gray-300" />
               </div>
-              <p className="text-sm font-medium text-gray-500">Chưa có cánh đồng nào.</p>
-              <p className="mt-1 text-xs text-gray-400">Nhờ admin HTX tạo trước.</p>
+              <p className="text-sm font-medium text-gray-500">
+                {fieldKeyword.trim() ? "Không tìm thấy cánh đồng phù hợp." : "Chưa có cánh đồng nào."}
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                {fieldKeyword.trim() ? "Thử nhập từ khóa ngắn hơn hoặc một phần tên cánh đồng." : "Nhờ admin HTX tạo trước."}
+              </p>
             </div>
           ) : (
-            fields.map((field) => {
+            visibleFields.map((field) => {
               const isSelected = selectedField?._id === field._id;
               return (
                 <button

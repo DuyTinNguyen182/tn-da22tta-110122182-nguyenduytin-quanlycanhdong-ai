@@ -148,6 +148,30 @@ const getOverviewOptions = async () => {
   };
 };
 
+const getCurrentSeasonInfo = async () => {
+  const now = new Date();
+
+  const currentSeasonDetails = await SeasonDetail.find({
+    startDate: { $lte: now },
+    $or: [{ endDate: null }, { endDate: { $gte: now } }],
+  })
+    .populate("season", "name")
+    .sort({ startDate: -1, createdAt: -1 })
+    .lean();
+
+  if (!currentSeasonDetails.length) {
+    return null;
+  }
+
+  const currentSeason = currentSeasonDetails[0];
+
+  return {
+    seasonName: currentSeason.season?.name || "",
+    startDate: currentSeason.startDate,
+    endDate: currentSeason.endDate || null,
+  };
+};
+
 const decorateSeasonInstances = (seasonDetails, assignmentsBySeason, logsBySeason) => {
   return seasonDetails.map((seasonDetail) => {
     const key = String(seasonDetail._id);
@@ -389,4 +413,5 @@ const getAdminOverview = async (rawFilters, currentUser) => {
 
 module.exports = {
   getAdminOverview,
+  getCurrentSeasonInfo,
 };

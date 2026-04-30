@@ -55,6 +55,30 @@ const getStatusText = (status) => {
   return "Tất cả";
 };
 
+const formatCurrentSeasonBanner = (currentSeason) => {
+  if (!currentSeason?.seasonName || !currentSeason?.startDate) {
+    return {
+      content: "Không có mùa vụ nào đang canh tác.",
+      className: "bg-amber-50 text-amber-900",
+    };
+  }
+
+  const start = new Date(currentSeason.startDate);
+  const now = new Date();
+  const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+
+  return {
+    content: (
+      <>
+        Mùa vụ hiện tại: <span className="font-bold">{currentSeason.seasonName} {start.getFullYear()}</span>.&nbsp;
+        Ngày bắt đầu: <span className="font-semibold">{start.toLocaleDateString("vi-VN")}</span>.&nbsp;
+        Mùa vụ đã bắt đầu được <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span> ngày.
+      </>
+    ),
+    className: "bg-emerald-50 text-emerald-900",
+  };
+};
+
 const AdminOverview = () => {
   const { toast, confirm } = useFeedback();
   const [options, setOptions] = useState({
@@ -71,6 +95,13 @@ const AdminOverview = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [filterForm, setFilterForm] = useState(buildDefaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(buildDefaultFilters);
+  const [currentSeason, setCurrentSeason] = useState(null);
+
+  useEffect(() => {
+    api.get("/admin/current-season")
+      .then((res) => setCurrentSeason(res.data))
+      .catch(() => setCurrentSeason(null));
+  }, []);
 
   const fetchOptions = async () => {
     const res = await api.get("/admin/plot-statistics/options");
@@ -271,9 +302,15 @@ const AdminOverview = () => {
     return <LoadingScreen fullScreen={true} message="Đang tải thống kê admin..." />;
   }
 
+  const seasonBanner = formatCurrentSeasonBanner(currentSeason);
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-6">
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
+        <div className={`mb-0 rounded-xl px-6 py-4 text-base font-medium shadow-sm ${seasonBanner.className}`}>
+          {seasonBanner.content}
+        </div>
+
         <section className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
