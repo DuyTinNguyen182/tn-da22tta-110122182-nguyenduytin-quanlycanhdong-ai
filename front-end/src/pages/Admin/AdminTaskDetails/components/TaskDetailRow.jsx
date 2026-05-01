@@ -1,9 +1,10 @@
 import React from "react";
-import { Pencil, Save, Trash2, X } from "lucide-react";
+import { Briefcase, Pencil, Save, Trash2, X } from "lucide-react";
+import CustomDropdown from "../../../../components/UI/CustomDropdown";
 
 const TaskDetailRow = ({
   taskDetail,
-  tasks,
+  taskOptions,
   isEditing,
   editingTaskId,
   editingTaskDetailName,
@@ -19,18 +20,14 @@ const TaskDetailRow = ({
     <tr className="border-t border-gray-100">
       <td className="px-5 py-3">
         {isEditing ? (
-          <select
+          <CustomDropdown
             value={editingTaskId}
-            onChange={(e) => onEditingTaskIdChange(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 outline-none focus:border-emerald-500"
-          >
-            <option value="">Chọn công việc</option>
-            {tasks.map((task) => (
-              <option key={task._id} value={task._id}>
-                {task.name}
-              </option>
-            ))}
-          </select>
+            onChange={onEditingTaskIdChange}
+            options={taskOptions}
+            placeholder="Chọn công việc"
+            icon={Briefcase}
+            size="small"
+          />
         ) : (
           <span className="font-medium text-gray-700">{taskDetail.taskName}</span>
         )}

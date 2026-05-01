@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import api from "../../../services/api";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
+import CustomCheckbox from "../../../components/UI/CustomCheckbox";
 import { useFeedback } from "../../../hooks/useFeedback";
 
 const formatDate = (value) =>
@@ -205,13 +206,11 @@ const AdminSeasonRecommendations = () => {
 
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <label className="inline-flex cursor-pointer items-center gap-3">
-                      <input
-                        type="checkbox"
+                      <CustomCheckbox
                         checked={draft.isVisible}
-                        onChange={(e) =>
-                          updateDraft(season.seasonId, "isVisible", e.target.checked)
+                        onChange={() =>
+                          updateDraft(season.seasonId, "isVisible", !draft.isVisible)
                         }
-                        className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                       />
                       <span className="text-sm font-medium text-gray-700">
                         Bật hiển thị khuyến nghị này cho nông dân

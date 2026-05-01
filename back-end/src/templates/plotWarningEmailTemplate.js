@@ -36,10 +36,6 @@ const buildPlotWarningEmailTemplate = ({ farmerName, rows, selectedActivity, adm
         `<tr>
           <td style="padding:8px 10px;border:1px solid #e5e7eb;">${escapeHtml(row.plotName)}</td>
           <td style="padding:8px 10px;border:1px solid #e5e7eb;">${escapeHtml(row.fieldName)}</td>
-          <td style="padding:8px 10px;border:1px solid #e5e7eb;">${escapeHtml(row.seasonLabel)}</td>
-          <td style="padding:8px 10px;border:1px solid #e5e7eb;text-align:right;">${escapeHtml(
-            Number(row.plotArea || 0).toLocaleString("vi-VN")
-          )} m2</td>
         </tr>`
     )
     .join("");
@@ -53,8 +49,6 @@ const buildPlotWarningEmailTemplate = ({ farmerName, rows, selectedActivity, adm
           <tr style="background:#f9fafb;">
             <th style="padding:8px 10px;border:1px solid #e5e7eb;text-align:left;">Thửa ruộng</th>
             <th style="padding:8px 10px;border:1px solid #e5e7eb;text-align:left;">Cánh đồng</th>
-            <th style="padding:8px 10px;border:1px solid #e5e7eb;text-align:left;">Mùa vụ</th>
-            <th style="padding:8px 10px;border:1px solid #e5e7eb;text-align:right;">Diện tích</th>
           </tr>
         </thead>
         <tbody>${htmlRows}</tbody>

@@ -14,6 +14,8 @@ import {
 import api from "../../../services/api";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import PaginationControls from "../../../components/Common/PaginationControls";
+import CustomCheckbox from "../../../components/UI/CustomCheckbox";
+import CustomDropdown from "../../../components/UI/CustomDropdown";
 import { useFeedback } from "../../../hooks/useFeedback";
 
 const EMPTY_FORM = {
@@ -34,6 +36,8 @@ const VISIBILITY_OPTIONS = [
   { value: "visible", label: "Đang hiện" },
   { value: "hidden", label: "Đang ẩn" },
 ];
+
+const FORM_TYPE_OPTIONS = TYPE_OPTIONS.filter((option) => option.value !== "all");
 
 const TYPE_STYLES = {
   notification: {
@@ -99,7 +103,9 @@ const AdminAnnouncements = () => {
           limit: 5,
           ...(filters.keyword.trim() ? { keyword: filters.keyword.trim() } : {}),
           ...(filters.type !== "all" ? { type: filters.type } : {}),
-          ...(filters.visibility !== "all" ? { visibility: filters.visibility } : {}),
+          ...(filters.visibility !== "all"
+            ? { visibility: filters.visibility }
+            : {}),
         },
       });
 
@@ -247,7 +253,9 @@ const AdminAnnouncements = () => {
       <div className="space-y-6">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-3xl border border-gray-100 bg-white p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">Tổng mục</p>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
+              Tổng mục
+            </p>
             <p className="mt-2 text-3xl font-bold text-gray-900">{summary.totalCount}</p>
           </div>
 
@@ -292,29 +300,25 @@ const AdminAnnouncements = () => {
                 className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
               />
 
-              <select
+              <CustomDropdown
                 value={filters.type}
-                onChange={(e) => handleFilterChange("type", e.target.value)}
-                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-              >
-                {TYPE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => handleFilterChange("type", value)}
+                options={TYPE_OPTIONS}
+                placeholder="Tất cả loại"
+                icon={BellRing}
+                variant="filter"
+                className="min-w-[180px]"
+              />
 
-              <select
+              <CustomDropdown
                 value={filters.visibility}
-                onChange={(e) => handleFilterChange("visibility", e.target.value)}
-                className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-              >
-                {VISIBILITY_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(value) => handleFilterChange("visibility", value)}
+                options={VISIBILITY_OPTIONS}
+                placeholder="Tất cả trạng thái"
+                icon={Eye}
+                variant="filter"
+                className="min-w-[180px]"
+              />
 
               <button
                 type="button"
@@ -334,7 +338,9 @@ const AdminAnnouncements = () => {
               <div className="rounded-2xl bg-white p-4 text-gray-400 shadow-sm">
                 <ShieldAlert size={28} />
               </div>
-              <p className="mt-4 text-base font-semibold text-gray-700">Chưa có dữ liệu phù hợp</p>
+              <p className="mt-4 text-base font-semibold text-gray-700">
+                Chưa có dữ liệu phù hợp
+              </p>
               <p className="mt-1 text-sm text-gray-500">
                 Thử đổi bộ lọc hoặc tạo thông báo mới.
               </p>
@@ -446,7 +452,9 @@ const AdminAnnouncements = () => {
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 px-6 py-5">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">
-                  {editingId ? "Chỉnh sửa thông báo/cảnh báo" : "Tạo thông báo/cảnh báo mới"}
+                  {editingId
+                    ? "Chỉnh sửa thông báo/cảnh báo"
+                    : "Tạo thông báo/cảnh báo mới"}
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
                   Chọn loại, nhập nội dung và thiết lập trạng thái hiển thị cho nông dân.
@@ -465,14 +473,13 @@ const AdminAnnouncements = () => {
             <div className="space-y-4 px-6 py-5">
               <label className="block">
                 <span className="mb-2 block text-sm font-semibold text-gray-700">Loại</span>
-                <select
+                <CustomDropdown
                   value={form.type}
-                  onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                >
-                  <option value="notification">Thông báo</option>
-                  <option value="warning">Cảnh báo</option>
-                </select>
+                  onChange={(value) => setForm((prev) => ({ ...prev, type: value }))}
+                  options={FORM_TYPE_OPTIONS}
+                  placeholder="Chọn loại"
+                  icon={BellRing}
+                />
               </label>
 
               <label className="block">
@@ -498,12 +505,12 @@ const AdminAnnouncements = () => {
                 />
               </label>
 
-              <label className="inline-flex items-center gap-3 rounded-2xl bg-gray-50 px-4 py-3">
-                <input
-                  type="checkbox"
+              <label className="inline-flex cursor-pointer items-center gap-3 rounded-2xl bg-gray-50 px-4 py-3">
+                <CustomCheckbox
                   checked={form.isVisible}
-                  onChange={(e) => setForm((prev) => ({ ...prev, isVisible: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                  onChange={() =>
+                    setForm((prev) => ({ ...prev, isVisible: !prev.isVisible }))
+                  }
                 />
                 <span className="text-sm font-medium text-gray-700">
                   Hiển thị cho nông dân ngay sau khi lưu

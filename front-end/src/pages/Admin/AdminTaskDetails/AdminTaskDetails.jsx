@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Briefcase, Plus } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
+import CustomDropdown from "../../../components/UI/CustomDropdown";
 import TaskDetailRow from "./components/TaskDetailRow";
 
 const AdminTaskDetails = () => {
@@ -42,6 +43,28 @@ const AdminTaskDetails = () => {
     if (!filterTaskId) return taskDetails;
     return taskDetails.filter((item) => item.taskId === filterTaskId);
   }, [filterTaskId, taskDetails]);
+
+  const createTaskOptions = useMemo(
+    () => [
+      { value: "", label: "Chọn công việc" },
+      ...tasks.map((task) => ({
+        value: task._id,
+        label: task.name,
+      })),
+    ],
+    [tasks]
+  );
+
+  const filterTaskOptions = useMemo(
+    () => [
+      { value: "", label: "Tất cả công việc" },
+      ...tasks.map((task) => ({
+        value: task._id,
+        label: `${task.name} (${task.taskDetailCount || 0})`,
+      })),
+    ],
+    [tasks]
+  );
 
   const handleCreate = async () => {
     const taskId = newTaskId.trim();
@@ -141,28 +164,23 @@ const AdminTaskDetails = () => {
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="mb-4 font-bold text-gray-800">Thêm chi tiết công việc mới</h2>
           <div className="grid gap-3 md:grid-cols-[220px_1fr_auto]">
-            <select
+            <CustomDropdown
               value={newTaskId}
-              onChange={(e) => setNewTaskId(e.target.value)}
-              className="rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
-            >
-              <option value="">Chọn công việc</option>
-              {tasks.map((task) => (
-                <option key={task._id} value={task._id}>
-                  {task.name}
-                </option>
-              ))}
-            </select>
+              onChange={setNewTaskId}
+              options={createTaskOptions}
+              placeholder="Chọn công việc"
+              icon={Briefcase}
+            />
             <input
               value={newTaskDetailName}
               onChange={(e) => setNewTaskDetailName(e.target.value)}
               placeholder="Ví dụ: Phun thuốc lần 1"
-              className="px-4 py-2.5 rounded-xl border border-gray-200 focus:border-emerald-500 outline-none"
+              className="rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
             />
             <button
               disabled={submitting}
               onClick={handleCreate}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
             >
               <Plus size={16} /> Tạo mới
             </button>
@@ -171,18 +189,14 @@ const AdminTaskDetails = () => {
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <h2 className="mb-4 font-bold text-gray-800">Lọc theo công việc</h2>
-          <select
+          <CustomDropdown
             value={filterTaskId}
-            onChange={(e) => setFilterTaskId(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
-          >
-            <option value="">Tất cả công việc</option>
-            {tasks.map((task) => (
-              <option key={task._id} value={task._id}>
-                {task.name} ({task.taskDetailCount || 0})
-              </option>
-            ))}
-          </select>
+            onChange={setFilterTaskId}
+            options={filterTaskOptions}
+            placeholder="Tất cả công việc"
+            icon={Briefcase}
+            variant="filter"
+          />
           <p className="mt-3 text-sm text-gray-500">
             Hiển thị {filteredTaskDetails.length} chi tiết công việc.
           </p>
@@ -222,7 +236,7 @@ const AdminTaskDetails = () => {
                   <TaskDetailRow
                     key={taskDetail._id}
                     taskDetail={taskDetail}
-                    tasks={tasks}
+                    taskOptions={createTaskOptions}
                     isEditing={editingTaskDetailId === taskDetail._id}
                     editingTaskId={editingTaskId}
                     editingTaskDetailName={editingTaskDetailName}
