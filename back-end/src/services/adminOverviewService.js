@@ -166,6 +166,7 @@ const getCurrentSeasonInfo = async () => {
   const currentSeason = currentSeasonDetails[0];
 
   return {
+    seasonId: currentSeason.season?._id ? String(currentSeason.season._id) : "",
     seasonName: currentSeason.season?.name || "",
     startDate: currentSeason.startDate,
     endDate: currentSeason.endDate || null,

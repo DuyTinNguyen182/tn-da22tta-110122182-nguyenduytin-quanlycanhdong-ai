@@ -19,10 +19,10 @@ import StatCard from "./StatCard";
 const CURRENT_YEAR = new Date().getFullYear();
 const ROWS_PER_PAGE = 10;
 
-const buildDefaultFilters = () => ({
+const buildDefaultFilters = (seasonId = "", year = String(CURRENT_YEAR)) => ({
   fieldId: "",
-  seasonId: "",
-  year: String(CURRENT_YEAR),
+  seasonId,
+  year,
   taskId: "",
   taskDetailId: "",
   status: "all",
@@ -67,16 +67,22 @@ const Dashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [bootstrapped, setBootstrapped] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [currentSeason, setCurrentSeason] = useState(null);
+  const [currentSeasonLoaded, setCurrentSeasonLoaded] = useState(false);
+  const [defaultSeasonApplied, setDefaultSeasonApplied] = useState(false);
   const [filterForm, setFilterForm] = useState(buildDefaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(buildDefaultFilters);
-  const [currentSeason, setCurrentSeason] = useState(null);
 
-  // Lấy mùa vụ hiện tại
-  useEffect(() => {
-    api.get("/user-overview/dashboard/current-season")
-      .then(res => setCurrentSeason(res.data))
-      .catch(() => setCurrentSeason(null));
-  }, []);
+  const fetchCurrentSeason = async () => {
+    try {
+      const res = await api.get("/user-overview/dashboard/current-season");
+      setCurrentSeason(res.data || null);
+    } catch (_error) {
+      setCurrentSeason(null);
+    } finally {
+      setCurrentSeasonLoaded(true);
+    }
+  };
 
   const fetchOptions = async () => {
     const res = await api.get("/user-overview/dashboard/options");
@@ -98,9 +104,11 @@ const Dashboard = () => {
       } else {
         setLoading(true);
       }
+
       const res = await api.get("/user-overview/dashboard/statistics", {
         params: buildQueryParams(filters),
       });
+
       setStatistics(res.data);
     } catch (error) {
       console.error("Lỗi tải thống kê dashboard:", error);
@@ -110,6 +118,10 @@ const Dashboard = () => {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    fetchCurrentSeason();
+  }, []);
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -123,13 +135,44 @@ const Dashboard = () => {
         setLoading(false);
       }
     };
+
     bootstrap();
   }, [toast]);
 
+  const resolveInitialFilters = useMemo(() => {
+    if (!currentSeason?.seasonId) {
+      return buildDefaultFilters();
+    }
+
+    const matchedSeason = options.seasons.find((item) => item._id === currentSeason.seasonId);
+    if (!matchedSeason) {
+      return buildDefaultFilters();
+    }
+
+    const seasonYear = currentSeason.startDate
+      ? String(new Date(currentSeason.startDate).getFullYear())
+      : String(CURRENT_YEAR);
+
+    return buildDefaultFilters(matchedSeason._id, seasonYear);
+  }, [currentSeason, options.seasons]);
+
   useEffect(() => {
-    if (!bootstrapped) return;
+    if (!bootstrapped || !currentSeasonLoaded || defaultSeasonApplied) {
+      return;
+    }
+
+    setFilterForm(resolveInitialFilters);
+    setAppliedFilters(resolveInitialFilters);
+    setDefaultSeasonApplied(true);
+  }, [bootstrapped, currentSeasonLoaded, defaultSeasonApplied, resolveInitialFilters]);
+
+  useEffect(() => {
+    if (!bootstrapped || !defaultSeasonApplied) {
+      return;
+    }
+
     fetchStatistics(appliedFilters);
-  }, [appliedFilters, bootstrapped]);
+  }, [appliedFilters, bootstrapped, defaultSeasonApplied]);
 
   const currentTask = useMemo(
     () => options.tasks.find((item) => item._id === filterForm.taskId) || null,
@@ -138,6 +181,7 @@ const Dashboard = () => {
 
   const taskDetailOptions = useMemo(() => {
     if (!currentTask) return [];
+
     return (currentTask.taskDetails || []).map((item) => ({
       value: item._id,
       label: item.name,
@@ -225,10 +269,9 @@ const Dashboard = () => {
   };
 
   const handleResetFilters = () => {
-    const nextFilters = buildDefaultFilters();
     setCurrentPage(1);
-    setFilterForm(nextFilters);
-    setAppliedFilters(nextFilters);
+    setFilterForm(resolveInitialFilters);
+    setAppliedFilters(resolveInitialFilters);
   };
 
   const handleRefresh = () => {
@@ -247,17 +290,27 @@ const Dashboard = () => {
     return <LoadingScreen fullScreen={true} message="Đang tải thống kê..." />;
   }
 
-  // Tính số ngày đã bắt đầu mùa vụ
   let seasonBanner = null;
   if (currentSeason && currentSeason.seasonName && currentSeason.startDate) {
     const start = new Date(currentSeason.startDate);
     const now = new Date();
     const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+
     seasonBanner = (
       <div className="mb-0 rounded-xl bg-emerald-50 px-6 py-4 text-base font-medium text-emerald-900 shadow-sm">
-        Mùa vụ hiện tại: <span className="font-bold">{currentSeason.seasonName} {start.getFullYear()}</span>.&nbsp;
-        Ngày bắt đầu: <span className="font-semibold">{start.toLocaleDateString("vi-VN")}</span>.&nbsp;
-        Mùa vụ đã bắt đầu được <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span> ngày.
+        Mùa vụ hiện tại:
+        {" "}
+        <span className="font-bold">
+          {currentSeason.seasonName} {start.getFullYear()}
+        </span>
+        . Ngày bắt đầu:
+        {" "}
+        <span className="font-semibold">{start.toLocaleDateString("vi-VN")}</span>
+        . Mùa vụ đã bắt đầu được
+        {" "}
+        <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span>
+        {" "}
+        ngày.
       </div>
     );
   } else {
@@ -272,6 +325,7 @@ const Dashboard = () => {
     <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-6">
       <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
         {seasonBanner}
+
         <section className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
@@ -279,7 +333,6 @@ const Dashboard = () => {
                 <Filter size={18} />
                 Bộ lọc thống kê
               </div>
-              {/* <h2 className="mt-3 text-2xl font-bold text-gray-900">Lọc dữ liệu cần xem</h2> */}
             </div>
 
             <div className="flex flex-wrap gap-3">
@@ -432,7 +485,7 @@ const Dashboard = () => {
           />
           <StatCard
             title="Tỉ lệ hoàn thành"
-            value={summary.completionRate + "%"}
+            value={`${summary.completionRate}%`}
             unit=""
             icon={ListChecks}
             color="violet"
@@ -473,12 +526,13 @@ const Dashboard = () => {
           ) : (
             <div className="space-y-4">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1000px]">
+                <table className="w-full min-w-[1180px]">
                   <thead className="bg-gray-50 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
                     <tr>
                       <th className="px-5 py-4">Thửa ruộng</th>
                       <th className="px-5 py-4">Cánh đồng</th>
                       <th className="px-5 py-4">Mùa vụ</th>
+                      <th className="px-5 py-4">Công việc</th>
                       <th className="px-5 py-4">Ngày thực hiện</th>
                       <th className="px-5 py-4">Trạng thái</th>
                     </tr>
@@ -503,6 +557,13 @@ const Dashboard = () => {
                         <td className="px-5 py-4">
                           <p className="font-semibold text-gray-900">{row.seasonLabel}</p>
                           <p className="mt-1 text-sm text-gray-500">Năm: {row.year || "--"}</p>
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <p className="font-semibold text-gray-900">{row.activityLabel}</p>
+                          <p className="mt-1 text-sm text-gray-500">
+                            {row.taskDetailName ? row.taskName : "Công việc chung"}
+                          </p>
                         </td>
 
                         <td className="px-5 py-4">

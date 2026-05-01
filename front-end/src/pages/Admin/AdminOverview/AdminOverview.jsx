@@ -19,10 +19,10 @@ import { useFeedback } from "../../../hooks/useFeedback";
 const CURRENT_YEAR = new Date().getFullYear();
 const ROWS_PER_PAGE = 10;
 
-const buildDefaultFilters = () => ({
+const buildDefaultFilters = (seasonId = "", year = String(CURRENT_YEAR)) => ({
   fieldId: "",
-  seasonId: "",
-  year: String(CURRENT_YEAR),
+  seasonId,
+  year,
   taskId: "",
   taskDetailId: "",
   status: "all",
@@ -115,6 +115,8 @@ const AdminOverview = () => {
   const [filterForm, setFilterForm] = useState(buildDefaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(buildDefaultFilters);
   const [currentSeason, setCurrentSeason] = useState(null);
+  const [currentSeasonLoaded, setCurrentSeasonLoaded] = useState(false);
+  const [defaultSeasonApplied, setDefaultSeasonApplied] = useState(false);
   const [sendingRecipientKey, setSendingRecipientKey] = useState("");
   const [sendingAllWarnings, setSendingAllWarnings] = useState(false);
   const [sentWarningKeys, setSentWarningKeys] = useState(() => new Set());
@@ -123,7 +125,8 @@ const AdminOverview = () => {
     api
       .get("/admin/current-season")
       .then((res) => setCurrentSeason(res.data))
-      .catch(() => setCurrentSeason(null));
+      .catch(() => setCurrentSeason(null))
+      .finally(() => setCurrentSeasonLoaded(true));
   }, []);
 
   const fetchOptions = async () => {
@@ -178,9 +181,36 @@ const AdminOverview = () => {
   }, [toast]);
 
   useEffect(() => {
-    if (!bootstrapped) return;
+    if (!bootstrapped || !defaultSeasonApplied) return;
     fetchStatistics(appliedFilters);
-  }, [appliedFilters, bootstrapped]);
+  }, [appliedFilters, bootstrapped, defaultSeasonApplied]);
+
+  const resolveInitialFilters = useMemo(() => {
+    if (!currentSeason?.seasonId) {
+      return buildDefaultFilters();
+    }
+
+    const matchedSeason = options.seasons.find((item) => item._id === currentSeason.seasonId);
+    if (!matchedSeason) {
+      return buildDefaultFilters();
+    }
+
+    const seasonYear = currentSeason.startDate
+      ? String(new Date(currentSeason.startDate).getFullYear())
+      : String(CURRENT_YEAR);
+
+    return buildDefaultFilters(matchedSeason._id, seasonYear);
+  }, [currentSeason, options.seasons]);
+
+  useEffect(() => {
+    if (!bootstrapped || !currentSeasonLoaded || defaultSeasonApplied) {
+      return;
+    }
+
+    setFilterForm(resolveInitialFilters);
+    setAppliedFilters(resolveInitialFilters);
+    setDefaultSeasonApplied(true);
+  }, [bootstrapped, currentSeasonLoaded, defaultSeasonApplied, resolveInitialFilters]);
 
   const currentTask = useMemo(
     () => options.tasks.find((item) => item._id === filterForm.taskId) || null,
@@ -320,7 +350,7 @@ const AdminOverview = () => {
   };
 
   const handleResetFilters = () => {
-    const nextFilters = buildDefaultFilters();
+    const nextFilters = resolveInitialFilters;
     setCurrentPage(1);
     setFilterForm(nextFilters);
     setAppliedFilters(nextFilters);
