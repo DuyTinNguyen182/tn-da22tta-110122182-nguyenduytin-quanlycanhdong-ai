@@ -2,12 +2,12 @@ const mongoose = require("mongoose");
 
 const seasonSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true, unique: true },
+    name: { type: String, required: true, unique: true, trim: true },
     isVisible: { type: Boolean, default: true },
-    createdAt: { type: Date, default: Date.now },
   },
   {
     collection: "seasons",
+    timestamps: true,
   }
 );
 

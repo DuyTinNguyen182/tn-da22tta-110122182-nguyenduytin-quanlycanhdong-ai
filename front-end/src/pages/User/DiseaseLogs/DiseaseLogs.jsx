@@ -60,6 +60,7 @@ const formatSeasonLabel = (season) => {
 };
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString("vi-VN") : "--");
+const getLogPlots = (log) => (Array.isArray(log?.plots) ? log.plots.filter(Boolean) : []);
 
 const DiseaseLogs = () => {
   const { toast, confirm } = useFeedback();
@@ -240,7 +241,7 @@ const DiseaseLogs = () => {
     return logs.filter((log) => {
       const haystack = [
         log.diseaseName, log.fieldName, log.seasonLabel, log.description,
-        ...(log.plotSnapshot || []).map((item) => item.name),
+        ...getLogPlots(log).map((item) => item.name),
       ].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(normalized);
     });
@@ -289,18 +290,12 @@ const DiseaseLogs = () => {
     const seasons = fieldId ? await loadSeasonsByField(fieldId) : [];
     const selectedSeason = seasons.find((s) => s._id === seasonId);
 
-    // Prefer loggablePlots; for historical seasons fall back to plotSnapshot
     const plots =
       selectedSeason?.loggablePlots?.length
         ? selectedSeason.loggablePlots
         : selectedSeason?.assignedPlots?.length
           ? selectedSeason.assignedPlots
-          : (log.plotSnapshot || []).map((s) => ({
-            _id: String(s.plotId),
-            name: s.name,
-            area: s.area,
-            status: s.status,
-          }));
+          : getLogPlots(log);
 
     setEditingLog(log);
     setFormSeasons(seasons);
@@ -541,14 +536,14 @@ const DiseaseLogs = () => {
           filteredLogs.map((log) => {
             const statusMeta = getStatusMeta(log.status);
             const plotNames =
-              (log.plotSnapshot || []).map((item) => item.name).filter(Boolean).join(", ") ||
+              getLogPlots(log).map((item) => item.name).filter(Boolean).join(", ") ||
               "Toàn bộ thửa tham gia vụ";
             const isSeasonActive = log.seasonStatus === "active";
             const seasonLabel =
               log.seasonLabel ||
               (log.season ? formatSeasonLabel(log.season) : null) ||
               "Chưa có mùa vụ";
-            const plotCount = log.plotSnapshot?.length || log.plotCount || 0;
+            const plotCount = getLogPlots(log).length || log.plotCount || 0;
 
             return (
               <article

@@ -27,19 +27,14 @@ const seasonPlotAssignmentSchema = new mongoose.Schema(
       enum: ["active", "inactive"],
       default: "active",
     },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now },
   },
   {
     collection: "season_plot_assignments",
+    timestamps: true,
   }
 );
 
 seasonPlotAssignmentSchema.index({ seasonDetail: 1, plot: 1 }, { unique: true });
-
-seasonPlotAssignmentSchema.pre("save", function updateTimestamp(next) {
-  this.updatedAt = new Date();
-  next();
-});
+seasonPlotAssignmentSchema.index({ seasonDetail: 1, user: 1, field: 1, status: 1 });
 
 module.exports = mongoose.model("SeasonPlotAssignment", seasonPlotAssignmentSchema);

@@ -9,21 +9,30 @@ const seasonDetailSchema = new mongoose.Schema(
     },
     startDate: { type: Date, default: null },
     endDate: { type: Date, default: null },
-    createdAt: { type: Date, default: Date.now },
   },
   {
     collection: "season_details",
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-seasonDetailSchema.index({ season: 1, startDate: 1 }, { unique: true });
+seasonDetailSchema.index(
+  { season: 1, startDate: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { startDate: { $type: "date" } },
+  }
+);
+seasonDetailSchema.index({ startDate: 1, endDate: 1 });
 
 seasonDetailSchema.virtual("status").get(function () {
   const now = new Date();
   if (this.endDate && this.endDate < now) return "completed";
-  if (this.startDate && this.startDate <= now && (!this.endDate || this.endDate >= now)) return "active";
+  if (this.startDate && this.startDate <= now && (!this.endDate || this.endDate >= now)) {
+    return "active";
+  }
   return "planned";
 });
 

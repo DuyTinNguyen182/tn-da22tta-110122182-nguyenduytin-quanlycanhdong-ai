@@ -3,21 +3,20 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const jwtConfig = require("../config/jwt");
 
-// 1. Logic Đăng Ký
-const registerUser = async (data) => {
-  const { fullName, email, password, phone, address } = data;
+const normalizeEmail = (value = "") => value.trim().toLowerCase();
 
-  // Kiểm tra email tồn tại chưa
+const registerUser = async (data) => {
+  const { fullName, password, phone, address } = data;
+  const email = normalizeEmail(data.email);
+
   const userExists = await User.findOne({ email });
   if (userExists) {
-    throw new Error("Email này đã được sử dụng!");
+    throw new Error("Email nay da duoc su dung!");
   }
 
-  // Mã hóa mật khẩu (Salt 10 vòng)
   const salt = await bcrypt.genSalt(10);
   const hashedPassword = await bcrypt.hash(password, salt);
 
-  // Lưu vào DB
   const user = await User.create({
     fullName,
     email,
@@ -36,28 +35,22 @@ const registerUser = async (data) => {
   };
 };
 
-// 2. Logic Đăng Nhập
 const loginUser = async (email, password) => {
-  // Tìm user theo email
-  const user = await User.findOne({ email });
+  const normalizedEmail = normalizeEmail(email);
+  const user = await User.findOne({ email: normalizedEmail }).select("+password");
   if (!user) {
-    throw new Error("Email không tồn tại!");
+    throw new Error("Email khong ton tai!");
   }
 
-  // So sánh mật khẩu nhập vào vs mật khẩu đã mã hóa
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    throw new Error("Mật khẩu không đúng!");
+    throw new Error("Mat khau khong dung!");
   }
 
-  // Tạo Token (Thẻ bài) có hạn dùng 30 ngày
-  const token = jwt.sign(
-    { id: user._id, role: user.role },
-    jwtConfig.SECRET_KEY,
-    { expiresIn: jwtConfig.EXPIRES_IN }
-  );
+  const token = jwt.sign({ id: user._id, role: user.role }, jwtConfig.SECRET_KEY, {
+    expiresIn: jwtConfig.EXPIRES_IN,
+  });
 
-  // Trả về thông tin user (trừ pass) và token
   return {
     _id: user._id,
     fullName: user.fullName,
@@ -65,26 +58,27 @@ const loginUser = async (email, password) => {
     phone: user.phone,
     address: user.address,
     role: user.role,
-    token: token,
+    token,
   };
 };
 
 const getUserById = async (id) => {
   const user = await User.findById(id).select("_id fullName email phone address role");
   if (!user) {
-    throw new Error("Không tìm thấy người dùng");
+    throw new Error("Khong tim thay nguoi dung");
   }
 
   return user;
 };
 
 const updateProfile = async (id, profileData) => {
-  const { fullName, email, phone, address } = profileData;
+  const { fullName, phone, address } = profileData;
+  const email = profileData.email ? normalizeEmail(profileData.email) : undefined;
 
   if (email) {
     const existingUser = await User.findOne({ email, _id: { $ne: id } });
     if (existingUser) {
-      throw new Error("Email này đã được sử dụng!");
+      throw new Error("Email nay da duoc su dung!");
     }
   }
 
@@ -100,7 +94,7 @@ const updateProfile = async (id, profileData) => {
   ).select("_id fullName email phone address role");
 
   if (!updatedUser) {
-    throw new Error("Không tìm thấy người dùng");
+    throw new Error("Khong tim thay nguoi dung");
   }
 
   return updatedUser;
@@ -108,17 +102,17 @@ const updateProfile = async (id, profileData) => {
 
 const changePassword = async (id, currentPassword, newPassword) => {
   if (!newPassword || newPassword.length < 6) {
-    throw new Error("Mật khẩu mới phải ít nhất 6 ký tự");
+    throw new Error("Mat khau moi phai it nhat 6 ky tu");
   }
 
-  const user = await User.findById(id);
+  const user = await User.findById(id).select("+password");
   if (!user) {
-    throw new Error("Không tìm thấy người dùng");
+    throw new Error("Khong tim thay nguoi dung");
   }
 
   const isMatch = await bcrypt.compare(currentPassword, user.password);
   if (!isMatch) {
-    throw new Error("Mật khẩu hiện tại không đúng");
+    throw new Error("Mat khau hien tai khong dung");
   }
 
   const salt = await bcrypt.genSalt(10);

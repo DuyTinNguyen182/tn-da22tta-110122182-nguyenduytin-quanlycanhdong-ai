@@ -2,17 +2,11 @@ const SeasonDetail = require("../models/seasonDetailModel");
 const DiaryLog = require("../models/diaryLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
-const {
-  getSeasonMap,
-  resolveSeasonId,
-  getSeasonNameById,
-} = require("./seasonService");
+const Plot = require("../models/plotModel");
+const { getSeasonMap, resolveSeasonId, getSeasonNameById } = require("./seasonService");
 
-/**
- * Decorate a season detail document with the season catalog name.
- */
 const decorateSeasonDetail = (seasonDoc, catalogMap) => {
-  const detail = seasonDoc.toObject ? seasonDoc.toObject() : { ...seasonDoc };
+  const detail = seasonDoc.toObject ? seasonDoc.toObject({ virtuals: true }) : { ...seasonDoc };
   const seasonRefId =
     detail.season && typeof detail.season === "object" && detail.season._id
       ? String(detail.season._id)
@@ -20,10 +14,8 @@ const decorateSeasonDetail = (seasonDoc, catalogMap) => {
         ? String(detail.season)
         : null;
 
-  const seasonMeta = seasonRefId
-    ? catalogMap.get(seasonRefId) || detail.season || null
-    : null;
-  const seasonName = seasonMeta?.name || "Không xác định";
+  const seasonMeta = seasonRefId ? catalogMap.get(seasonRefId) || detail.season || null : null;
+  const seasonName = seasonMeta?.name || "Khong xac dinh";
 
   return {
     ...detail,
@@ -34,42 +26,30 @@ const decorateSeasonDetail = (seasonDoc, catalogMap) => {
   };
 };
 
-/**
- * Get all season details (admin view).
- */
 const getAllSeasonDetails = async () => {
   const [seasonDocs, catalogMap] = await Promise.all([
-    SeasonDetail.find()
-      .populate("season", "name")
-      .sort({ startDate: -1, createdAt: -1 }),
+    SeasonDetail.find().populate("season", "name").sort({ startDate: -1, createdAt: -1 }),
     getSeasonMap(),
   ]);
 
   return seasonDocs.map((doc) => decorateSeasonDetail(doc, catalogMap));
 };
 
-/**
- * Get a single season detail by id.
- */
 const getSeasonDetailById = async (id) => {
   const seasonDoc = await SeasonDetail.findById(id).populate("season", "name");
   if (!seasonDoc) {
-    throw new Error("Không tìm thấy chi tiết mùa vụ");
+    throw new Error("Khong tim thay chi tiet mua vu");
   }
 
   const catalogMap = await getSeasonMap();
   return decorateSeasonDetail(seasonDoc, catalogMap);
 };
 
-/**
- * Get the currently active season detail (for farmer usage later).
- * Returns null if no active season detail exists.
- */
 const getActiveSeasonDetail = async () => {
   const now = new Date();
   const seasonDoc = await SeasonDetail.findOne({
     startDate: { $lte: now },
-    $or: [{ endDate: null }, { endDate: { $gte: now } }]
+    $or: [{ endDate: null }, { endDate: { $gte: now } }],
   }).populate("season", "name");
 
   if (!seasonDoc) {
@@ -80,41 +60,38 @@ const getActiveSeasonDetail = async () => {
   return decorateSeasonDetail(seasonDoc, catalogMap);
 };
 
-/**
- * Create a new season detail (admin only).
- */
+const ensureNoOverlappingActiveSeason = async (targetId = null) => {
+  const now = new Date();
+  const existingActive = await SeasonDetail.findOne({
+    startDate: { $lte: now },
+    $or: [{ endDate: null }, { endDate: { $gte: now } }],
+    ...(targetId ? { _id: { $ne: targetId } } : {}),
+  });
+
+  if (existingActive) {
+    throw new Error("Dang co mot mua vu dang hoat dong. Hay ket thuc mua vu hien tai truoc.");
+  }
+};
+
 const createSeasonDetail = async (data) => {
   const { startDate, endDate } = data;
-
   const seasonId = await resolveSeasonId(data);
   const catalogMap = await getSeasonMap();
-  const resolvedName = catalogMap.get(seasonId)?.name || "Không xác định";
+  const resolvedName = catalogMap.get(seasonId)?.name || "Khong xac dinh";
 
   const now = new Date();
   const isActive = startDate && new Date(startDate) <= now && (!endDate || new Date(endDate) >= now);
-
   if (isActive) {
-    const existingActive = await SeasonDetail.findOne({
-      startDate: { $lte: now },
-      $or: [{ endDate: null }, { endDate: { $gte: now } }]
-    });
-    if (existingActive) {
-      throw new Error(
-        "Đang có một mùa vụ đang hoạt động. Vui lòng kết thúc mùa vụ hiện tại trước khi bắt đầu mùa vụ mới."
-      );
-    }
+    await ensureNoOverlappingActiveSeason();
   }
 
-  // Check duplicate: same season + same startDate
   if (startDate) {
     const exists = await SeasonDetail.findOne({
       season: seasonId,
       startDate: new Date(startDate),
     });
     if (exists) {
-      throw new Error(
-        `Mùa vụ "${resolvedName}" với ngày bắt đầu này đã tồn tại.`
-      );
+      throw new Error(`Mua vu "${resolvedName}" voi ngay bat dau nay da ton tai.`);
     }
   }
 
@@ -124,33 +101,24 @@ const createSeasonDetail = async (data) => {
     endDate: endDate || null,
   });
 
-  const seasonDoc = await SeasonDetail.findById(seasonDetail._id).populate(
-    "season",
-    "name"
-  );
-
+  const seasonDoc = await SeasonDetail.findById(seasonDetail._id).populate("season", "name");
   return decorateSeasonDetail(seasonDoc, catalogMap);
 };
 
-/**
- * Update season detail (admin only).
- */
 const updateSeasonDetail = async (id, data) => {
   const existing = await SeasonDetail.findById(id);
   if (!existing) {
-    throw new Error("Không tìm thấy chi tiết mùa vụ");
+    throw new Error("Khong tim thay chi tiet mua vu");
   }
 
   const updateData = {};
 
-  // Resolve season id if provided
   if (data.seasonName || data.seasonId || data.seasonCode) {
-    const newSeasonId = await resolveSeasonId({
+    updateData.season = await resolveSeasonId({
       seasonId: data.seasonId,
       seasonCode: data.seasonCode,
       seasonName: data.seasonName,
     });
-    updateData.season = newSeasonId;
   }
 
   if (data.startDate !== undefined) {
@@ -162,28 +130,21 @@ const updateSeasonDetail = async (id, data) => {
   }
 
   const now = new Date();
-  const finalStartDate = updateData.startDate !== undefined ? updateData.startDate : existing.startDate;
+  const finalStartDate =
+    updateData.startDate !== undefined ? updateData.startDate : existing.startDate;
   const finalEndDate = updateData.endDate !== undefined ? updateData.endDate : existing.endDate;
-  const isActive = finalStartDate && new Date(finalStartDate) <= now && (!finalEndDate || new Date(finalEndDate) >= now);
+  const isActive =
+    finalStartDate &&
+    new Date(finalStartDate) <= now &&
+    (!finalEndDate || new Date(finalEndDate) >= now);
 
   if (isActive) {
-    const existingActive = await SeasonDetail.findOne({
-      startDate: { $lte: now },
-      $or: [{ endDate: null }, { endDate: { $gte: now } }],
-      _id: { $ne: id },
-    });
-    if (existingActive) {
-      throw new Error(
-        "Đang có một mùa vụ đang hoạt động. Bạn không thể cập nhật lịch trình đè lên mùa vụ này."
-      );
-    }
+    await ensureNoOverlappingActiveSeason(id);
   }
 
-  // Check duplicate if season or startDate changed
   const newSeasonId = updateData.season || existing.season;
-  const newStartDate = updateData.startDate !== undefined
-    ? updateData.startDate
-    : existing.startDate;
+  const newStartDate =
+    updateData.startDate !== undefined ? updateData.startDate : existing.startDate;
 
   if (newStartDate) {
     const duplicate = await SeasonDetail.findOne({
@@ -194,9 +155,7 @@ const updateSeasonDetail = async (id, data) => {
 
     if (duplicate) {
       const resolvedName = await getSeasonNameById(newSeasonId);
-      throw new Error(
-        `Mùa vụ "${resolvedName}" với ngày bắt đầu này đã tồn tại.`
-      );
+      throw new Error(`Mua vu "${resolvedName}" voi ngay bat dau nay da ton tai.`);
     }
   }
 
@@ -208,19 +167,15 @@ const updateSeasonDetail = async (id, data) => {
   return updatedDoc ? decorateSeasonDetail(updatedDoc, catalogMap) : null;
 };
 
-/**
- * Finish (complete) a season detail (admin only).
- */
 const finishSeasonDetail = async (id) => {
   const existing = await SeasonDetail.findById(id);
   if (!existing) {
-    throw new Error("Không tìm thấy chi tiết mùa vụ");
+    throw new Error("Khong tim thay chi tiet mua vu");
   }
 
-  // Check if it's already completed by endDate logic
   const now = new Date();
   if (existing.endDate && existing.endDate < now) {
-    throw new Error("Mùa vụ này đã được kết thúc trước đó");
+    throw new Error("Mua vu nay da duoc ket thuc truoc do");
   }
 
   const updatedDoc = await SeasonDetail.findByIdAndUpdate(
@@ -233,18 +188,22 @@ const finishSeasonDetail = async (id) => {
   return updatedDoc ? decorateSeasonDetail(updatedDoc, catalogMap) : null;
 };
 
-/**
- * Delete a season detail and cascade delete related records (admin only).
- */
 const deleteSeasonDetail = async (id) => {
   const season = await SeasonDetail.findById(id);
   if (!season) {
-    throw new Error("Không tìm thấy chi tiết mùa vụ");
+    throw new Error("Khong tim thay chi tiet mua vu");
   }
 
+  const assignments = await SeasonPlotAssignment.find({ seasonDetail: id }).select("_id").lean();
+  const assignmentIds = assignments.map((item) => item._id);
+
   await Promise.all([
-    DiaryLog.deleteMany({ season: id }),
-    DiseaseLog.deleteMany({ season: id }),
+    assignmentIds.length
+      ? DiaryLog.deleteMany({ seasonPlotAssignments: { $in: assignmentIds } })
+      : Promise.resolve(),
+    assignmentIds.length
+      ? DiseaseLog.deleteMany({ seasonPlotAssignments: { $in: assignmentIds } })
+      : Promise.resolve(),
     SeasonPlotAssignment.deleteMany({ seasonDetail: id }),
   ]);
 
@@ -252,65 +211,61 @@ const deleteSeasonDetail = async (id) => {
   return season;
 };
 
-const Plot = require("../models/plotModel");
-
-/**
- * Get season details for a specific farmer.
- * Auto-assigns active plots to the currently active global season.
- */
 const getFarmerSeasonDetails = async (userId, fieldId) => {
-  if (!fieldId) throw new Error("Yêu cầu chọn cánh đồng");
+  if (!fieldId) {
+    throw new Error("Yeu cau chon canh dong");
+  }
 
-  // Get all global season details
   const seasonDocs = await SeasonDetail.find()
     .populate("season", "name")
     .sort({ startDate: -1, createdAt: -1 });
 
   const catalogMap = await getSeasonMap();
   const plots = await Plot.find({ user: userId, field: fieldId }).lean();
-
   const results = [];
 
   for (const doc of seasonDocs) {
     const seasonDecorated = decorateSeasonDetail(doc, catalogMap);
-    
-    // Status is provided by the virtual of seasonDetailModel (if toObject uses virtuals) 
-    // Wait, let's calculate status explicitly to be safe:
     const now = new Date();
     let seasonStatus = "planned";
-    if (doc.endDate && doc.endDate < now) seasonStatus = "completed";
-    else if (doc.startDate && doc.startDate <= now && (!doc.endDate || doc.endDate >= now)) seasonStatus = "active";
-    
+    if (doc.endDate && doc.endDate < now) {
+      seasonStatus = "completed";
+    } else if (doc.startDate && doc.startDate <= now && (!doc.endDate || doc.endDate >= now)) {
+      seasonStatus = "active";
+    }
+
     seasonDecorated.status = seasonStatus;
 
     let assignments = await SeasonPlotAssignment.find({
       seasonDetail: doc._id,
       user: userId,
       field: fieldId,
-    }).populate("plot", "name area status addressDetail").lean();
+    })
+      .populate("plot", "name area status")
+      .lean();
 
-    // Lazy creation of assignments for active season
     if (assignments.length === 0 && seasonStatus === "active") {
-      const activePlots = plots.filter((p) => p.status === "active");
+      const activePlots = plots.filter((plot) => plot.status === "active");
       if (activePlots.length > 0) {
-        const payload = activePlots.map((p) => ({
+        const payload = activePlots.map((plot) => ({
           seasonDetail: doc._id,
           field: fieldId,
-          plot: p._id,
+          plot: plot._id,
           user: userId,
           status: "active",
         }));
-        await SeasonPlotAssignment.insertMany(payload);
 
+        await SeasonPlotAssignment.insertMany(payload);
         assignments = await SeasonPlotAssignment.find({
           seasonDetail: doc._id,
           user: userId,
           field: fieldId,
-        }).populate("plot", "name area status addressDetail").lean();
+        })
+          .populate("plot", "name area status")
+          .lean();
       }
     }
 
-    // Skip historical/planned seasons if the farmer isn't participating at all
     if (assignments.length === 0 && seasonStatus !== "active") {
       continue;
     }

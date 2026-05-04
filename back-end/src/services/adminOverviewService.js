@@ -274,8 +274,11 @@ const getLogTaskInfo = (log) => {
 
 const buildRecentActivities = (logs, seasonDetailMap, recentLimit) => {
   return logs.slice(0, recentLimit).map((log) => {
-    const seasonDetail = seasonDetailMap.get(String(log.season));
+    const firstAssignment = log.seasonPlotAssignments?.[0] || null;
+    const seasonDetailId = firstAssignment?.seasonDetail || null;
+    const seasonDetail = seasonDetailId ? seasonDetailMap.get(String(seasonDetailId)) : null;
     const taskInfo = getLogTaskInfo(log);
+    const plot = firstAssignment?.plot || null;
 
     return {
       _id: log._id,
@@ -287,9 +290,9 @@ const buildRecentActivities = (logs, seasonDetailMap, recentLimit) => {
       taskDetailId: taskInfo.taskDetailId,
       taskDetailName: taskInfo.taskDetailName,
       activityName: taskInfo.activityName,
-      plotId: log.plot?._id || log.plot || null,
-      plotName: log.plot?.name || "",
-      seasonDetailId: seasonDetail?._id || log.season,
+      plotId: plot?._id || plot || null,
+      plotName: plot?.name || "",
+      seasonDetailId: seasonDetail?._id || seasonDetailId,
       seasonLabel: seasonDetail?.seasonLabel || "",
       status: seasonDetail?.status || "",
     };
@@ -340,26 +343,33 @@ const getAdminOverview = async (rawFilters, currentUser) => {
 
   const seasonDetailIds = seasonDetails.map((item) => item._id);
 
-  const [assignments, logs] = seasonDetailIds.length
-    ? await Promise.all([
-        SeasonPlotAssignment.find({
-          seasonDetail: { $in: seasonDetailIds },
-          status: "active",
+  const assignments = seasonDetailIds.length
+    ? await SeasonPlotAssignment.find({
+        seasonDetail: { $in: seasonDetailIds },
+        status: "active",
+      })
+        .populate("plot", "name area status")
+        .lean()
+    : [];
+
+  const assignmentIds = assignments.map((item) => item._id);
+
+  const logs = assignmentIds.length
+    ? await DiaryLog.find({ seasonPlotAssignments: { $in: assignmentIds } })
+        .populate("task", "name")
+        .populate({
+          path: "taskDetail",
+          select: "name task",
+          populate: { path: "task", select: "name" },
         })
-          .populate("plot", "name area status")
-          .lean(),
-        DiaryLog.find({ season: { $in: seasonDetailIds } })
-          .populate("task", "name")
-          .populate({
-            path: "taskDetail",
-            select: "name task",
-            populate: { path: "task", select: "name" },
-          })
-          .populate("plot", "name")
-          .sort({ date: -1, createdAt: -1 })
-          .lean(),
-      ])
-    : [[], []];
+        .populate({
+          path: "seasonPlotAssignments",
+          select: "seasonDetail plot",
+          populate: { path: "plot", select: "name" },
+        })
+        .sort({ date: -1, createdAt: -1 })
+        .lean()
+    : [];
 
   const assignmentsBySeason = new Map();
   assignments.forEach((item) => {
@@ -372,11 +382,16 @@ const getAdminOverview = async (rawFilters, currentUser) => {
 
   const logsBySeason = new Map();
   logs.forEach((item) => {
-    const key = String(item.season);
-    if (!logsBySeason.has(key)) {
-      logsBySeason.set(key, []);
-    }
-    logsBySeason.get(key).push(item);
+    const seasonIds = Array.from(
+      new Set((item.seasonPlotAssignments || []).map((assignment) => String(assignment.seasonDetail)))
+    );
+
+    seasonIds.forEach((key) => {
+      if (!logsBySeason.has(key)) {
+        logsBySeason.set(key, []);
+      }
+      logsBySeason.get(key).push(item);
+    });
   });
 
   const seasonInstances = decorateSeasonInstances(seasonDetails, assignmentsBySeason, logsBySeason);

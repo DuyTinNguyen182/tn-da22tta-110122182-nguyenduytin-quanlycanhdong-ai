@@ -24,20 +24,30 @@ const normalizePlotIds = (plotIds = []) => {
   );
 };
 
-const getSeasonForUser = async (seasonId, _userId) => {
+const getSeasonForUser = async (seasonId) => {
   const season = await SeasonDetail.findById(seasonId);
   if (!season) {
-    throw new Error("Không tìm thấy vụ mùa");
+    throw new Error("Khong tim thay vu mua");
   }
 
   return season;
 };
 
+const ensureActiveSeasonForMutation = (season, action) => {
+  const now = new Date();
+  const isActive =
+    season.startDate &&
+    new Date(season.startDate) <= now &&
+    (!season.endDate || new Date(season.endDate) >= now);
+
+  if (!isActive) {
+    throw new Error(`Khong the ${action} nhat ky cua vu da ket thuc`);
+  }
+};
+
 const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds, fieldId }) => {
   const requestedPlotIds =
-    scope === "single_plot"
-      ? normalizePlotIds([plotId])
-      : normalizePlotIds(plotIds);
+    scope === "single_plot" ? normalizePlotIds([plotId]) : normalizePlotIds(plotIds);
 
   let targetFieldId = fieldId ? String(fieldId) : null;
 
@@ -51,19 +61,19 @@ const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds, fieldId
       .lean();
 
     if (requestedPlots.length !== requestedPlotIds.length) {
-      throw new Error("Có thửa không hợp lệ hoặc không thuộc người dùng hiện tại.");
+      throw new Error("Co thua khong hop le hoac khong thuoc nguoi dung hien tai.");
     }
 
     const fieldIds = Array.from(new Set(requestedPlots.map((p) => String(p.field))));
     if (fieldIds.length !== 1) {
-      throw new Error("Các thửa được chọn phải thuộc cùng một cánh đồng.");
+      throw new Error("Cac thua duoc chon phai thuoc cung mot canh dong.");
     }
 
     targetFieldId = fieldIds[0];
   }
 
   if (scope === "all_plots" && !targetFieldId) {
-    throw new Error("Thiếu thông tin cánh đồng khi áp dụng cho toàn bộ thửa.");
+    throw new Error("Thieu thong tin canh dong khi ap dung cho toan bo thua.");
   }
 
   const assignments = await SeasonPlotAssignment.find({
@@ -75,71 +85,60 @@ const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds, fieldId
     .populate("plot", "name area status field user")
     .lean();
 
-  const activeAssignments = assignments.filter((a) => a.plot && a.plot.status === "active");
+  const activeAssignments = assignments.filter((item) => item.plot && item.plot.status === "active");
 
   if (activeAssignments.length === 0) {
-    throw new Error("Vụ mùa này chưa có thửa nào sẵn sàng ghi nhật ký.");
+    throw new Error("Vu mua nay chua co thua nao san sang ghi nhat ky.");
   }
 
-  const assignmentByPlotId = new Map(activeAssignments.map((a) => [String(a.plot._id), a]));
+  const assignmentByPlotId = new Map(activeAssignments.map((item) => [String(item.plot._id), item]));
 
   if (scope === "all_plots") {
     return {
       scope: "all_plots",
       assignments: activeAssignments,
-      plots: activeAssignments.map((a) => a.plot),
+      plots: activeAssignments.map((item) => item.plot),
     };
   }
 
-  const normalizedIds = requestedPlotIds;
-
-  if (normalizedIds.length === 0) {
-    throw new Error("Cần chọn ít nhất 1 thửa để lưu nhật ký.");
+  if (requestedPlotIds.length === 0) {
+    throw new Error("Can chon it nhat 1 thua de luu nhat ky.");
   }
 
-  const selectedAssignments = [];
-  for (const id of normalizedIds) {
-    if (!assignmentByPlotId.has(id)) {
-      throw new Error("Có thửa không hợp lệ hoặc không tham gia vụ mùa đang chọn.");
+  const selectedAssignments = requestedPlotIds.map((id) => {
+    const assignment = assignmentByPlotId.get(id);
+    if (!assignment) {
+      throw new Error("Co thua khong hop le hoac khong tham gia vu mua dang chon.");
     }
-    selectedAssignments.push(assignmentByPlotId.get(id));
-  }
+    return assignment;
+  });
 
   return {
-    scope: normalizedIds.length === 1 ? "single_plot" : "selected_plots",
+    scope: requestedPlotIds.length === 1 ? "single_plot" : "selected_plots",
     assignments: selectedAssignments,
-    plots: selectedAssignments.map((a) => a.plot),
+    plots: selectedAssignments.map((item) => item.plot),
   };
 };
 
-const buildPlotSnapshot = (plots) =>
-  plots.map((plot) => ({
-    plotId: plot._id,
-    name: plot.name || "",
-    area: Number(plot.area || 0),
-    status: plot.status || "",
-  }));
+const getSeasonIdFromLog = (log) => {
+  const firstAssignment = log.seasonPlotAssignments?.[0];
+  return firstAssignment?.seasonDetail?._id || firstAssignment?.seasonDetail || null;
+};
 
 const mapLogOutput = (logDoc) => {
   const log = logDoc.toObject ? logDoc.toObject() : { ...logDoc };
   const taskDetail = log.taskDetail || null;
   const taskFromDetail = taskDetail?.task || null;
   const task = taskFromDetail || log.task || null;
-
-  const hasAssignments =
-    Array.isArray(log.seasonPlotAssignments) && log.seasonPlotAssignments.length > 0;
-
-  const resolvedPlots = hasAssignments
-    ? log.seasonPlotAssignments.map((assignment) => assignment.plot).filter(Boolean)
-    : log.plotSnapshot
-      ? log.plotSnapshot.map((snapshot) => ({
-          _id: snapshot.plotId,
-          name: snapshot.name,
-          area: snapshot.area,
-          status: snapshot.status,
-        }))
-      : [];
-
+  const assignmentIds = (log.seasonPlotAssignments || [])
+    .map((assignment) => assignment?._id || assignment)
+    .filter(Boolean)
+    .map((id) => String(id));
+  const resolvedPlots = (log.seasonPlotAssignments || []).map((assignment) => assignment.plot).filter(Boolean);
+  const plotIds = resolvedPlots
+    .map((plot) => plot?._id || plot)
+    .filter(Boolean)
+    .map((id) => String(id));
   const scope = log.scope || (resolvedPlots.length > 1 ? "selected_plots" : "single_plot");
   const taskId = task?._id ? String(task._id) : typeof task === "string" ? String(task) : null;
   const taskDetailId = taskDetail?._id
@@ -147,9 +146,9 @@ const mapLogOutput = (logDoc) => {
     : typeof taskDetail === "string"
       ? String(taskDetail)
       : null;
-  const taskName = task?.name || task?.label || "Khác";
+  const taskName = task?.name || task?.label || "Khac";
   const taskDetailName = taskDetail?.name || "";
-  const title = taskDetailName || taskName || "Nhật ký mùa vụ";
+  const title = taskDetailName || taskName || "Nhat ky mua vu";
 
   return {
     ...log,
@@ -161,15 +160,17 @@ const mapLogOutput = (logDoc) => {
     taskLabel: taskDetailName ? `${taskName} - ${taskDetailName}` : taskName,
     scope,
     plots: resolvedPlots,
+    plotIds,
+    seasonPlotAssignmentIds: assignmentIds,
     seasonPlotAssignments: undefined,
     plotCount: resolvedPlots.length,
     appliesToAllPlots: scope === "all_plots",
     plotLabel:
       scope === "all_plots"
-        ? "Tất cả thửa tham gia vụ"
+        ? "Tat ca thua tham gia vu"
         : resolvedPlots.length === 1
-          ? resolvedPlots[0]?.name || "1 thửa"
-          : `${resolvedPlots.length} thửa được chọn`,
+          ? resolvedPlots[0]?.name || "1 thua"
+          : `${resolvedPlots.length} thua duoc chon`,
   };
 };
 
@@ -183,33 +184,31 @@ const buildDiaryLogPopulate = (query) =>
     })
     .populate({
       path: "seasonPlotAssignments",
-      populate: { path: "plot", select: "name area status" },
+      populate: [
+        { path: "plot", select: "name area status" },
+        { path: "seasonDetail", select: "_id startDate endDate" },
+      ],
     });
 
 const getLogsBySeason = async (seasonId, userId, fieldId = null) => {
-  await getSeasonForUser(seasonId, userId);
+  await getSeasonForUser(seasonId);
 
   const assignments = await SeasonPlotAssignment.find({
     seasonDetail: seasonId,
     user: userId,
     ...(fieldId ? { field: fieldId } : {}),
   }).lean();
+
   const assignmentIds = assignments.map((assignment) => assignment._id);
-
-  const logQuery = {
-    user: userId,
-    $or: [{ seasonPlotAssignments: { $in: assignmentIds } }],
-  };
-
-  if (!fieldId) {
-    logQuery.$or.push({ season: seasonId });
+  if (!assignmentIds.length) {
+    return [];
   }
 
   const logs = await buildDiaryLogPopulate(
-    DiaryLog.find(logQuery)
-      .populate("plot", "name area status")
-      .populate("plots", "name area status")
-      .sort({ date: -1, createdAt: -1 })
+    DiaryLog.find({
+      user: userId,
+      seasonPlotAssignments: { $in: assignmentIds },
+    }).sort({ date: -1, createdAt: -1 })
   );
 
   return logs.map(mapLogOutput);
@@ -224,17 +223,8 @@ const createLog = async (data, userId) => {
     taskName: data.taskName,
   });
 
-  const season = await getSeasonForUser(seasonValue, userId);
-
-  const now = new Date();
-  const isActive =
-    season.startDate &&
-    new Date(season.startDate) <= now &&
-    (!season.endDate || new Date(season.endDate) >= now);
-
-  if (!isActive) {
-    throw new Error("Chỉ có thể thêm nhật ký cho vụ đang active");
-  }
+  const season = await getSeasonForUser(seasonValue);
+  ensureActiveSeasonForMutation(season, "them");
 
   const requestedScope =
     data.scope === "selected_plots"
@@ -262,7 +252,6 @@ const createLog = async (data, userId) => {
     cost: data.cost,
     scope: resolved.scope,
     seasonPlotAssignments: resolved.assignments.map((assignment) => assignment._id),
-    plotSnapshot: buildPlotSnapshot(resolved.plots),
     user: userId,
   });
 
@@ -271,37 +260,29 @@ const createLog = async (data, userId) => {
 };
 
 const updateLog = async (id, data, userId) => {
-  const existingLog = await buildDiaryLogPopulate(
-    DiaryLog.findOne({ _id: id, user: userId })
-  );
+  const existingLog = await buildDiaryLogPopulate(DiaryLog.findOne({ _id: id, user: userId }));
 
   if (!existingLog) {
-    throw new Error("Không tìm thấy nhật ký");
+    throw new Error("Khong tim thay nhat ky");
   }
 
-  const seasonId = existingLog.seasonPlotAssignments?.[0]?.seasonDetail || existingLog.season;
-  const season = await getSeasonForUser(seasonId, userId);
-
-  const now = new Date();
-  const isActive =
-    season.startDate &&
-    new Date(season.startDate) <= now &&
-    (!season.endDate || new Date(season.endDate) >= now);
-
-  if (!isActive) {
-    throw new Error("Không thể chỉnh sửa nhật ký của vụ đã kết thúc");
+  const seasonId = getSeasonIdFromLog(existingLog);
+  if (!seasonId) {
+    throw new Error("Nhat ky khong con lien ket vu mua hop le");
   }
+
+  const season = await getSeasonForUser(seasonId);
+  ensureActiveSeasonForMutation(season, "chinh sua");
 
   const updateData = { ...data };
-
-  const existingPlotIdsStr = (existingLog.seasonPlotAssignments || [])
+  const existingPlotIds = (existingLog.seasonPlotAssignments || [])
     .map((assignment) => String(assignment.plot?._id))
     .filter(Boolean);
 
   let scope =
     updateData.scope ||
     existingLog.scope ||
-    (existingPlotIdsStr.length > 1 ? "selected_plots" : "single_plot");
+    (existingPlotIds.length > 1 ? "selected_plots" : "single_plot");
 
   if (updateData.scope === "all_plots") {
     scope = "all_plots";
@@ -315,9 +296,8 @@ const updateLog = async (id, data, userId) => {
     season,
     userId,
     scope,
-    plotId:
-      updateData.plotId !== undefined ? updateData.plotId : existingPlotIdsStr[0] || null,
-    plotIds: updateData.plotIds !== undefined ? updateData.plotIds : existingPlotIdsStr,
+    plotId: updateData.plotId !== undefined ? updateData.plotId : existingPlotIds[0] || null,
+    plotIds: updateData.plotIds !== undefined ? updateData.plotIds : existingPlotIds,
     fieldId: updateData.fieldId !== undefined ? updateData.fieldId : null,
   });
 
@@ -353,8 +333,6 @@ const updateLog = async (id, data, userId) => {
 
   updateData.scope = resolved.scope;
   updateData.seasonPlotAssignments = resolved.assignments.map((assignment) => assignment._id);
-  updateData.plotSnapshot = buildPlotSnapshot(resolved.plots);
-  updateData.season = undefined;
 
   const updated = await buildDiaryLogPopulate(
     DiaryLog.findOneAndUpdate({ _id: id, user: userId }, updateData, { new: true })
@@ -369,20 +347,16 @@ const deleteLog = async (id, userId) => {
   );
 
   if (!existingLog) {
-    throw new Error("Không tìm thấy nhật ký");
+    throw new Error("Khong tim thay nhat ky");
   }
 
-  const seasonId = existingLog.seasonPlotAssignments?.[0]?.seasonDetail || existingLog.season;
-  const season = await getSeasonForUser(seasonId, userId);
-  const now = new Date();
-  const isActive =
-    season.startDate &&
-    new Date(season.startDate) <= now &&
-    (!season.endDate || new Date(season.endDate) >= now);
-
-  if (!isActive) {
-    throw new Error("Không thể xóa nhật ký của vụ đã kết thúc");
+  const seasonId = getSeasonIdFromLog(existingLog);
+  if (!seasonId) {
+    throw new Error("Nhat ky khong con lien ket vu mua hop le");
   }
+
+  const season = await getSeasonForUser(seasonId);
+  ensureActiveSeasonForMutation(season, "xoa");
 
   return await DiaryLog.findOneAndDelete({ _id: id, user: userId });
 };

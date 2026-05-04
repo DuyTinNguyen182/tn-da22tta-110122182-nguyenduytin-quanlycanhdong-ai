@@ -32,7 +32,6 @@ const emptyPlotForm = {
   name: "",
   area: "",
   status: "active",
-  addressDetail: "",
   imageFile: null,
 };
 
@@ -124,7 +123,6 @@ const Fields = () => {
       name: plot.name || "",
       area: plot.area || "",
       status: plot.status || "active",
-      addressDetail: plot.addressDetail || "",
       imageFile: null,
     });
     setImagePreview(plot.imageUrl || null);
@@ -162,7 +160,6 @@ const Fields = () => {
       formData.append("name", plotForm.name.trim());
       formData.append("area", plotForm.area);
       formData.append("status", plotForm.status);
-      formData.append("addressDetail", plotForm.addressDetail || "");
       if (!editingPlot) {
         formData.append("fieldId", selectedField._id);
       }
@@ -426,8 +423,8 @@ const Fields = () => {
                           {plot.status === "active" ? "Đang canh tác" : "Chờ vụ mới"}
                         </span>
 
-                        <p className="truncate text-xs text-gray-600" title={plot.addressDetail || "Chưa bổ sung"}>
-                          {plot.addressDetail || <span className="italic text-gray-400">Chưa bổ sung</span>}
+                        <p className="truncate text-xs text-gray-600" title="">
+                          <span className="italic text-gray-400">Theo địa chỉ cánh đồng</span>
                         </p>
 
                         <div className="flex justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
@@ -534,21 +531,6 @@ const Fields = () => {
                     className="w-full"
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-500">
-                  Địa chỉ chi tiết
-                </label>
-                <textarea
-                  rows={2}
-                  value={plotForm.addressDetail}
-                  onChange={(e) =>
-                    setPlotForm((prev) => ({ ...prev, addressDetail: e.target.value }))
-                  }
-                  className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-                  placeholder="Ấp 2, gần kênh Ngang, lô trong cùng"
-                />
               </div>
 
               {/* Ảnh thửa ruộng */}

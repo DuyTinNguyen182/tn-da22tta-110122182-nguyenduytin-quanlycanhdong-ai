@@ -43,7 +43,14 @@ const formatComparableDate = (value) =>
   value ? new Date(value).toISOString().slice(0, 10) : "";
 
 const normalizeExistingAssignments = (log = {}) =>
-  (log.seasonPlotAssignments || []).map((a) => (a?._id ? String(a._id) : String(a)));
+  (log.seasonPlotAssignments || []).map((item) => (item?._id ? String(item._id) : String(item)));
+
+const normalizeExistingPlots = (log = {}) =>
+  (log.seasonPlotAssignments || [])
+    .map((item) => item?.plot?._id || item?.plot)
+    .filter(Boolean)
+    .map((item) => String(item))
+    .sort();
 
 const applyProcessingFields = (target, data, actorId) => {
   const nextStatus = normalizeStatus(data.status, target.status || "unprocessed");
@@ -64,15 +71,7 @@ const applyProcessingFields = (target, data, actorId) => {
 };
 
 const hasHistoricalContentChanges = (data, existingLog) => {
-  // Season change is trickier now because season is implied by assignments,
-  // but let's assume season doesn't change implicitly without assignments changing.
-  
-  const nextDiseaseName = (
-    data.diseaseName ||
-    data.disease ||
-    existingLog.diseaseName ||
-    ""
-  ).trim();
+  const nextDiseaseName = (data.diseaseName || data.disease || existingLog.diseaseName || "").trim();
   if (nextDiseaseName !== (existingLog.diseaseName || "").trim()) {
     return true;
   }
@@ -95,7 +94,7 @@ const hasHistoricalContentChanges = (data, existingLog) => {
   const currentScope = existingLog.scope === "selected_plots" ? "selected_plots" : "all_plots";
   const nextScope =
     data.scope !== undefined
-      ? data.scope === "selected_plots"
+      ? data.scope === "selected_plots" || data.scope === "single_plot"
         ? "selected_plots"
         : "all_plots"
       : currentScope;
@@ -103,7 +102,21 @@ const hasHistoricalContentChanges = (data, existingLog) => {
     return true;
   }
 
-  // checking plot changes isn't perfect here but roughly:
+  const currentFieldId =
+    existingLog.seasonPlotAssignments?.[0]?.field?._id || existingLog.seasonPlotAssignments?.[0]?.field || null;
+  const nextFieldId = data.fieldId || data.field || currentFieldId || null;
+  if (String(nextFieldId || "") !== String(currentFieldId || "")) {
+    return true;
+  }
+
+  if (data.plotIds !== undefined) {
+    const currentPlotIds = normalizeExistingPlots(existingLog);
+    const nextPlotIds = normalizePlotIds(data.plotIds);
+    if (currentPlotIds.join(",") !== nextPlotIds.join(",")) {
+      return true;
+    }
+  }
+
   const currentImageName = (existingLog.imageName || "").trim();
   const nextImageName =
     data.imageName !== undefined ? (data.imageName || "").trim() : currentImageName;
@@ -116,19 +129,17 @@ const hasHistoricalContentChanges = (data, existingLog) => {
 };
 
 const mapDiseaseLogOutput = (logDoc) => {
-  // Pass { virtuals: true } so Mongoose propagates it to all nested populated docs
-  // (e.g. seasonDetail inside seasonPlotAssignments will include its 'status' virtual)
   const log = logDoc.toObject ? logDoc.toObject({ virtuals: true }) : { ...logDoc };
-
-  const hasAssignments = Array.isArray(log.seasonPlotAssignments) && log.seasonPlotAssignments.length > 0;
-  const resolvedPlots = hasAssignments 
-    ? log.seasonPlotAssignments.map(a => a.plot).filter(Boolean)
-    : log.plotSnapshot 
-      ? log.plotSnapshot.map(s => ({ _id: s.plotId, name: s.name, area: s.area, status: s.status }))
-      : [];
-
-  // Extract field and season from the first valid assignment
-  const firstAssignment = hasAssignments ? log.seasonPlotAssignments[0] : null;
+  const assignmentIds = (log.seasonPlotAssignments || [])
+    .map((assignment) => assignment?._id || assignment)
+    .filter(Boolean)
+    .map((id) => String(id));
+  const resolvedPlots = (log.seasonPlotAssignments || []).map((item) => item.plot).filter(Boolean);
+  const plotIds = resolvedPlots
+    .map((plot) => plot?._id || plot)
+    .filter(Boolean)
+    .map((id) => String(id));
+  const firstAssignment = log.seasonPlotAssignments?.[0] || null;
   const seasonDetail = firstAssignment?.seasonDetail || null;
   const fieldObj = firstAssignment?.field || null;
 
@@ -138,27 +149,38 @@ const mapDiseaseLogOutput = (logDoc) => {
   const seasonBaseName = seasonDetail?.season?.name || seasonDetail?.seasonName || null;
   const seasonYear = seasonDetail?.startDate ? new Date(seasonDetail.startDate).getFullYear() : null;
   const seasonLabel = seasonBaseName
-    ? seasonYear ? `${seasonBaseName} ${seasonYear}` : seasonBaseName
+    ? seasonYear
+      ? `${seasonBaseName} ${seasonYear}`
+      : seasonBaseName
     : null;
 
-  // 'status' virtual is now included directly via toObject({ virtuals: true })
-  // Fallback: compute from dates if virtual is still missing (shouldn't happen)
-  const seasonStatus = seasonDetail?.status ?? (() => {
-    if (!seasonDetail) return null;
-    const now = new Date();
-    const start = seasonDetail.startDate ? new Date(seasonDetail.startDate) : null;
-    const end = seasonDetail.endDate ? new Date(seasonDetail.endDate) : null;
-    if (end && end < now) return "completed";
-    if (start && start <= now && (!end || end >= now)) return "active";
-    return start ? "planned" : "active";
-  })();
+  const seasonStatus =
+    seasonDetail?.status ??
+    (() => {
+      if (!seasonDetail) return null;
+      const now = new Date();
+      const start = seasonDetail.startDate ? new Date(seasonDetail.startDate) : null;
+      const end = seasonDetail.endDate ? new Date(seasonDetail.endDate) : null;
+      if (end && end < now) return "completed";
+      if (start && start <= now && (!end || end >= now)) return "active";
+      return start ? "planned" : "active";
+    })();
 
   return {
     ...log,
     diseaseName: log.diseaseName || "Khong xac dinh",
     seasonPlotAssignments: undefined,
     plots: resolvedPlots,
+    plotIds,
+    seasonPlotAssignmentIds: assignmentIds,
     plotCount: resolvedPlots.length,
+    appliesToAllPlots: log.scope === "all_plots",
+    plotLabel:
+      log.scope === "all_plots"
+        ? "Tat ca thua tham gia vu"
+        : resolvedPlots.length === 1
+          ? resolvedPlots[0]?.name || "1 thua"
+          : `${resolvedPlots.length} thua duoc chon`,
     userName: log.user?.fullName || undefined,
     fieldId,
     fieldName,
@@ -185,21 +207,17 @@ const populateDiseaseLogQuery = (query) =>
     .populate("user", "fullName email")
     .populate("processedBy", "fullName email");
 
-const getSeasonForUser = async (seasonId, _userId) => {
-  // Use non-lean to preserve virtuals (e.g. status), then convert
+const getSeasonForUser = async (seasonId) => {
   const seasonDoc = await SeasonDetail.findById(seasonId).populate("season", "name");
 
   if (!seasonDoc) {
     throw new Error("Khong tim thay mua vu");
   }
 
-  // Convert to plain object but manually carry virtual status
-  const season = seasonDoc.toObject({ virtuals: true });
-  return season;
+  return seasonDoc.toObject({ virtuals: true });
 };
 
 const ensureActiveSeasonForMutation = (season, action) => {
-  // Use virtual status (already computed by toObject({virtuals:true})) or fall back to date check
   const statusFromVirtual = season.status;
   const isActive = statusFromVirtual
     ? statusFromVirtual === "active"
@@ -207,7 +225,7 @@ const ensureActiveSeasonForMutation = (season, action) => {
         const now = new Date();
         return season.startDate
           ? new Date(season.startDate) <= now && (!season.endDate || new Date(season.endDate) >= now)
-          : true; // no startDate → treat as always-active (admin-created without dates)
+          : true;
       })();
 
   if (!isActive) {
@@ -235,7 +253,7 @@ const getParticipantPlotsForSeason = async (seasonId, userId, fieldId = null) =>
 
 const resolveAffectedPlots = async ({ seasonId, userId, fieldId, scope, plotIds }) => {
   const participantAssignments = await getParticipantPlotsForSeason(seasonId, userId, fieldId);
-  const assignmentByPlotId = new Map(participantAssignments.map((a) => [String(a.plot._id), a]));
+  const assignmentByPlotId = new Map(participantAssignments.map((item) => [String(item.plot._id), item]));
 
   if (scope === "selected_plots") {
     const selectedPlotIds = normalizePlotIds(plotIds);
@@ -261,18 +279,14 @@ const buildDiseaseLogPayload = async (
   { requireActiveSeason = false } = {},
   imageUrl = ""
 ) => {
-  // If editing an existing log, get its season from assignments
   let seasonId = data.seasonId || data.season;
   let fieldId = data.fieldId || data.field || null;
-  if (!seasonId && existingLog && existingLog.seasonPlotAssignments?.[0]?.seasonDetail) {
+
+  if (!seasonId && existingLog?.seasonPlotAssignments?.[0]?.seasonDetail) {
     seasonId = String(existingLog.seasonPlotAssignments[0].seasonDetail);
   }
-  if (!fieldId && existingLog && existingLog.seasonPlotAssignments?.[0]?.field) {
+  if (!fieldId && existingLog?.seasonPlotAssignments?.[0]?.field) {
     fieldId = String(existingLog.seasonPlotAssignments[0].field);
-  }
-  // Fallback to legacy season field if it somehow exists
-  if (!seasonId && existingLog?.season) {
-    seasonId = String(existingLog.season);
   }
 
   if (!seasonId) {
@@ -282,7 +296,7 @@ const buildDiseaseLogPayload = async (
     throw new Error("Thieu fieldId");
   }
 
-  const season = await getSeasonForUser(seasonId, userId);
+  const season = await getSeasonForUser(seasonId);
   if (requireActiveSeason) {
     ensureActiveSeasonForMutation(season, "luu");
   }
@@ -292,10 +306,11 @@ const buildDiseaseLogPayload = async (
     throw new Error("Ten benh la bat buoc");
   }
 
-  const scope = ["selected_plots", "single_plot"].includes(data.scope) ? "selected_plots" : "all_plots";
-  
+  const scope =
+    data.scope === "selected_plots" || data.scope === "single_plot" ? "selected_plots" : "all_plots";
+
   let affectedAssignments = [];
-  if (data.plotIds || data.scope) {
+  if (data.plotIds !== undefined || data.scope !== undefined || data.fieldId !== undefined || data.field !== undefined) {
     affectedAssignments = await resolveAffectedPlots({
       seasonId: season._id,
       userId,
@@ -304,10 +319,8 @@ const buildDiseaseLogPayload = async (
       plotIds: data.plotIds,
     });
   } else if (existingLog) {
-    // keeping same plots if no plot data provided, but still constrain to the selected field
     affectedAssignments = await SeasonPlotAssignment.find({
-      _id: { $in: existingLog.seasonPlotAssignments },
-      ...(fieldId ? { field: fieldId } : {}),
+      _id: { $in: normalizeExistingAssignments(existingLog) },
     })
       .populate("plot")
       .lean();
@@ -327,15 +340,8 @@ const buildDiseaseLogPayload = async (
     status,
     processingNote: (data.processingNote || existingLog?.processingNote || "").trim(),
     scope,
-    seasonPlotAssignments: affectedAssignments.map((a) => a._id),
-    plotSnapshot: affectedAssignments.map((a) => ({
-      plotId: a.plot._id,
-      name: a.plot.name || "",
-      area: Number(a.plot.area || 0),
-      status: a.plot.status || "",
-    })),
+    seasonPlotAssignments: affectedAssignments.map((item) => item._id),
     user: userId,
-    // Lưu imageUrl nếu có (từ Cloudinary), giữ nguyên nếu không upload mới
     imageUrl: imageUrl || existingLog?.imageUrl || "",
   };
 
@@ -350,9 +356,15 @@ const buildDiseaseLogPayload = async (
 };
 
 const createDiseaseLog = async (data, userId, imageUrl = "") => {
-  const payload = await buildDiseaseLogPayload(data, userId, null, {
-    requireActiveSeason: true,
-  }, imageUrl);
+  const payload = await buildDiseaseLogPayload(
+    data,
+    userId,
+    null,
+    {
+      requireActiveSeason: true,
+    },
+    imageUrl
+  );
 
   if (payload.status === "processed") {
     payload.processedBy = userId;
@@ -389,14 +401,12 @@ const getDiseaseLogs = async (filters, currentUser) => {
 
   if (filters.seasonId || filters.fieldId) {
     const assignments = await SeasonPlotAssignment.find(assignmentFilters).lean();
-    const assignmentIds = assignments.map(a => a._id);
-
-    query.$or = [{ seasonPlotAssignments: { $in: assignmentIds } }];
-
-    if (filters.seasonId && !filters.fieldId) {
-      // Legacy fallback for old records that still store only season.
-      query.$or.push({ season: filters.seasonId });
+    const assignmentIds = assignments.map((item) => item._id);
+    if (!assignmentIds.length) {
+      return [];
     }
+
+    query.seasonPlotAssignments = { $in: assignmentIds };
   }
 
   const logs = await populateDiseaseLogQuery(
@@ -407,9 +417,7 @@ const getDiseaseLogs = async (filters, currentUser) => {
 };
 
 const updateDiseaseLog = async (id, data, currentUser) => {
-  const query = isAdminUser(currentUser)
-    ? { _id: id }
-    : { _id: id, user: currentUser.id };
+  const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
 
   const existing = await DiseaseLog.findOne(query).populate("seasonPlotAssignments").lean();
   if (!existing) {
@@ -417,11 +425,12 @@ const updateDiseaseLog = async (id, data, currentUser) => {
   }
 
   const ownerUserId = existing.user?.toString?.() || existing.user;
-  
-  const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || existing.season;
-  const season = await getSeasonForUser(seasonId, ownerUserId);
+  const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || null;
+  if (!seasonId) {
+    throw new Error("Nhat ky benh khong con lien ket vu mua hop le");
+  }
 
-  // Use virtual status (populated via toObject({ virtuals: true }) in getSeasonForUser)
+  const season = await getSeasonForUser(seasonId);
   const isActive = season.status
     ? season.status === "active"
     : (() => {
@@ -433,9 +442,7 @@ const updateDiseaseLog = async (id, data, currentUser) => {
 
   if (!isActive) {
     if (hasHistoricalContentChanges(data, existing)) {
-      throw new Error(
-        "Vu mua da ket thuc. Ban chi co the cap nhat trang thai xu ly va ghi chu."
-      );
+      throw new Error("Vu mua da ket thuc. Ban chi co the cap nhat trang thai xu ly va ghi chu.");
     }
 
     const updatedHistoricalLog = await DiseaseLog.findOne(query);
@@ -456,11 +463,6 @@ const updateDiseaseLog = async (id, data, currentUser) => {
   if (payload.status === "processed") {
     payload.processedBy = currentUser.id;
   }
-  
-  // Clean up legacy fields
-  payload.season = undefined;
-  payload.field = undefined;
-  payload.plots = undefined;
 
   const updated = await populateDiseaseLogQuery(
     DiseaseLog.findOneAndUpdate(query, payload, { new: true })
@@ -470,9 +472,7 @@ const updateDiseaseLog = async (id, data, currentUser) => {
 };
 
 const updateDiseaseLogStatus = async (id, data, currentUser) => {
-  const query = isAdminUser(currentUser)
-    ? { _id: id }
-    : { _id: id, user: currentUser.id };
+  const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
 
   const existing = await DiseaseLog.findOne(query);
   if (!existing) {
@@ -492,9 +492,7 @@ const updateDiseaseLogStatus = async (id, data, currentUser) => {
 };
 
 const deleteDiseaseLog = async (id, currentUser) => {
-  const query = isAdminUser(currentUser)
-    ? { _id: id }
-    : { _id: id, user: currentUser.id };
+  const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
 
   const existing = await DiseaseLog.findOne(query).populate("seasonPlotAssignments").lean();
   if (!existing) {
@@ -502,7 +500,11 @@ const deleteDiseaseLog = async (id, currentUser) => {
   }
 
   const ownerUserId = existing.user?.toString?.() || existing.user;
-  const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || existing.season;
+  const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || null;
+  if (!seasonId) {
+    throw new Error("Nhat ky benh khong con lien ket vu mua hop le");
+  }
+
   const season = await getSeasonForUser(seasonId, ownerUserId);
   ensureActiveSeasonForMutation(season, "xoa");
 

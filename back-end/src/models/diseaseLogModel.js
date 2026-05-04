@@ -4,7 +4,7 @@ const diseaseLogSchema = new mongoose.Schema(
   {
     diseaseName: { type: String, required: true, trim: true },
     confidence: { type: Number, default: null },
-    description: { type: String, default: "" },
+    description: { type: String, default: "", trim: true },
     source: {
       type: String,
       enum: ["ai_scan", "manual"],
@@ -19,7 +19,7 @@ const diseaseLogSchema = new mongoose.Schema(
       default: "unprocessed",
     },
     processedAt: { type: Date, default: null },
-    processingNote: { type: String, default: "" },
+    processingNote: { type: String, default: "", trim: true },
     scope: {
       type: String,
       enum: ["all_plots", "selected_plots"],
@@ -29,14 +29,6 @@ const diseaseLogSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "SeasonPlotAssignment",
-      },
-    ],
-    plotSnapshot: [
-      {
-        plotId: { type: mongoose.Schema.Types.ObjectId, ref: "Plot", default: null },
-        name: { type: String, default: "" },
-        area: { type: Number, default: 0 },
-        status: { type: String, default: "" },
       },
     ],
     user: {
@@ -56,7 +48,7 @@ const diseaseLogSchema = new mongoose.Schema(
   }
 );
 
-diseaseLogSchema.index({ season: 1, user: 1, detectedAt: -1 });
-diseaseLogSchema.index({ field: 1, status: 1, detectedAt: -1 });
+diseaseLogSchema.index({ user: 1, status: 1, detectedAt: -1 });
+diseaseLogSchema.index({ seasonPlotAssignments: 1, detectedAt: -1 });
 
 module.exports = mongoose.model("DiseaseLog", diseaseLogSchema);

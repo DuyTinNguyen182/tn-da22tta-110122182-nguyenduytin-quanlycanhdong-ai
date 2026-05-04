@@ -1,7 +1,8 @@
 const mongoose = require("mongoose");
 const Field = require("../models/fieldModel");
 const Plot = require("../models/plotModel");
-
+const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
+const DiaryLog = require("../models/diaryLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
 const User = require("../models/userModel");
 
@@ -12,7 +13,7 @@ const normalizeFieldPayload = (data = {}) => {
   const address = (data.address || "").trim();
 
   if (!name) {
-    throw new Error("Tên cánh đồng là bắt buộc");
+    throw new Error("Ten canh dong la bat buoc");
   }
 
   return { name, address };
@@ -101,17 +102,16 @@ const enrichFields = async (fieldDocs, currentUser) => {
 
 const createField = async (data, currentUser) => {
   if (!isAdminUser(currentUser)) {
-    throw new Error("Chỉ admin mới được tạo cánh đồng");
+    throw new Error("Chi admin moi duoc tao canh dong");
   }
 
   const payload = normalizeFieldPayload(data);
-
   const exists = await Field.findOne({
     name: { $regex: `^${payload.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
   });
 
   if (exists) {
-    throw new Error("Tên cánh đồng đã tồn tại");
+    throw new Error("Ten canh dong da ton tai");
   }
 
   return await Field.create({
@@ -121,36 +121,28 @@ const createField = async (data, currentUser) => {
 };
 
 const getAllFields = async (currentUser) => {
-  const fields = await Field.find()
-    .populate("user", "fullName")
-    .sort({ createdAt: -1 });
-
+  const fields = await Field.find().populate("user", "fullName").sort({ createdAt: -1 });
   return await enrichFields(fields, currentUser);
 };
 
 const updateField = async (id, data, currentUser) => {
   if (!isAdminUser(currentUser)) {
-    throw new Error("Chỉ admin mới được cập nhật cánh đồng");
+    throw new Error("Chi admin moi duoc cap nhat canh dong");
   }
 
   const payload = normalizeFieldPayload(data);
-
   const duplicate = await Field.findOne({
     _id: { $ne: id },
     name: { $regex: `^${payload.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
   });
 
   if (duplicate) {
-    throw new Error("Tên cánh đồng đã tồn tại");
+    throw new Error("Ten canh dong da ton tai");
   }
 
-  const field = await Field.findByIdAndUpdate(id, payload, { new: true }).populate(
-    "user",
-    "fullName"
-  );
-
+  const field = await Field.findByIdAndUpdate(id, payload, { new: true }).populate("user", "fullName");
   if (!field) {
-    throw new Error("Không tìm thấy cánh đồng");
+    throw new Error("Khong tim thay canh dong");
   }
 
   const [enrichedField] = await enrichFields([field], currentUser);
@@ -160,12 +152,26 @@ const updateField = async (id, data, currentUser) => {
 const deleteFieldCascadeById = async (fieldId) => {
   const field = await Field.findById(fieldId);
   if (!field) {
-    throw new Error("Không tìm thấy cánh đồng");
+    throw new Error("Khong tim thay canh dong");
   }
 
+  const [plots, assignments] = await Promise.all([
+    Plot.find({ field: fieldId }).select("_id").lean(),
+    SeasonPlotAssignment.find({ field: fieldId }).select("_id").lean(),
+  ]);
+
+  const plotIds = plots.map((item) => item._id);
+  const assignmentIds = assignments.map((item) => item._id);
+
   await Promise.all([
-    Plot.deleteMany({ field: fieldId }),
-    DiseaseLog.deleteMany({ field: fieldId }),
+    assignmentIds.length
+      ? DiaryLog.deleteMany({ seasonPlotAssignments: { $in: assignmentIds } })
+      : Promise.resolve(),
+    assignmentIds.length
+      ? DiseaseLog.deleteMany({ seasonPlotAssignments: { $in: assignmentIds } })
+      : Promise.resolve(),
+    SeasonPlotAssignment.deleteMany({ field: fieldId }),
+    plotIds.length ? Plot.deleteMany({ _id: { $in: plotIds } }) : Promise.resolve(),
   ]);
 
   await Field.deleteOne({ _id: fieldId });
@@ -174,7 +180,7 @@ const deleteFieldCascadeById = async (fieldId) => {
 
 const deleteField = async (id, currentUser) => {
   if (!isAdminUser(currentUser)) {
-    throw new Error("Chỉ admin mới được xóa cánh đồng");
+    throw new Error("Chi admin moi duoc xoa canh dong");
   }
 
   return await deleteFieldCascadeById(id);
