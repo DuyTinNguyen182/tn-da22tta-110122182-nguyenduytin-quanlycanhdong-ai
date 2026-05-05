@@ -336,7 +336,7 @@ const AIChat = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] bg-slate-50 relative overflow-hidden">
+    <div className="app-page-shell relative flex flex-col overflow-hidden bg-slate-50">
       {/* Smart Scrolling Header */}
       <div 
         className={`absolute top-0 left-0 right-0 z-30 transition-transform duration-300 ease-in-out border-b border-slate-200/60 bg-white/85 backdrop-blur-xl px-4 md:px-6 py-2.5 shadow-sm hook-header ${

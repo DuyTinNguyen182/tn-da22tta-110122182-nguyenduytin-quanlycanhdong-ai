@@ -199,7 +199,7 @@ const Account = () => {
   `;
 
   return (
-    <div className="bg-gray-50 py-8 px-4 sm:px-6 lg:px-8"> {/*min-h-screen*/}
+    <div className="bg-gray-50 px-4 py-6 pb-28 sm:px-6 sm:py-8 lg:px-8"> {/*min-h-screen*/}
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">

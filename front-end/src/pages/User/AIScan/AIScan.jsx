@@ -164,6 +164,7 @@ const AIScan = () => {
   const navigate = useNavigate();
   const { toast } = useFeedback();
   const fileInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
 
   const [selectedImage, setSelectedImage] = useState(
     () => transientAIScanState.selectedImage
@@ -357,6 +358,10 @@ const AIScan = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+    }
   };
 
   const handleCropConfirm = async (croppedFile) => {
@@ -388,6 +393,10 @@ const AIScan = () => {
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
     }
 
     transientAIScanState = {
@@ -515,7 +524,7 @@ const AIScan = () => {
   };
 
   const uploadPanel = (
-    <section className="flex min-h-0 flex-col overflow-y-auto custom-scrollbar rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="flex flex-col rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm md:min-h-0 md:overflow-y-auto md:custom-scrollbar">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700">Ảnh đầu vào</p>
@@ -553,13 +562,13 @@ const AIScan = () => {
 
       <label
         htmlFor="upload-input"
-        className={`mt-4 flex min-h-0 flex-1 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[28px] border-2 border-dashed transition-colors ${previewUrl
+        className={`mt-4 flex min-h-[220px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[28px] border-2 border-dashed transition-colors md:min-h-0 md:flex-1 ${previewUrl
             ? "border-emerald-200 bg-emerald-50/60"
             : "border-slate-200 bg-slate-50 hover:border-emerald-300 hover:bg-emerald-50/40"
           }`}
       >
         {previewUrl ? (
-          <div className="relative flex h-full w-full items-center justify-center p-4">
+          <div className="relative flex min-h-[220px] w-full items-center justify-center p-4 md:h-full">
             <img
               src={previewUrl}
               alt="Ảnh đã chọn"
@@ -598,11 +607,27 @@ const AIScan = () => {
         accept="image/*"
         onChange={handleImageChange}
       />
+      <input
+        id="camera-input"
+        ref={cameraInputRef}
+        type="file"
+        className="hidden"
+        accept="image/*"
+        capture="environment"
+        onChange={handleImageChange}
+      />
 
       <div className="mt-4 flex flex-wrap gap-3">
         <label
+          htmlFor="camera-input"
+          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-700 md:hidden"
+        >
+          <ScanLine size={18} />
+          Camera
+        </label>
+        <label
           htmlFor="upload-input"
-          className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 sm:flex-none"
         >
           <UploadCloud size={18} />
           Tải ảnh mới
@@ -612,7 +637,7 @@ const AIScan = () => {
           type="button"
           onClick={handleRecrop}
           disabled={!selectedImage || loading}
-          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-55"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-55 sm:flex-none"
         >
           <Crop size={18} />
           Crop lại
@@ -622,7 +647,7 @@ const AIScan = () => {
           type="button"
           onClick={handleRescan}
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-55"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-55 sm:flex-none"
         >
           <RefreshCcw size={18} />
           Làm mới
@@ -632,7 +657,7 @@ const AIScan = () => {
           type="button"
           onClick={handleScan}
           disabled={!selectedImage || loading}
-          className={`ml-auto inline-flex items-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors ${!selectedImage || loading
+          className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors sm:ml-auto sm:w-auto ${!selectedImage || loading
               ? "cursor-not-allowed bg-slate-300"
               : "bg-emerald-600 hover:bg-emerald-700"
             }`}
@@ -654,8 +679,8 @@ const AIScan = () => {
   );
 
   const resultPanel = (
-    <section className="flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
+    <section className="flex flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm md:min-h-0">
+      <div className="p-5 md:flex-1 md:overflow-y-auto md:custom-scrollbar">
         {!selectedImage && !loading && !result && !error && (
         <div className="flex h-full flex-col justify-between">
           <div>
@@ -1121,9 +1146,9 @@ const AIScan = () => {
   ) : null;
 
   return (
-    <div className="h-[calc(100vh-80px)] overflow-hidden bg-[#f4f8f5] p-4 md:p-5">
-      <div className="mx-auto flex h-full max-w-7xl flex-col gap-4">
-        <div className="grid flex-1 min-h-0 gap-4 xl:grid-cols-[1.06fr_0.94fr]">
+    <div className="app-page-shell overflow-y-auto bg-[#f4f8f5] p-3 md:overflow-hidden md:p-5">
+      <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-4 md:h-full">
+        <div className="grid gap-4 md:min-h-0 md:flex-1 xl:grid-cols-[1.06fr_0.94fr]">
           {uploadPanel}
           {resultPanel}
         </div>

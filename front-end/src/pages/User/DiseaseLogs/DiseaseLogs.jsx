@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   ClipboardList,
@@ -7,6 +7,7 @@ import {
   Plus,
   Save,
   Search,
+  SlidersHorizontal,
   ShieldAlert,
   Trash2,
   X,
@@ -73,6 +74,7 @@ const DiseaseLogs = () => {
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
+  const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [filters, setFilters] = useState({
     fieldId: "",
@@ -81,7 +83,6 @@ const DiseaseLogs = () => {
   });
   const [form, setForm] = useState(emptyForm);
 
-  // ── Dropdown options (memoized) ──
 
   const fieldOptions = useMemo(
     () => [
@@ -127,7 +128,6 @@ const DiseaseLogs = () => {
     [formSeasons]
   );
 
-  // ── Data loading ──
 
   const loadFields = async () => {
     const res = await api.get("/fields");
@@ -233,7 +233,6 @@ const DiseaseLogs = () => {
     }));
   }, [isModalOpen, form.seasonId, formSeasons]);
 
-  // ── Computed ──
 
   const filteredLogs = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
@@ -261,8 +260,10 @@ const DiseaseLogs = () => {
     [formSeasons, form.seasonId]
   );
   const isHistoricalEdit = Boolean(editingLog && selectedFormSeason?.status !== "active");
+  const hasActiveFilters = Boolean(
+    keyword.trim() || filters.fieldId || filters.seasonId || filters.status
+  );
 
-  // ── Handlers ──
 
   const openCreateModal = async () => {
     const fieldId = filters.fieldId || fields[0]?._id || "";
@@ -420,49 +421,68 @@ const DiseaseLogs = () => {
     setKeyword("");
     setFilters(defaultFilters);
     setFilterSeasons([]);
+    setShowFiltersMobile(false);
     await loadDiseaseLogs(defaultFilters);
   };
 
-  // ── Render ──
+  // â”€â”€ Render â”€â”€
 
   return (
-    <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-50 p-4 lg:p-5">
+    <div className="app-page-shell overflow-y-auto bg-gray-50 p-3 md:p-4 lg:p-5">
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1 [&>h1]:hidden md:[&>h1]:block">
           <h1 className="text-xl font-bold text-gray-900">Nhật ký bệnh</h1>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
+          <p className="text-sm text-gray-500 md:mt-1 md:max-w-2xl">
             Ghi nhận bệnh theo mùa vụ, cánh đồng và phạm vi thửa bị ảnh hưởng.
           </p>
         </div>
         <button
           type="button"
           onClick={openCreateModal}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-md"
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-md sm:w-auto"
         >
           <Plus size={16} /> Thêm nhật ký
         </button>
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+      <div className="grid grid-cols-3 gap-2.5 md:gap-3">
+        <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm md:p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Tổng bản ghi</p>
-          <p className="mt-1.5 text-2xl font-bold text-gray-900">{summary.total}</p>
+          <p className="mt-1 text-xl font-bold text-gray-900 md:mt-1.5 md:text-2xl">{summary.total}</p>
         </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm md:p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Chưa xử lý</p>
-          <p className="mt-1.5 text-2xl font-bold text-amber-600">{summary.unprocessed}</p>
+          <p className="mt-1 text-xl font-bold text-amber-600 md:mt-1.5 md:text-2xl">{summary.unprocessed}</p>
         </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <div className="rounded-2xl border border-gray-100 bg-white p-3 shadow-sm md:p-4">
           <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Đã xử lý</p>
-          <p className="mt-1.5 text-2xl font-bold text-emerald-600">{summary.processed}</p>
+          <p className="mt-1 text-xl font-bold text-emerald-600 md:mt-1.5 md:text-2xl">{summary.processed}</p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
-        <div className="grid grid-cols-1 items-center gap-2.5 xl:grid-cols-[1.2fr_1fr_1fr_auto_auto]">
+        <button
+          type="button"
+          onClick={() => setShowFiltersMobile((prev) => !prev)}
+          className="flex w-full items-center justify-between rounded-xl bg-gray-50/80 px-3 py-2.5 text-sm font-semibold text-gray-700 md:hidden"
+        >
+          <span className="inline-flex items-center gap-2">
+            <SlidersHorizontal size={16} className="text-gray-400" />
+            Bộ lọc và tìm kiếm
+          </span>
+          <span className="rounded-full bg-white px-2 py-0.5 text-xs text-gray-500 ring-1 ring-gray-200">
+            {hasActiveFilters
+              ? "Đang lọc"
+              : showFiltersMobile
+                ? "Ẩn"
+                : "Hiện"}
+          </span>
+        </button>
+
+        <div className={`${showFiltersMobile || hasActiveFilters ? "mt-3 grid" : "hidden"} grid-cols-1 items-center gap-2.5 md:mt-0 md:grid xl:grid-cols-[1.2fr_1fr_1fr_auto_auto]`}>
           <div className="relative">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -548,12 +568,12 @@ const DiseaseLogs = () => {
             return (
               <article
                 key={log._id}
-                className="group rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+                className="group rounded-2xl border border-gray-100 bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md md:p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2.5">
-                      <h2 className="text-lg font-bold text-gray-900">{log.diseaseName}</h2>
+                      <h2 className="text-base font-bold text-gray-900 md:text-lg">{log.diseaseName}</h2>
                       <span className={`rounded-lg px-2.5 py-0.5 text-xs font-bold ${statusMeta.className}`}>
                         {statusMeta.label}
                       </span>
@@ -561,7 +581,7 @@ const DiseaseLogs = () => {
                         {log.source === "manual" ? "Thủ công" : "AI scan"}
                       </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-gray-500">
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 md:text-sm">
                       <span className="inline-flex items-center gap-1.5">
                         <CalendarDays size={14} />
                         {formatDate(log.detectedAt)}
@@ -571,7 +591,7 @@ const DiseaseLogs = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex items-center gap-1.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                     <button
                       type="button"
                       onClick={() => openEditModal(log)}
@@ -596,9 +616,9 @@ const DiseaseLogs = () => {
                 </div>
 
                 {/* Body: info + optional image */}
-                <div className="mt-3 flex gap-3">
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row">
                   {/* Info grid */}
-                  <div className="grid flex-1 grid-cols-1 gap-2.5 xl:grid-cols-3">
+                  <div className="grid flex-1 grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                     <div className="rounded-xl bg-gray-50/80 p-3 ring-1 ring-gray-100">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Phạm vi</p>
                       <p className="mt-1 text-sm font-medium text-gray-700">
@@ -611,7 +631,7 @@ const DiseaseLogs = () => {
                       <p className="mt-1 text-sm text-gray-700 line-clamp-3">{log.description || "Chưa có mô tả."}</p>
                     </div>
                     <div className="rounded-xl bg-gray-50/80 p-3 ring-1 ring-gray-100">
-                      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Ghi chú xữ lý</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Ghi chú xử lý</p>
                       <p className="mt-1 text-sm text-gray-700 line-clamp-3">{log.processingNote || "Chưa có ghi chú."}</p>
                       {log.status === "processed" && log.processedAt && (
                         <p className="mt-1 text-xs text-emerald-600">Xử lý ngày {formatDate(log.processedAt)}</p>
