@@ -6,6 +6,7 @@ import FeedbackProvider from "./components/Feedback/FeedbackProvider";
 import ProtectedLayout from "./components/Layout/ProtectedRoute";
 import PublicRoute from "./components/Layout/PublicRoute";
 import AdminLayout from "./components/Layout/AdminLayout";
+import ScrollToTopButton from "./components/Layout/ScrollToTopButton";
 
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Auth/Login";
@@ -70,6 +71,7 @@ function App() {
 
             <Route path="*" element={<Navigate to="/login" />} />
           </Routes>
+          <ScrollToTopButton />
         </BrowserRouter>
       </FeedbackProvider>
     </AuthProvider>

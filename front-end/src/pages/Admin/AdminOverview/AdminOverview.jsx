@@ -3,6 +3,8 @@ import {
   BellRing,
   Briefcase,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   Filter,
   ListChecks,
   Map as MapIcon,
@@ -55,6 +57,17 @@ const buildWarningSessionKey = (recipientKey, filters) =>
     taskId: filters?.taskId || "",
     taskDetailId: filters?.taskDetailId || "",
   });
+
+const summarizeLabels = (values, maxItems = 2) => {
+  const uniqueValues = Array.from(
+    new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))
+  );
+
+  if (uniqueValues.length === 0) return "--";
+  if (uniqueValues.length <= maxItems) return uniqueValues.join(", ");
+
+  return `${uniqueValues.slice(0, maxItems).join(", ")} +${uniqueValues.length - maxItems}`;
+};
 
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa thực hiện";
@@ -120,6 +133,7 @@ const AdminOverview = () => {
   const [sendingRecipientKey, setSendingRecipientKey] = useState("");
   const [sendingAllWarnings, setSendingAllWarnings] = useState(false);
   const [sentWarningKeys, setSentWarningKeys] = useState(() => new Set());
+  const [expandedFarmerKeys, setExpandedFarmerKeys] = useState(() => new Set());
 
   useEffect(() => {
     api
@@ -297,6 +311,49 @@ const AdminOverview = () => {
       ? `${summary.matchedSeasonCount} lịch mùa vụ`
       : "Chưa có lịch mùa vụ phù hợp";
 
+  const groupedFarmerRows = useMemo(() => {
+    const groups = new Map();
+
+    rows.forEach((row) => {
+      const groupKey = getFarmerGroupKey(row) || `assignment-${row.assignmentId}`;
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          recipientKey: groupKey,
+          farmerId: row.farmerId || "",
+          farmerName: row.farmerName || "Nông dân",
+          farmerEmail: row.farmerEmail || "",
+          farmerPhone: row.farmerPhone || "",
+          rows: [],
+          totalArea: 0,
+          doneCount: 0,
+          pendingCount: 0,
+          fieldNames: [],
+          seasonLabels: [],
+        });
+      }
+
+      const group = groups.get(groupKey);
+      group.rows.push(row);
+      group.totalArea += Number(row.plotArea || 0);
+      group.fieldNames.push(row.fieldName || "");
+      group.seasonLabels.push(row.seasonLabel || "");
+
+      if (row.status === "done") {
+        group.doneCount += 1;
+      } else {
+        group.pendingCount += 1;
+      }
+    });
+
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      totalPlotCount: group.rows.length,
+      fieldSummary: summarizeLabels(group.fieldNames),
+      seasonSummary: summarizeLabels(group.seasonLabels),
+    }));
+  }, [rows]);
+
   const pendingFarmerGroups = useMemo(() => {
     const groups = new Map();
 
@@ -328,15 +385,19 @@ const AdminOverview = () => {
     [pendingFarmerGroups]
   );
 
-  const warnedFarmerCountInSession = warnableFarmerGroups.filter((group) =>
-    sentWarningKeys.has(buildWarningSessionKey(group.recipientKey, appliedFilters))
-  ).length;
-
-  const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
-  const paginatedRows = useMemo(() => {
+  const totalPages = Math.max(1, Math.ceil(groupedFarmerRows.length / ROWS_PER_PAGE));
+  const paginatedFarmerRows = useMemo(() => {
     const startIndex = (currentPage - 1) * ROWS_PER_PAGE;
-    return rows.slice(startIndex, startIndex + ROWS_PER_PAGE);
-  }, [rows, currentPage]);
+    return groupedFarmerRows.slice(startIndex, startIndex + ROWS_PER_PAGE);
+  }, [groupedFarmerRows, currentPage]);
+
+  useEffect(() => {
+    setExpandedFarmerKeys((prev) => {
+      const validKeys = new Set(groupedFarmerRows.map((item) => item.recipientKey));
+      const next = new Set([...prev].filter((key) => validKeys.has(key)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [groupedFarmerRows]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -368,6 +429,20 @@ const AdminOverview = () => {
     }));
   };
 
+  const toggleFarmerExpanded = (recipientKey) => {
+    setExpandedFarmerKeys((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(recipientKey)) {
+        next.delete(recipientKey);
+      } else {
+        next.add(recipientKey);
+      }
+
+      return next;
+    });
+  };
+
   const ensureTaskSelected = () => {
     if (!appliedFilters.taskId) {
       toast.warning("Vui lòng chọn công việc trước khi gửi cảnh báo.");
@@ -386,10 +461,11 @@ const AdminOverview = () => {
     });
   };
 
-  const handleWarning = async (row) => {
+  const handleWarning = async (groupOrRow) => {
     if (!ensureTaskSelected()) return;
 
-    const group = pendingFarmerGroups.get(getFarmerGroupKey(row));
+    const recipientKey = groupOrRow?.recipientKey || getFarmerGroupKey(groupOrRow);
+    const group = pendingFarmerGroups.get(recipientKey);
 
     if (!group) {
       toast.warning("Nông dân này hiện không còn việc tồn đọng phù hợp để cảnh báo.");
@@ -674,16 +750,13 @@ const AdminOverview = () => {
             <p className="mt-3 text-3xl font-bold text-amber-600">
               {summary.pendingFarmerCount}
             </p>
-            {/* <p className="mt-2 text-sm text-gray-500">
-              Đã gửi trong phiên này: {warnedFarmerCountInSession}/{summary.pendingFarmerCount || 0}
-            </p> */}
           </div>
         </section>
 
         <section className="rounded-[28px] border border-gray-100 bg-white shadow-sm">
           <div className="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Bảng thống kê theo thửa ruộng</h2>
+              <h2 className="text-xl font-bold text-gray-900">Bảng thống kê theo nông dân</h2>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
@@ -727,128 +800,180 @@ const AdminOverview = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1200px]">
+              <div className="overflow-x-hidden">
+                <table className="w-full table-fixed">
                   <thead className="bg-gray-50 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
                     <tr>
-                      <th className="px-5 py-4">Thửa ruộng</th>
-                      <th className="px-5 py-4">Cánh đồng</th>
-                      <th className="px-5 py-4">Mùa vụ</th>
-                      <th className="px-5 py-4">Công việc</th>
-                      <th className="px-5 py-4">Ngày thực hiện</th>
-                      <th className="px-5 py-4">Nông dân</th>
-                      <th className="px-5 py-4">Trạng thái</th>
-                      <th className="px-5 py-4 text-right">Cảnh báo</th>
+                      <th className="w-[24%] px-5 py-4">Nông dân</th>
+                      <th className="w-[14%] px-5 py-4">Thửa ruộng</th>
+                      <th className="w-[23%] px-5 py-4">Phạm vi</th>
+                      <th className="w-[16%] px-5 py-4">Công việc</th>
+                      <th className="w-[13%] px-5 py-4">Tiến độ</th>
+                      <th className="w-[10%] px-5 py-4 text-right">Cảnh báo</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedRows.map((row) => {
-                      const farmerGroup = pendingFarmerGroups.get(getFarmerGroupKey(row));
-                      const isPending = row.status === "pending";
-                      const isSendingRow =
-                        sendingRecipientKey &&
-                        sendingRecipientKey === getFarmerGroupKey(row);
+                    {paginatedFarmerRows.map((group) => {
+                      const pendingGroup = pendingFarmerGroups.get(group.recipientKey);
+                      const isExpanded = expandedFarmerKeys.has(group.recipientKey);
+                      const isSendingGroup =
+                        sendingRecipientKey && sendingRecipientKey === group.recipientKey;
                       const canWarn =
-                        isPending && Boolean(farmerGroup?.farmerEmail) && Boolean(appliedFilters.taskId);
+                        group.pendingCount > 0 &&
+                        Boolean(pendingGroup?.farmerEmail) &&
+                        Boolean(appliedFilters.taskId);
                       const isSentInSession = sentWarningKeys.has(
-                        buildWarningSessionKey(getFarmerGroupKey(row), appliedFilters)
+                        buildWarningSessionKey(group.recipientKey, appliedFilters)
                       );
 
                       return (
-                        <tr key={row.assignmentId} className="border-t border-gray-100 align-top">
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-gray-900">{row.plotName}</p>
-                            <p className="mt-1 text-sm text-gray-500">
-                              Diện tích: {Number(row.plotArea || 0).toLocaleString("vi-VN")} m2
-                            </p>
-                          </td>
+                        <React.Fragment key={group.recipientKey}>
+                          <tr className="border-t border-gray-100 align-top">
+                            <td className="break-words px-5 py-4">
+                              <div className="flex min-w-0 items-start gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleFarmerExpanded(group.recipientKey)}
+                                  className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                                  aria-label={isExpanded ? "Ẩn chi tiết thửa ruộng" : "Xem chi tiết thửa ruộng"}
+                                >
+                                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                </button>
 
-                          <td className="px-5 py-4">
-                            <div className="inline-flex items-center gap-2 rounded-2xl bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-                              <MapIcon size={14} />
-                              {row.fieldName}
-                            </div>
-                          </td>
+                                <div className="min-w-0">
+                                  <p className="font-semibold text-gray-900">{group.farmerName}</p>
+                                  <p className="mt-1 text-sm text-gray-500">{group.farmerEmail || "--"}</p>
+                                  <p className="mt-1 text-sm text-gray-400">{group.farmerPhone || "--"}</p>
+                                  {isSentInSession ? (
+                                    <p className="mt-2 text-xs font-medium text-sky-700">
+                                      Đã gửi cảnh báo trong phiên hiện tại.
+                                    </p>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </td>
 
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-gray-900">{row.seasonLabel}</p>
-                            <p className="mt-1 text-sm text-gray-500">Năm: {row.year || "--"}</p>
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-gray-900">{row.activityLabel}</p>
-                            <p className="mt-1 text-sm text-gray-500">
-                              {row.taskDetailName ? row.taskName : "Công việc chung"}
-                            </p>
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <p
-                              className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-                                row.performedAt
-                                  ? "bg-emerald-50 text-emerald-700"
-                                  : "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              {formatDate(row.performedAt)}
-                            </p>
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <p className="font-semibold text-gray-900">{row.farmerName}</p>
-                            <p className="mt-1 text-sm text-gray-500">{row.farmerEmail || "--"}</p>
-                            <p className="mt-1 text-sm text-gray-400">{row.farmerPhone || "--"}</p>
-                            {/* {isSentInSession ? (
-                              <p className="mt-2 text-xs font-medium text-sky-700">
-                                Đã gửi trong phiên hiện tại.
+                            <td className="break-words px-5 py-4">
+                              <p className="font-semibold text-gray-900">{group.totalPlotCount} thửa</p>
+                              <p className="mt-1 text-sm text-gray-500">
+                                Tổng diện tích: {group.totalArea.toLocaleString("vi-VN")} m2
                               </p>
-                            ) : null} */}
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <span
-                              className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getStatusClasses(row.status)}`}
-                            >
-                              {getStatusText(row.status)}
-                            </span>
-                          </td>
-
-                          <td className="px-5 py-4">
-                            <div className="flex justify-end">
                               <button
                                 type="button"
-                                onClick={() => handleWarning(row)}
-                                disabled={!canWarn || sendingAllWarnings || Boolean(sendingRecipientKey)}
-                                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${
-                                  !canWarn || sendingAllWarnings || Boolean(sendingRecipientKey)
-                                    ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                                    : isSentInSession
-                                      ? "bg-sky-600 text-white shadow-md shadow-sky-200 hover:bg-sky-700"
-                                      : "bg-amber-500 text-white shadow-md shadow-amber-200 hover:bg-amber-600"
-                                }`}
+                                onClick={() => toggleFarmerExpanded(group.recipientKey)}
+                                className="mt-3 inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 transition-all hover:bg-gray-200"
                               >
-                                <BellRing size={15} />
-                                {!isPending
-                                  ? "Đã xong"
-                                  : isSendingRow
-                                    ? "Đang gửi..."
-                                    : isSentInSession
-                                      ? "Đã gửi"
-                                      : "Cảnh báo"}
+                                {isExpanded ? "Ẩn chi tiết" : `Xem ${group.totalPlotCount} thửa`}
                               </button>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+
+                            <td className="break-words px-5 py-4">
+                              <div className="inline-flex max-w-full items-center gap-2 rounded-2xl bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
+                                <MapIcon size={14} />
+                                {group.fieldSummary}
+                              </div>
+                              <p className="mt-2 text-sm text-gray-500">Mùa vụ: {group.seasonSummary}</p>
+                            </td>
+
+                            <td className="break-words px-5 py-4">
+                              <p className="font-semibold text-gray-900">{selectedTaskLabel}</p>
+                              <p className="mt-1 text-sm text-gray-500">
+                                {appliedFilters.taskDetailId
+                                  ? "Đang lọc theo chi tiết công việc đã chọn"
+                                  : "Tổng hợp theo bộ lọc hiện tại"}
+                              </p>
+                            </td>
+
+                            <td className="break-words px-5 py-4">
+                              <div className="flex flex-wrap gap-2">
+                                <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+                                  Đã làm: {group.doneCount}
+                                </span>
+                                <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">
+                                  Chưa làm: {group.pendingCount}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm text-gray-500">
+                                Hoàn thành:{" "}
+                                {group.totalPlotCount
+                                  ? Math.round((group.doneCount / group.totalPlotCount) * 100)
+                                  : 0}
+                                %
+                              </p>
+                            </td>
+
+                            <td className="px-5 py-4">
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => handleWarning(group)}
+                                  disabled={!canWarn || sendingAllWarnings || Boolean(sendingRecipientKey)}
+                                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                                    !canWarn || sendingAllWarnings || Boolean(sendingRecipientKey)
+                                      ? "cursor-not-allowed bg-gray-100 text-gray-400"
+                                      : isSentInSession
+                                        ? "bg-sky-600 text-white shadow-md shadow-sky-200 hover:bg-sky-700"
+                                        : "bg-amber-500 text-white shadow-md shadow-amber-200 hover:bg-amber-600"
+                                  }`}
+                                >
+                                  <BellRing size={15} />
+                                  {group.pendingCount === 0
+                                    ? "Đã xong"
+                                    : !pendingGroup?.farmerEmail
+                                      ? "Thiếu email"
+                                      : isSendingGroup
+                                        ? "Đang gửi..."
+                                        : isSentInSession
+                                          ? "Đã gửi"
+                                          : "Cảnh báo"}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+
+                          {isExpanded ? (
+                            <tr className="border-t border-gray-100 bg-gray-50/70">
+                              <td colSpan={6} className="px-5 py-3">
+                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                  {group.rows.map((row) => (
+                                    <div
+                                      key={row.assignmentId}
+                                      className="rounded-2xl border border-gray-200 bg-white px-4 py-3"
+                                    >
+                                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                                        <p className="font-semibold text-gray-900">{row.plotName}</p>
+                                        <span
+                                          className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClasses(row.status)}`}
+                                        >
+                                          {getStatusText(row.status)}
+                                        </span>
+                                      </div>
+                                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                                        <p className="text-gray-500">
+                                        Diện tích: {Number(row.plotArea || 0).toLocaleString("vi-VN")} m2
+                                        </p>
+                                        <p className="inline-flex items-center gap-2 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-700">
+                                          <MapIcon size={14} />
+                                          {row.fieldName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ) : null}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-
               <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
                 <p className="text-sm text-gray-500">
-                  Hiển thị {paginatedRows.length} dòng trong tổng số {rows.length} dòng theo bộ lọc
-                  hiện tại.
+                  Hiển thị {paginatedFarmerRows.length} nông dân trong tổng số{" "}
+                  {groupedFarmerRows.length} nông dân, tương ứng {summary.visibleCount} thửa theo
+                  bộ lọc hiện tại.
                 </p>
 
                 <PaginationControls
