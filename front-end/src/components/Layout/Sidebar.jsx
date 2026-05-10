@@ -18,9 +18,9 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { icon: Map, label: "Thửa ruộng của tôi", path: "/fields" },
     { icon: Sprout, label: "Nhật ký canh tác", path: "/crops" },
     { icon: AlertTriangle, label: "Nhật ký bệnh", path: "/disease-logs" },
-    { icon: Bell, label: "Thông báo & cảnh báo", path: "/announcements" },
     { icon: ScanLine, label: "AI dự đoán", path: "/ai-scan" },
     { icon: FileText, label: "AI tư vấn", path: "/ask-ai" },
+    { icon: Bell, label: "Thông báo & cảnh báo", path: "/announcements" },
     { icon: BookText, label: "Khuyến nghị mùa vụ", path: "/season-recommendations" },
   ];
 

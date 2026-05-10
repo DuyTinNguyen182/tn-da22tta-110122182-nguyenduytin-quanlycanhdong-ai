@@ -3,7 +3,6 @@ import {
   AlertCircle,
   AlertTriangle,
   BookOpen,
-  CalendarDays,
   CheckCircle,
   Crop,
   Loader2,
@@ -17,6 +16,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import GuideModal from "./GuideModal";
 import ImageCropModal from "./ImageCropModal";
+import SaveDiseaseLogModal from "./SaveDiseaseLogModal";
 import { useFeedback } from "../../../hooks/useFeedback";
 import api from "../../../services/api";
 
@@ -109,33 +109,8 @@ const buildLowConfidenceMessage = (diagnosisResult) => {
     )}. Bạn nên kiểm tra thêm bằng ảnh rõ hơn hoặc đối chiếu thực tế.`;
 };
 
-const buildDiagnosisDescriptionText = (diagnosisResult) => {
-  if (!diagnosisResult) return "Không có dữ liệu chẩn đoán.";
-
-  const confidenceWarning = buildLowConfidenceMessage(diagnosisResult);
-  const topPredictionLines = (diagnosisResult.top_predictions || [])
-    .slice(0, 3)
-    .map(
-      (prediction, index) =>
-        `${index + 1}. ${prediction.disease || prediction.class_name}: ${formatPercent(
-          prediction.confidence
-        )}`
-    );
-
-  return [
-    `Kết quả AI: ${diagnosisResult.disease || "Không xác định"}`,
-    `Độ tin cậy: ${formatPercent(diagnosisResult.confidence)}`,
-    confidenceWarning ? `Lưu ý: ${confidenceWarning}` : null,
-    topPredictionLines.length > 0 ? "Top dự đoán:" : null,
-    ...topPredictionLines,
-    "Nguồn: AI chẩn đoán bệnh lúa",
-  ]
-    .filter(Boolean)
-    .join("\n");
-};
-
 const READY_NOTES = [
-  "Ảnh sẽ được crop tự động loại bỏ bớt nền thừa trước khi phân tích.",
+  // "Ảnh sẽ được crop tự động loại bỏ bớt nền thừa trước khi phân tích.",
   "Để có kết quả tốt nhất, hãy chọn ảnh rõ nét và đủ ánh sáng ở vùng lá bệnh.",
   "AI hỗ trợ nhận diện các bệnh phổ biến như Đạo ôn, Bạc lá, Lem lép hạt..."
 ];
@@ -178,19 +153,6 @@ const AIScan = () => {
   const [showGuideModal, setShowGuideModal] = useState(false);
   const [cropSourceFile, setCropSourceFile] = useState(null);
 
-  const [fields, setFields] = useState([]);
-  const [plots, setPlots] = useState([]);
-  const [seasons, setSeasons] = useState([]);
-  const [selectedSeason, setSelectedSeason] = useState("");
-  const [selectedField, setSelectedField] = useState(null);
-  const [selectedPlotIds, setSelectedPlotIds] = useState([]);
-  const [selectAllPlots, setSelectAllPlots] = useState(true);
-  const [detectedDate, setDetectedDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  );
-  const [saveLoading, setSaveLoading] = useState(false);
-  const [loadingModal, setLoadingModal] = useState(false);
-
   useEffect(() => {
     if (!selectedImage) {
       setPreviewUrl(null);
@@ -212,78 +174,6 @@ const AIScan = () => {
       error,
     };
   }, [selectedImage, result, error]);
-
-  useEffect(() => {
-    if (!showSaveModal) return;
-
-    const fetchFields = async () => {
-      try {
-        const res = await api.get("/fields");
-        const fieldList = (res.data || []).filter(
-          (f) => Number(f.myPlotCount || 0) > 0
-        );
-        setFields(fieldList);
-        setSelectedField(fieldList[0] || null);
-      } catch (fetchError) {
-        console.error("Lỗi khi tải danh sách cánh đồng", fetchError);
-      }
-    };
-
-    fetchFields();
-    setDetectedDate(new Date().toISOString().slice(0, 10));
-    setSelectAllPlots(true);
-    setSelectedPlotIds([]);
-  }, [showSaveModal]);
-
-  useEffect(() => {
-    if (!showSaveModal || !selectedField?._id) {
-      setPlots([]);
-      setSeasons([]);
-      setSelectedSeason("");
-      setSelectedPlotIds([]);
-      return;
-    }
-
-    const fetchFieldData = async () => {
-      try {
-        setLoadingModal(true);
-        const [seasonsRes, plotsRes] = await Promise.all([
-          api.get("/season-details/member", { params: { fieldId: selectedField._id } }),
-          api.get("/plots", { params: { fieldId: selectedField._id } }),
-        ]);
-
-        const seasonList = sortSeasons(seasonsRes.data || []);
-        const active = seasonList.find((s) => s.status === "active");
-        const farmerPlots = (plotsRes.data || []).filter((p) => p.status === "active");
-
-        setSeasons(seasonList);
-        setSelectedSeason(active?._id || seasonList[0]?._id || "");
-        setPlots(farmerPlots);
-        setSelectAllPlots(true);
-        setSelectedPlotIds([]);
-      } catch (fetchError) {
-        console.error("Lỗi khi tải mùa vụ hoặc thửa ruộng", fetchError);
-      } finally {
-        setLoadingModal(false);
-      }
-    };
-
-    fetchFieldData();
-  }, [selectedField, showSaveModal]);
-
-  const currentSeason = useMemo(
-    () => seasons.find((s) => s._id === selectedSeason) || null,
-    [seasons, selectedSeason]
-  );
-
-  // Ưu tiên loggablePlots từ mùa vụ (đã lazy-create assignments), fallback về plots trực tiếp
-  const loggablePlots = useMemo(
-    () =>
-      currentSeason?.loggablePlots?.length
-        ? currentSeason.loggablePlots
-        : plots,
-    [currentSeason, plots]
-  );
 
   const topPredictions = useMemo(
     () =>
@@ -428,99 +318,10 @@ const AIScan = () => {
       }
     } catch (scanError) {
       console.error(scanError);
-      setError("Không thể chẩn đoán. Vui lòng kiểm tra lại hệ thống AI.");
+      setError("Không thể dự đoán. Vui lòng kiểm tra lại hệ thống AI.");
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSaveDiseaseLog = async () => {
-    if (!result) return;
-
-    if (!selectedField?._id) {
-      toast.warning("Vui lòng chọn cánh đồng.");
-      return;
-    }
-
-    if (!selectedSeason) {
-      toast.warning("Không tìm thấy mùa vụ cho cánh đồng này.");
-      return;
-    }
-
-    if (currentSeason?.status !== "active") {
-      toast.warning("Chỉ có thể lưu nhật ký bệnh cho vụ đang canh tác.");
-      return;
-    }
-
-    if (!selectAllPlots && selectedPlotIds.length === 0) {
-      toast.warning("Vui lòng chọn ít nhất 1 thửa hoặc chọn tất cả các thửa.");
-      return;
-    }
-
-    // Tính scope: chỉ dùng all_plots hoặc selected_plots
-    const allPlotIds = loggablePlots.map((p) => p._id);
-    const finalPlotIds = selectAllPlots ? allPlotIds : selectedPlotIds;
-    const scope =
-      selectAllPlots || finalPlotIds.length === allPlotIds.length
-        ? "all_plots"
-        : "selected_plots";
-
-    const payload = {
-      diseaseName: result.disease || "Không xác định",
-      confidence: result.confidence,
-      description: buildDiagnosisDescriptionText(result),
-      fieldId: selectedField?._id || "",
-      seasonId: selectedSeason,
-      date: detectedDate,
-      scope,
-      plotIds: finalPlotIds,
-      imageName: selectedImage?.name || "",
-      source: "ai_scan",
-    };
-
-    try {
-      setSaveLoading(true);
-
-      // Gửi FormData để đính kèm ảnh quét lên Cloudinary
-      const formData = new FormData();
-      Object.entries(payload).forEach(([key, value]) => {
-        if (value === null || value === undefined) return;
-        if (Array.isArray(value)) {
-          value.forEach((v) => formData.append(key, v));
-        } else {
-          formData.append(key, String(value));
-        }
-      });
-      if (selectedImage) {
-        formData.append("image", selectedImage);
-      }
-
-      await api.post("/disease-logs", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      toast.success("Đã lưu nhật ký bệnh thành công.");
-      setShowSaveModal(false);
-    } catch (saveError) {
-      console.error("Lỗi khi lưu nhật ký bệnh", saveError);
-      toast.error(
-        saveError?.response?.data?.message ||
-          "Không thể lưu nhật ký. Vui lòng thử lại."
-      );
-    } finally {
-      setSaveLoading(false);
-    }
-  };
-
-  const togglePlotSelection = (plotId) => {
-    if (selectAllPlots) {
-      setSelectAllPlots(false);
-      setSelectedPlotIds([plotId]);
-      return;
-    }
-
-    setSelectedPlotIds((prev) =>
-      prev.includes(plotId) ? prev.filter((id) => id !== plotId) : [...prev, plotId]
-    );
   };
 
   const uploadPanel = (
@@ -593,7 +394,7 @@ const AIScan = () => {
               Chọn ảnh lá lúa để bắt đầu
             </h4>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Ngay sau khi tải lên, hệ thống sẽ mở bước crop để bạn chọn đúng vùng lá cần chẩn đoán.
+              Ngay sau khi tải lên, hệ thống sẽ mở bước crop để bạn chọn đúng vùng lá cần dự đoán.
             </p>
           </div>
         )}
@@ -670,7 +471,7 @@ const AIScan = () => {
           ) : (
             <>
               <ScanLine size={18} />
-              Chẩn đoán ngay
+              Dự đoán ngay
             </>
           )}
         </button>
@@ -685,19 +486,38 @@ const AIScan = () => {
         <div className="flex h-full flex-col justify-between">
           <div>
             <p className="text-sm font-semibold text-emerald-700">Kết quả phân tích</p>
-            <h3 className="mt-1 text-2xl font-bold text-slate-900">Chờ ảnh đầu vào</h3>
+            <h3 className="mt-1 text-2xl font-bold text-slate-900">Sẵn sàng quét AI</h3>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              Tải ảnh trước, crop đúng vùng lá rồi bấm chẩn đoán để kết quả hiển thị ngay tại đây.
+              Thực hiện các bước dưới để nhận kết quả dự đoán bệnh lúa từ AI
             </p>
+
+            <div className="mt-6 space-y-3">
+              {[
+                { step: 1, title: "Chọn ảnh lá lúa", desc: "Tải ảnh từ máy hoặc chụp trực tiếp từ camera" },
+                { step: 2, title: "Crop vùng lá", desc: "Chọn đúng vùng lá bị bệnh cần dự đoán" },
+                { step: 3, title: "Dự đoán", desc: "Bấm \"Dự đoán ngay\" để AI phân tích" },
+              ].map((item) => (
+                <div key={item.step} className="flex gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
+                    {item.step}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900">{item.title}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-6 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Mẹo & Lưu ý</p>
             {READY_NOTES.map((note) => (
               <div
                 key={note}
-                className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600"
+                className="rounded-[18px] border border-emerald-100 bg-emerald-50/50 px-3 py-2.5 text-xs leading-5 text-emerald-700"
               >
-                {note}
+                • {note}
               </div>
             ))}
           </div>
@@ -714,10 +534,10 @@ const AIScan = () => {
               <div>
                 <p className="text-sm font-semibold text-emerald-800">Ảnh đã sẵn sàng</p>
                 <h3 className="mt-1 text-xl font-bold text-slate-900">
-                  Có thể gửi AI chẩn đoán ngay
+                  Có thể gửi AI dự đoán ngay
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Nếu cần, bạn có thể crop lại trước khi bấm chẩn đoán để lấy đúng vùng lá muốn phân tích.
+                  Nếu cần, bạn có thể crop lại trước khi bấm dự đoán để lấy đúng vùng lá muốn phân tích.
                 </p>
               </div>
             </div>
@@ -734,7 +554,7 @@ const AIScan = () => {
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                 Gợi ý
               </p>
-              <p className="mt-2 text-base font-semibold text-slate-900">Bấm “Chẩn đoán ngay”</p>
+              <p className="mt-2 text-base font-semibold text-slate-900">Bấm “Dự đoán ngay”</p>
             </div>
           </div>
         </div>
@@ -752,7 +572,7 @@ const AIScan = () => {
           <div className="mt-5 space-y-4">
             {[
               "Chuẩn hóa ảnh đầu vào",
-              "So khớp với mô hình chẩn đoán",
+              "So khớp với mô hình dự đoán",
               "Tổng hợp dự đoán có khả năng cao nhất",
             ].map((step, index) => (
               <div
@@ -784,7 +604,7 @@ const AIScan = () => {
             <div>
               <p className="text-sm font-semibold text-rose-700">Không thể phân tích ảnh</p>
               <h3 className="mt-1 text-xl font-bold text-slate-900">
-                Có lỗi trong lúc chẩn đoán
+                Có lỗi trong lúc dự đoán
               </h3>
               <p className="mt-2 text-sm leading-6 text-rose-700">{error}</p>
             </div>
@@ -942,209 +762,6 @@ const AIScan = () => {
     </section>
   );
 
-  const canSave = Boolean(result && currentSeason && currentSeason.status === "active");
-
-  const saveModal = showSaveModal ? (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_32px_90px_-40px_rgba(15,23,42,0.45)]">
-        <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 text-white">
-          <div>
-            <p className="text-sm font-semibold text-emerald-50/80">Ghi nhận ca phát hiện</p>
-            <h3 className="text-xl font-bold">Lưu nhật ký bệnh</h3>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowSaveModal(false)}
-            className="rounded-xl p-2 transition-colors hover:bg-white/15"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto p-6">
-          {loadingModal ? (
-            <div className="flex items-center justify-center gap-3 py-16 text-slate-400">
-              <Loader2 size={24} className="animate-spin text-emerald-500" />
-              <span className="text-sm">Đang tải dữ liệu...</span>
-            </div>
-          ) : (
-            <div className="space-y-5">
-            <div className="rounded-[22px] border border-emerald-100 bg-emerald-50/80 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
-                Tóm tắt bản ghi
-              </p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-white px-4 py-3">
-                  <p className="text-xs text-slate-500">Bệnh</p>
-                  <p className="mt-1 font-semibold text-slate-900">
-                    {result?.disease || "-"}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-white px-4 py-3">
-                  <p className="text-xs text-slate-500">Độ tin cậy</p>
-                  <p className="mt-1 font-semibold text-slate-900">
-                    {typeof result?.confidence === "number"
-                      ? formatPercent(result.confidence)
-                      : "-"}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-              {/* Cảnh báo khi không có mùa vụ đang canh tác */}
-              {!loadingModal && (!currentSeason || currentSeason.status !== "active") && (
-                <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <AlertCircle size={17} className="mt-0.5 shrink-0 text-amber-500" />
-                  <p className="text-sm text-amber-800">
-                    Cánh đồng này hiện <strong>không có mùa vụ đang canh tác</strong>.
-                    Bạn chỉ có thể lưu nhật ký khi đang trong một vụ mùa hoạt động.
-                  </p>
-                </div>
-              )}
-
-              {/* Cánh đồng + Mùa vụ */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-700">Chọn cánh đồng</label>
-                  <select
-                    value={selectedField?._id || ""}
-                    onChange={(e) => {
-                      const found = fields.find((f) => f._id === e.target.value);
-                      setSelectedField(found || null);
-                    }}
-                    className="w-full rounded-2xl border border-slate-200 px-3 py-3 text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50"
-                  >
-                    {fields.length === 0 && <option value="">Chưa có cánh đồng</option>}
-                    {fields.map((field) => (
-                      <option key={field._id} value={field._id}>
-                        {field.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-slate-700">Mùa vụ đang canh tác</label>
-                  {currentSeason?.status === "active" ? (
-                    <div className="flex min-h-[50px] items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3">
-                      <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                      <span className="text-sm font-semibold text-emerald-800">{formatSeasonLabel(currentSeason)}</span>
-                    </div>
-                  ) : (
-                    <div className="flex min-h-[50px] items-center rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-400">
-                      Không có mùa vụ đang canh tác
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Ngày phát hiện */}
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Ngày phát hiện bệnh
-                </label>
-                <div className="relative">
-                  <CalendarDays
-                    size={16}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                  />
-                  <input
-                    type="date"
-                    value={detectedDate}
-                    onChange={(e) => setDetectedDate(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 py-3 pl-10 pr-3 text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50"
-                  />
-                </div>
-              </div>
-
-              {/* Chọn thửa ruộng */}
-              <div>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-                  <label className="text-sm font-semibold text-slate-700">
-                    Thửa ruộng bị ảnh hưởng
-                  </label>
-                  {loggablePlots.length > 0 && (
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={selectAllPlots}
-                        className="accent-emerald-600"
-                        onChange={(e) => {
-                          setSelectAllPlots(e.target.checked);
-                          if (e.target.checked) setSelectedPlotIds([]);
-                        }}
-                      />
-                      Tất cả các thửa ({loggablePlots.length})
-                    </label>
-                  )}
-                </div>
-
-                <div className="max-h-52 space-y-2 overflow-y-auto rounded-[22px] border border-slate-200 bg-slate-50 p-2">
-                  {loggablePlots.length === 0 ? (
-                    <p className="p-3 text-sm text-slate-400">
-                      {selectedField ? "Cánh đồng này chưa có thửa canh tác." : "Vui lòng chọn cánh đồng."}
-                    </p>
-                  ) : (
-                    loggablePlots.map((plot) => {
-                      const checked = selectAllPlots || selectedPlotIds.includes(plot._id);
-                      return (
-                        <label
-                          key={plot._id}
-                          className={`flex cursor-pointer items-center gap-3 rounded-2xl border bg-white px-3 py-3 transition-all ${
-                            checked ? "border-emerald-300 shadow-sm shadow-emerald-50" : "border-slate-100 hover:border-slate-200"
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            className="accent-emerald-600"
-                            onChange={() => togglePlotSelection(plot._id)}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className={`truncate text-sm font-medium ${checked ? "text-emerald-700" : "text-slate-700"}`}>
-                              {plot.name}
-                            </p>
-                            {plot.area ? (
-                              <p className="text-xs text-slate-400">
-                                {Number(plot.area).toLocaleString("vi-VN")} m²
-                              </p>
-                            ) : null}
-                          </div>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={() => setShowSaveModal(false)}
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-          >
-            Hủy
-          </button>
-          <button
-            type="button"
-            onClick={handleSaveDiseaseLog}
-            disabled={saveLoading || !canSave}
-            className={`rounded-2xl px-4 py-3 font-semibold text-white transition-colors ${
-              saveLoading || !canSave
-                ? "cursor-not-allowed bg-slate-300"
-                : "bg-emerald-600 hover:bg-emerald-700"
-            }`}
-          >
-            {saveLoading ? "Đang lưu..." : "Xác nhận lưu nhật ký"}
-          </button>
-        </div>
-      </div>
-    </div>
-  ) : null;
-
   return (
     <div className="app-page-shell overflow-y-auto bg-[#f4f8f5] p-3 md:overflow-hidden md:p-5">
       <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-4 md:h-full">
@@ -1154,7 +771,16 @@ const AIScan = () => {
         </div>
       </div>
 
-      {saveModal}
+      <SaveDiseaseLogModal
+        open={showSaveModal}
+        onClose={() => setShowSaveModal(false)}
+        result={result}
+        selectedImage={selectedImage}
+        onSaveSuccess={() => {
+          setResult(null);
+          setSelectedImage(null);
+        }}
+      />
       <GuideModal open={showGuideModal} onClose={() => setShowGuideModal(false)} />
       <ImageCropModal
         open={Boolean(cropSourceFile)}

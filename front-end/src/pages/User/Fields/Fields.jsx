@@ -171,10 +171,12 @@ const Fields = () => {
         await api.put(`/plots/${editingPlot._id}`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
+        toast.success("Cập nhật thửa ruộng thành công.");
       } else {
         await api.post("/plots", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
+        toast.success("Tạo thửa ruộng thành công.");
       }
 
       setIsPlotModalOpen(false);
@@ -234,7 +236,7 @@ const Fields = () => {
     <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-gray-50 font-sans">
       <aside className="z-10 flex w-[300px] shrink-0 flex-col border-r border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-4 py-4">
-          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
             <div className="rounded-lg bg-emerald-50 p-1.5">
               <Sprout size={16} className="text-emerald-600" />
             </div>
@@ -361,7 +363,7 @@ const Fields = () => {
                   <span>Tên thửa</span>
                   <span>Diện tích</span>
                   <span>Trạng thái</span>
-                  <span>Địa chỉ chi tiết</span>
+                  {/* <span>Địa chỉ chi tiết</span> */}
                   <span className="text-right">Thao tác</span>
                 </div>
 
@@ -395,7 +397,12 @@ const Fields = () => {
                               <img
                                 src={plot.imageUrl}
                                 alt={plot.name}
-                                className="h-10 w-10 rounded-lg object-cover ring-1 ring-gray-200"
+                                onClick={() => {
+                                  if (plot.imageUrl) {
+                                    window.open(plot.imageUrl, '_blank', 'noopener,noreferrer');
+                                  }
+                                }}
+                                className="cursor-pointer h-10 w-10 rounded-lg object-cover ring-1 ring-gray-200"
                               />
                             ) : (
                               <Tractor size={16} />
@@ -423,9 +430,9 @@ const Fields = () => {
                           {plot.status === "active" ? "Đang canh tác" : "Chờ vụ mới"}
                         </span>
 
-                        <p className="truncate text-xs text-gray-600" title="">
+                        {/* <p className="truncate text-xs text-gray-600" title="">
                           <span className="italic text-gray-400">Theo địa chỉ cánh đồng</span>
-                        </p>
+                        </p> */}
 
                         <div className="flex justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                           <button
@@ -543,7 +550,12 @@ const Fields = () => {
                     <img
                       src={imagePreview}
                       alt="Preview"
-                      className="h-40 w-full object-cover"
+                      onClick={() => {
+                        if (imagePreview) {
+                          window.open(imagePreview, '_blank', 'noopener,noreferrer');
+                        }
+                      }}
+                      className="cursor-pointer h-40 w-full object-cover"
                     />
                     <button
                       type="button"
