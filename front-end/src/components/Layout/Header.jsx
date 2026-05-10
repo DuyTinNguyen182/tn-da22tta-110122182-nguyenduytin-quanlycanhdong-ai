@@ -1,15 +1,19 @@
-import React from "react";
+import React, { useState } from "react";
 import { LogIn, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import HeaderOverview from "./HeaderOverview";
+import ConfirmLogout from "../Common/ConfirmLogout";
 
 const Header = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const handleLogout = async () => {
+  const [showLogout, setShowLogout] = useState(false);
+
+  const handleLogoutConfirm = async () => {
+    setShowLogout(false);
     await logout();
     navigate("/");
   };
@@ -43,13 +47,17 @@ const Header = () => {
               </div>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
-              title="Đăng xuất"
-            >
-              <LogOut size={18} />
-            </button>
+            {/* <>
+              <button
+                onClick={() => setShowLogout(true)}
+                className="ml-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                title="Đăng xuất"
+              >
+                <LogOut size={16} />
+                <span className="hidden md:inline">Đăng xuất</span>
+              </button>
+              <ConfirmLogout isOpen={showLogout} onClose={() => setShowLogout(false)} onConfirm={handleLogoutConfirm} />
+            </> */}
           </>
         ) : (
           <div className="flex items-center gap-3">

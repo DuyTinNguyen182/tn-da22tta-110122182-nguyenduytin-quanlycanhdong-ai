@@ -28,7 +28,8 @@ const ScrollToTopButton = () => {
 
   useEffect(() => {
     const updateVisibility = () => {
-      setIsVisible(isScrolledAwayFromTop());
+      const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+      setIsVisible(isDesktop && isScrolledAwayFromTop());
     };
 
     updateVisibility();

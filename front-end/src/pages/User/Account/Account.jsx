@@ -1,13 +1,26 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../../../context/AuthContext";
-import { Eye, EyeOff, User, ArrowLeft, ShieldCheck, Mail, MapPin, Phone } from "lucide-react";
+import { Eye, EyeOff, User, ArrowLeft, ShieldCheck, Mail, MapPin, Phone, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
+import ConfirmLogout from "../../../components/Common/ConfirmLogout";
 
 const Account = () => {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
+
+  const [showLogout, setShowLogout] = useState(false);
+
+  const handleLogout = () => {
+    setShowLogout(true);
+  };
+
+  const handleLogoutConfirm = async () => {
+    setShowLogout(false);
+    await logout();
+    navigate("/");
+  };
 
   const { toast } = useFeedback();
 
@@ -214,6 +227,15 @@ const Account = () => {
             <h1 className="text-2xl font-bold text-gray-900">Quản lý tài khoản</h1>
             <p className="text-sm text-gray-500">Cập nhật thông tin và bảo mật</p>
           </div>
+          <button
+            onClick={handleLogout}
+            className="ml-auto flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+            title="Đăng xuất"
+          >
+            <LogOut size={16} />
+            <span>Đăng xuất</span>
+          </button>
+          <ConfirmLogout isOpen={showLogout} onClose={() => setShowLogout(false)} onConfirm={handleLogoutConfirm} />
         </div>
 
         {/* Layout Container */}
