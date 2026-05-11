@@ -1,15 +1,26 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import FieldCard from "./components/FieldCard";
+import FieldRelationsDrawer from "./components/FieldRelationsDrawer";
 import FieldModal from "./components/FieldModal";
 
 const emptyFieldForm = {
   name: "",
   address: "",
 };
+
+const normalizeText = (value = "") =>
+  String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 
 const AdminFields = () => {
   const { toast, confirm } = useFeedback();
@@ -19,8 +30,12 @@ const AdminFields = () => {
   const [editingField, setEditingField] = useState(null);
   const [fieldForm, setFieldForm] = useState(emptyFieldForm);
   const [keyword, setKeyword] = useState("");
+  const [detailFieldId, setDetailFieldId] = useState(null);
+  const [detailKeyword, setDetailKeyword] = useState("");
+  const [fieldPlotsMap, setFieldPlotsMap] = useState({});
+  const [detailLoadingMap, setDetailLoadingMap] = useState({});
 
-  const fetchFields = async () => {
+  const fetchFields = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get("/fields");
@@ -31,23 +46,64 @@ const AdminFields = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     fetchFields();
-  }, []);
+  }, [fetchFields]);
+
+  useEffect(() => {
+    if (detailFieldId && !fields.some((field) => field._id === detailFieldId)) {
+      setDetailFieldId(null);
+      setDetailKeyword("");
+    }
+  }, [detailFieldId, fields]);
 
   const filteredFields = useMemo(() => {
-    const normalized = keyword.trim().toLowerCase();
+    const normalized = normalizeText(keyword);
     if (!normalized) return fields;
 
     return fields.filter((field) => {
-      return (
-        field.name?.toLowerCase().includes(normalized) ||
-        field.address?.toLowerCase().includes(normalized)
-      );
+      const haystack = normalizeText([field.name, field.address].filter(Boolean).join(" "));
+      return haystack.includes(normalized);
     });
   }, [fields, keyword]);
+
+  const activeDetailField = useMemo(
+    () => fields.find((field) => field._id === detailFieldId) || null,
+    [detailFieldId, fields]
+  );
+
+  const detailPlots = useMemo(
+    () => (detailFieldId ? fieldPlotsMap[detailFieldId] || [] : []),
+    [detailFieldId, fieldPlotsMap]
+  );
+
+  const isDetailLoading = detailFieldId ? Boolean(detailLoadingMap[detailFieldId]) : false;
+
+  const fetchFieldPlots = async (fieldId, options = {}) => {
+    if (!fieldId) {
+      return [];
+    }
+
+    const { force = false } = options;
+    if (!force && fieldPlotsMap[fieldId]) {
+      return fieldPlotsMap[fieldId];
+    }
+
+    try {
+      setDetailLoadingMap((prev) => ({ ...prev, [fieldId]: true }));
+      const res = await api.get("/plots", { params: { fieldId } });
+      const plots = res.data || [];
+      setFieldPlotsMap((prev) => ({ ...prev, [fieldId]: plots }));
+      return plots;
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Không thể tải danh sách thửa ruộng của cánh đồng.");
+      return [];
+    } finally {
+      setDetailLoadingMap((prev) => ({ ...prev, [fieldId]: false }));
+    }
+  };
 
   const openCreateModal = () => {
     setEditingField(null);
@@ -62,6 +118,12 @@ const AdminFields = () => {
       address: field.address || "",
     });
     setIsModalOpen(true);
+  };
+
+  const openDetailDrawer = async (field) => {
+    setDetailFieldId(field._id);
+    setDetailKeyword("");
+    await fetchFieldPlots(field._id);
   };
 
   const handleSaveField = async () => {
@@ -96,6 +158,15 @@ const AdminFields = () => {
     try {
       await api.delete(`/fields/${fieldId}`);
       toast.success("Đã xóa cánh đồng.");
+      setFieldPlotsMap((prev) => {
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
+      });
+      if (detailFieldId === fieldId) {
+        setDetailFieldId(null);
+        setDetailKeyword("");
+      }
       await fetchFields();
     } catch (error) {
       toast.error(error.response?.data?.message || "Không thể xóa cánh đồng");
@@ -107,6 +178,9 @@ const AdminFields = () => {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Quản lý cánh đồng</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Theo dõi nhanh từng cánh đồng và mở chi tiết để xem nông dân đang quản lý những thửa nào.
+          </p>
         </div>
 
         <button
@@ -141,6 +215,7 @@ const AdminFields = () => {
               field={field}
               onEdit={openEditModal}
               onDelete={handleDeleteField}
+              onViewDetails={openDetailDrawer}
             />
           ))}
         </div>
@@ -153,6 +228,19 @@ const AdminFields = () => {
         onChange={(update) => setFieldForm((prev) => ({ ...prev, ...update }))}
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveField}
+      />
+
+      <FieldRelationsDrawer
+        open={Boolean(activeDetailField)}
+        field={activeDetailField}
+        plots={detailPlots}
+        loading={isDetailLoading}
+        keyword={detailKeyword}
+        onKeywordChange={setDetailKeyword}
+        onClose={() => {
+          setDetailFieldId(null);
+          setDetailKeyword("");
+        }}
       />
     </div>
   );

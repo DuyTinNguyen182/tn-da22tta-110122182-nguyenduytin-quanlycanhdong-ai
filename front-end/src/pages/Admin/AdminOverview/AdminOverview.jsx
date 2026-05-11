@@ -1,125 +1,44 @@
-import React, { useEffect, useMemo, useState } from "react";
-import {
-  BellRing,
-  Briefcase,
-  CalendarDays,
-  ChevronDown,
-  ChevronUp,
-  Filter,
-  ListChecks,
-  Map as MapIcon,
-  RefreshCw,
-  ShieldAlert,
-  Sprout,
-} from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
-import PaginationControls from "../../../components/Common/PaginationControls";
-import CustomDropdown from "../../../components/UI/CustomDropdown";
 import { useFeedback } from "../../../hooks/useFeedback";
+import OverviewFilterPanel from "./components/OverviewFilterPanel";
+import OverviewSummaryCards from "./components/OverviewSummaryCards";
+import OverviewFarmerTable from "./components/OverviewFarmerTable";
+import {
+  ROWS_PER_PAGE,
+  buildDefaultFilters,
+  buildQueryParams,
+  buildWarningSessionKey,
+  formatCurrentSeasonBanner,
+  getFarmerGroupKey,
+  getStatusClasses,
+  getStatusText,
+  summarizeLabels,
+} from "./adminOverviewUtils.jsx";
 
-const CURRENT_YEAR = new Date().getFullYear();
-const ROWS_PER_PAGE = 10;
-
-const buildDefaultFilters = (seasonId = "", year = String(CURRENT_YEAR)) => ({
-  fieldId: "",
-  seasonId,
-  year,
-  taskId: "",
-  taskDetailId: "",
-  status: "all",
-});
-
-const buildQueryParams = (filters) => {
-  const params = {};
-
-  if (filters.fieldId) params.fieldId = filters.fieldId;
-  if (filters.seasonId) params.seasonId = filters.seasonId;
-  if (filters.year) params.year = filters.year;
-  if (filters.taskId) params.taskId = filters.taskId;
-  if (filters.taskDetailId) params.taskDetailId = filters.taskDetailId;
-  if (filters.status) params.status = filters.status;
-
-  return params;
+const emptySummary = {
+  totalPlotCount: 0,
+  doneCount: 0,
+  pendingCount: 0,
+  visibleCount: 0,
+  completionRate: 0,
+  matchedSeasonCount: 0,
+  pendingFarmerCount: 0,
+  pendingFarmerWithEmailCount: 0,
 };
 
-const getFarmerGroupKey = (row) =>
-  String(row?.recipientKey || row?.farmerId || row?.farmerEmail || "")
-    .trim()
-    .toLowerCase();
-
-const buildWarningSessionKey = (recipientKey, filters) =>
-  JSON.stringify({
-    recipientKey: String(recipientKey || "").trim().toLowerCase(),
-    fieldId: filters?.fieldId || "",
-    seasonId: filters?.seasonId || "",
-    year: filters?.year || "",
-    taskId: filters?.taskId || "",
-    taskDetailId: filters?.taskDetailId || "",
-  });
-
-const summarizeLabels = (values, maxItems = 2) => {
-  const uniqueValues = Array.from(
-    new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))
-  );
-
-  if (uniqueValues.length === 0) return "--";
-  if (uniqueValues.length <= maxItems) return uniqueValues.join(", ");
-
-  return `${uniqueValues.slice(0, maxItems).join(", ")} +${uniqueValues.length - maxItems}`;
-};
-
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa thực hiện";
-
-const getStatusClasses = (status) =>
-  status === "done"
-    ? "bg-emerald-100 text-emerald-700"
-    : "bg-amber-100 text-amber-700";
-
-const getStatusText = (status) => {
-  if (status === "done") return "Đã làm";
-  if (status === "pending") return "Chưa làm";
-  return "Tất cả";
-};
-
-const formatCurrentSeasonBanner = (currentSeason) => {
-  if (!currentSeason?.seasonName || !currentSeason?.startDate) {
-    return {
-      content: "Không có mùa vụ nào đang canh tác.",
-      className: "bg-amber-50 text-amber-900",
-    };
-  }
-
-  const start = new Date(currentSeason.startDate);
-  const now = new Date();
-  const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
-
-  return {
-    content: (
-      <>
-        Mùa vụ hiện tại:{" "}
-        <span className="font-bold">
-          {currentSeason.seasonName} {start.getFullYear()}
-        </span>
-        . Ngày bắt đầu:{" "}
-        <span className="font-semibold">{start.toLocaleDateString("vi-VN")}</span>. Mùa vụ đã bắt
-        đầu được <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span> ngày.
-      </>
-    ),
-    className: "bg-emerald-50 text-emerald-900",
-  };
+const emptyOptions = {
+  fields: [],
+  seasons: [],
+  tasks: [],
+  statuses: [],
+  years: [],
 };
 
 const AdminOverview = () => {
   const { toast, confirm } = useFeedback();
-  const [options, setOptions] = useState({
-    fields: [],
-    seasons: [],
-    tasks: [],
-    statuses: [],
-    years: [],
-  });
+  const [options, setOptions] = useState(emptyOptions);
   const [statistics, setStatistics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -143,40 +62,35 @@ const AdminOverview = () => {
       .finally(() => setCurrentSeasonLoaded(true));
   }, []);
 
-  const fetchOptions = async () => {
+  const fetchOptions = useCallback(async () => {
     const res = await api.get("/admin/plot-statistics/options");
-    setOptions(
-      res.data || {
-        fields: [],
-        seasons: [],
-        tasks: [],
-        statuses: [],
-        years: [],
+    setOptions(res.data || emptyOptions);
+  }, []);
+
+  const fetchStatistics = useCallback(
+    async (filters, { silent = false } = {}) => {
+      try {
+        if (silent) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
+
+        const res = await api.get("/admin/plot-statistics", {
+          params: buildQueryParams(filters),
+        });
+
+        setStatistics(res.data);
+      } catch (error) {
+        console.error("Lỗi tải thống kê admin:", error);
+        toast.error(error.response?.data?.message || "Không thể tải thống kê");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-    );
-  };
-
-  const fetchStatistics = async (filters, { silent = false } = {}) => {
-    try {
-      if (silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      const res = await api.get("/admin/plot-statistics", {
-        params: buildQueryParams(filters),
-      });
-
-      setStatistics(res.data);
-    } catch (error) {
-      console.error("Lỗi tải thống kê admin:", error);
-      toast.error(error.response?.data?.message || "Không thể tải thống kê");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    },
+    [toast]
+  );
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -192,12 +106,12 @@ const AdminOverview = () => {
     };
 
     bootstrap();
-  }, [toast]);
+  }, [fetchOptions, toast]);
 
   useEffect(() => {
     if (!bootstrapped || !defaultSeasonApplied) return;
     fetchStatistics(appliedFilters);
-  }, [appliedFilters, bootstrapped, defaultSeasonApplied]);
+  }, [appliedFilters, bootstrapped, defaultSeasonApplied, fetchStatistics]);
 
   const resolveInitialFilters = useMemo(() => {
     if (!currentSeason?.seasonId) {
@@ -211,7 +125,7 @@ const AdminOverview = () => {
 
     const seasonYear = currentSeason.startDate
       ? String(new Date(currentSeason.startDate).getFullYear())
-      : String(CURRENT_YEAR);
+      : undefined;
 
     return buildDefaultFilters(matchedSeason._id, seasonYear);
   }, [currentSeason, options.seasons]);
@@ -293,18 +207,10 @@ const AdminOverview = () => {
     [options.statuses]
   );
 
-  const rows = statistics?.rows || [];
-  const summary = statistics?.summary || {
-    totalPlotCount: 0,
-    doneCount: 0,
-    pendingCount: 0,
-    visibleCount: 0,
-    completionRate: 0,
-    matchedSeasonCount: 0,
-    pendingFarmerCount: 0,
-    pendingFarmerWithEmailCount: 0,
-  };
+  const rows = useMemo(() => statistics?.rows || [], [statistics]);
+  const summary = useMemo(() => statistics?.summary || emptySummary, [statistics]);
   const selectedActivity = statistics?.selectedActivity || {};
+  const hasSelectedTask = Boolean(appliedFilters.taskId);
   const selectedTaskLabel = selectedActivity.activityLabel || "Tất cả công việc";
   const matchedSeasonText =
     summary.matchedSeasonCount > 0
@@ -482,7 +388,9 @@ const AdminOverview = () => {
     );
 
     const confirmed = await confirm({
-      title: isAlreadySentInSession ? "Gửi lại cảnh báo cho nông dân này?" : "Gửi cảnh báo cho nông dân này?",
+      title: isAlreadySentInSession
+        ? "Gửi lại cảnh báo cho nông dân này?"
+        : "Gửi cảnh báo cho nông dân này?",
       message: `${group.farmerName} đang có ${group.rows.length} thửa chưa thực hiện "${selectedTaskLabel}".`,
       confirmText: isAlreadySentInSession ? "Gửi lại email" : "Gửi email",
       cancelText: "Hủy",
@@ -586,406 +494,54 @@ const AdminOverview = () => {
           {seasonBanner.content}
         </div>
 
-        <section className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xl font-bold uppercase tracking-[0.1em] text-emerald-700">
-                <Filter size={18} />
-                Bộ lọc thống kê
-              </div>
-            </div>
+        <OverviewFilterPanel
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          onReset={handleResetFilters}
+          onApply={handleApplyFilters}
+          filterForm={filterForm}
+          setFilterForm={setFilterForm}
+          fieldOptions={fieldOptions}
+          seasonOptions={seasonOptions}
+          yearOptions={yearOptions}
+          taskOptions={taskOptions}
+          taskDetailOptions={taskDetailOptions}
+          statusOptions={statusOptions}
+          currentTask={currentTask}
+          onTaskChange={handleTaskChange}
+        />
 
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition-all hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-                Làm mới
-              </button>
+        <OverviewSummaryCards
+          summary={summary}
+          selectedTaskLabel={selectedTaskLabel}
+          matchedSeasonText={matchedSeasonText}
+        />
 
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
-              >
-                Đặt lại bộ lọc
-              </button>
-
-              <button
-                type="button"
-                onClick={handleApplyFilters}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700"
-              >
-                <Filter size={16} />
-                Áp dụng
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-6 2xl:grid-cols-6">
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Cánh đồng
-              </p>
-              <CustomDropdown
-                value={filterForm.fieldId}
-                onChange={(value) => setFilterForm((prev) => ({ ...prev, fieldId: value }))}
-                options={fieldOptions}
-                placeholder="Chọn cánh đồng"
-                icon={MapIcon}
-                variant="filter"
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Mùa vụ
-              </p>
-              <CustomDropdown
-                value={filterForm.seasonId}
-                onChange={(value) => setFilterForm((prev) => ({ ...prev, seasonId: value }))}
-                options={seasonOptions}
-                placeholder="Chọn mùa vụ"
-                icon={Sprout}
-                variant="filter"
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Năm
-              </p>
-              <CustomDropdown
-                value={filterForm.year}
-                onChange={(value) => setFilterForm((prev) => ({ ...prev, year: value }))}
-                options={yearOptions}
-                placeholder="Chọn năm"
-                icon={CalendarDays}
-                variant="filter"
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Công việc
-              </p>
-              <CustomDropdown
-                value={filterForm.taskId}
-                onChange={handleTaskChange}
-                options={taskOptions}
-                placeholder="Chọn công việc"
-                icon={Briefcase}
-                variant="filter"
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Chi tiết công việc
-              </p>
-              <CustomDropdown
-                value={filterForm.taskDetailId}
-                onChange={(value) =>
-                  setFilterForm((prev) => ({ ...prev, taskDetailId: value }))
-                }
-                options={[
-                  {
-                    value: "",
-                    label: currentTask ? "Tất cả chi tiết" : "Chọn công việc trước",
-                  },
-                  ...taskDetailOptions,
-                ]}
-                placeholder="Chọn chi tiết công việc"
-                icon={ListChecks}
-                variant="filter"
-                className={!currentTask ? "opacity-70" : ""}
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Trạng thái
-              </p>
-              <CustomDropdown
-                value={filterForm.status}
-                onChange={(value) => setFilterForm((prev) => ({ ...prev, status: value }))}
-                options={statusOptions}
-                placeholder="Chọn trạng thái"
-                icon={ShieldAlert}
-                variant="filter"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-4">
-          <div className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
-              Đang hiển thị
-            </p>
-            <p className="mt-3 text-xl font-bold text-gray-900">{summary.visibleCount} thửa</p>
-          </div>
-
-          <div className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
-              Công việc đang theo dõi
-            </p>
-            <p className="mt-3 text-xl font-bold text-gray-900">{selectedTaskLabel}</p>
-          </div>
-
-          <div className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
-              Phạm vi mùa vụ
-            </p>
-            <p className="mt-3 text-xl font-bold text-gray-900">{matchedSeasonText}</p>
-          </div>
-
-          <div className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
-              Nông dân cần nhắc
-            </p>
-            <p className="mt-3 text-3xl font-bold text-amber-600">
-              {summary.pendingFarmerCount}
-            </p>
-          </div>
-        </section>
-
-        <section className="rounded-[28px] border border-gray-100 bg-white shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Bảng thống kê theo nông dân</h2>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
-              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                Đã làm
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700">
-                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                Chưa làm
-              </span>
-              <button
-                type="button"
-                onClick={handleWarningAll}
-                disabled={
-                  sendingAllWarnings ||
-                  warnableFarmerGroups.length === 0 ||
-                  loading ||
-                  !appliedFilters.taskId
-                }
-                className="ml-1 inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 font-semibold text-white shadow-md shadow-amber-200 transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none"
-              >
-                <BellRing size={15} />
-                {sendingAllWarnings ? "Đang gửi..." : "Cảnh báo tất cả"}
-              </button>
-            </div>
-          </div>
-
-          {loading ? (
-            <LoadingScreen message="Đang cập nhật bảng thống kê..." />
-          ) : rows.length === 0 ? (
-            <div className="flex h-72 flex-col items-center justify-center px-6 text-center">
-              <div className="rounded-3xl bg-amber-50 p-4 text-amber-600">
-                <ShieldAlert size={28} />
-              </div>
-              <p className="mt-4 text-lg font-semibold text-gray-800">Chưa có dữ liệu phù hợp</p>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-gray-500">
-                Hãy thử đổi mùa vụ, năm, công việc hoặc trạng thái. Nếu đang lọc theo chi tiết công
-                việc, cần kiểm tra xem công việc cha đã được chọn đúng chưa.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="overflow-x-hidden">
-                <table className="w-full table-fixed">
-                  <thead className="bg-gray-50 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                    <tr>
-                      <th className="w-[24%] px-5 py-4">Nông dân</th>
-                      <th className="w-[14%] px-5 py-4">Thửa ruộng</th>
-                      <th className="w-[23%] px-5 py-4">Phạm vi</th>
-                      <th className="w-[16%] px-5 py-4">Công việc</th>
-                      <th className="w-[13%] px-5 py-4">Tiến độ</th>
-                      <th className="w-[10%] px-5 py-4 text-right">Cảnh báo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedFarmerRows.map((group) => {
-                      const pendingGroup = pendingFarmerGroups.get(group.recipientKey);
-                      const isExpanded = expandedFarmerKeys.has(group.recipientKey);
-                      const isSendingGroup =
-                        sendingRecipientKey && sendingRecipientKey === group.recipientKey;
-                      const canWarn =
-                        group.pendingCount > 0 &&
-                        Boolean(pendingGroup?.farmerEmail) &&
-                        Boolean(appliedFilters.taskId);
-                      const isSentInSession = sentWarningKeys.has(
-                        buildWarningSessionKey(group.recipientKey, appliedFilters)
-                      );
-
-                      return (
-                        <React.Fragment key={group.recipientKey}>
-                          <tr className="border-t border-gray-100 align-top">
-                            <td className="break-words px-5 py-4">
-                              <div className="flex min-w-0 items-start gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleFarmerExpanded(group.recipientKey)}
-                                  className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-gray-200 text-gray-500 transition-all hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-                                  aria-label={isExpanded ? "Ẩn chi tiết thửa ruộng" : "Xem chi tiết thửa ruộng"}
-                                >
-                                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                </button>
-
-                                <div className="min-w-0">
-                                  <p className="font-semibold text-gray-900">{group.farmerName}</p>
-                                  <p className="mt-1 text-sm text-gray-500">{group.farmerEmail || "--"}</p>
-                                  <p className="mt-1 text-sm text-gray-400">{group.farmerPhone || "--"}</p>
-                                  {isSentInSession ? (
-                                    <p className="mt-2 text-xs font-medium text-sky-700">
-                                      Đã gửi cảnh báo trong phiên hiện tại.
-                                    </p>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </td>
-
-                            <td className="break-words px-5 py-4">
-                              <p className="font-semibold text-gray-900">{group.totalPlotCount} thửa</p>
-                              <p className="mt-1 text-sm text-gray-500">
-                                Tổng diện tích: {group.totalArea.toLocaleString("vi-VN")} m2
-                              </p>
-                              <button
-                                type="button"
-                                onClick={() => toggleFarmerExpanded(group.recipientKey)}
-                                className="mt-3 inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600 transition-all hover:bg-gray-200"
-                              >
-                                {isExpanded ? "Ẩn chi tiết" : `Xem ${group.totalPlotCount} thửa`}
-                              </button>
-                            </td>
-
-                            <td className="break-words px-5 py-4">
-                              <div className="inline-flex max-w-full items-center gap-2 rounded-2xl bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-                                <MapIcon size={14} />
-                                {group.fieldSummary}
-                              </div>
-                              <p className="mt-2 text-sm text-gray-500">Mùa vụ: {group.seasonSummary}</p>
-                            </td>
-
-                            <td className="break-words px-5 py-4">
-                              <p className="font-semibold text-gray-900">{selectedTaskLabel}</p>
-                              <p className="mt-1 text-sm text-gray-500">
-                                {appliedFilters.taskDetailId
-                                  ? "Đang lọc theo chi tiết công việc đã chọn"
-                                  : "Tổng hợp theo bộ lọc hiện tại"}
-                              </p>
-                            </td>
-
-                            <td className="break-words px-5 py-4">
-                              <div className="flex flex-wrap gap-2">
-                                <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
-                                  Đã làm: {group.doneCount}
-                                </span>
-                                <span className="inline-flex rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700">
-                                  Chưa làm: {group.pendingCount}
-                                </span>
-                              </div>
-                              <p className="mt-2 text-sm text-gray-500">
-                                Hoàn thành:{" "}
-                                {group.totalPlotCount
-                                  ? Math.round((group.doneCount / group.totalPlotCount) * 100)
-                                  : 0}
-                                %
-                              </p>
-                            </td>
-
-                            <td className="px-5 py-4">
-                              <div className="flex justify-end">
-                                <button
-                                  type="button"
-                                  onClick={() => handleWarning(group)}
-                                  disabled={!canWarn || sendingAllWarnings || Boolean(sendingRecipientKey)}
-                                  className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${
-                                    !canWarn || sendingAllWarnings || Boolean(sendingRecipientKey)
-                                      ? "cursor-not-allowed bg-gray-100 text-gray-400"
-                                      : isSentInSession
-                                        ? "bg-sky-600 text-white shadow-md shadow-sky-200 hover:bg-sky-700"
-                                        : "bg-amber-500 text-white shadow-md shadow-amber-200 hover:bg-amber-600"
-                                  }`}
-                                >
-                                  <BellRing size={15} />
-                                  {group.pendingCount === 0
-                                    ? "Đã xong"
-                                    : !pendingGroup?.farmerEmail
-                                      ? "Thiếu email"
-                                      : isSendingGroup
-                                        ? "Đang gửi..."
-                                        : isSentInSession
-                                          ? "Đã gửi"
-                                          : "Cảnh báo"}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-
-                          {isExpanded ? (
-                            <tr className="border-t border-gray-100 bg-gray-50/70">
-                              <td colSpan={6} className="px-5 py-3">
-                                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                  {group.rows.map((row) => (
-                                    <div
-                                      key={row.assignmentId}
-                                      className="rounded-2xl border border-gray-200 bg-white px-4 py-3"
-                                    >
-                                      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                                        <p className="font-semibold text-gray-900">{row.plotName}</p>
-                                        <span
-                                          className={`inline-flex rounded-full px-3 py-1.5 text-xs font-semibold ${getStatusClasses(row.status)}`}
-                                        >
-                                          {getStatusText(row.status)}
-                                        </span>
-                                      </div>
-                                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-                                        <p className="text-gray-500">
-                                        Diện tích: {Number(row.plotArea || 0).toLocaleString("vi-VN")} m2
-                                        </p>
-                                        <p className="inline-flex items-center gap-2 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-700">
-                                          <MapIcon size={14} />
-                                          {row.fieldName}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          ) : null}
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-sm text-gray-500">
-                  Hiển thị {paginatedFarmerRows.length} nông dân trong tổng số{" "}
-                  {groupedFarmerRows.length} nông dân, tương ứng {summary.visibleCount} thửa theo
-                  bộ lọc hiện tại.
-                </p>
-
-                <PaginationControls
-                  page={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  disabled={loading}
-                />
-              </div>
-            </div>
-          )}
-        </section>
+        <OverviewFarmerTable
+          loading={loading}
+          hasSelectedTask={hasSelectedTask}
+          warnableFarmerGroups={warnableFarmerGroups}
+          sendingAllWarnings={sendingAllWarnings}
+          onWarningAll={handleWarningAll}
+          rows={rows}
+          paginatedFarmerRows={paginatedFarmerRows}
+          pendingFarmerGroups={pendingFarmerGroups}
+          expandedFarmerKeys={expandedFarmerKeys}
+          sendingRecipientKey={sendingRecipientKey}
+          sentWarningKeys={sentWarningKeys}
+          appliedFilters={appliedFilters}
+          selectedTaskLabel={selectedTaskLabel}
+          onToggleFarmer={toggleFarmerExpanded}
+          onWarning={handleWarning}
+          buildWarningSessionKey={buildWarningSessionKey}
+          getStatusClasses={getStatusClasses}
+          getStatusText={getStatusText}
+          summary={summary}
+          groupedFarmerRows={groupedFarmerRows}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+        />
       </div>
     </div>
   );

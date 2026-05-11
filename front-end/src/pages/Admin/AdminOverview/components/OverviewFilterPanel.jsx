@@ -1,0 +1,164 @@
+import React from "react";
+import {
+  Briefcase,
+  CalendarDays,
+  Filter,
+  ListChecks,
+  Map as MapIcon,
+  RefreshCw,
+  ShieldAlert,
+  Sprout,
+} from "lucide-react";
+import CustomDropdown from "../../../../components/UI/CustomDropdown";
+
+const OverviewFilterPanel = ({
+  refreshing,
+  onRefresh,
+  onReset,
+  onApply,
+  filterForm,
+  setFilterForm,
+  fieldOptions,
+  seasonOptions,
+  yearOptions,
+  taskOptions,
+  taskDetailOptions,
+  statusOptions,
+  currentTask,
+  onTaskChange,
+}) => {
+  return (
+    <section className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xl font-bold uppercase tracking-[0.1em] text-emerald-700">
+            <Filter size={18} />
+            Bộ lọc thống kê
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition-all hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+            Làm mới
+          </button>
+
+          <button
+            type="button"
+            onClick={onReset}
+            className="rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition-all hover:border-amber-200 hover:text-amber-700"
+          >
+            Đặt lại
+          </button>
+
+          <button
+            type="button"
+            onClick={onApply}
+            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700"
+          >
+            <Filter size={16} />
+            Áp dụng
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-6 2xl:grid-cols-6">
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+            Cánh đồng
+          </p>
+          <CustomDropdown
+            value={filterForm.fieldId}
+            onChange={(value) => setFilterForm((prev) => ({ ...prev, fieldId: value }))}
+            options={fieldOptions}
+            placeholder="Chọn cánh đồng"
+            icon={MapIcon}
+            variant="filter"
+          />
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+            Mùa vụ
+          </p>
+          <CustomDropdown
+            value={filterForm.seasonId}
+            onChange={(value) => setFilterForm((prev) => ({ ...prev, seasonId: value }))}
+            options={seasonOptions}
+            placeholder="Chọn mùa vụ"
+            icon={Sprout}
+            variant="filter"
+          />
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">Năm</p>
+          <CustomDropdown
+            value={filterForm.year}
+            onChange={(value) => setFilterForm((prev) => ({ ...prev, year: value }))}
+            options={yearOptions}
+            placeholder="Chọn năm"
+            icon={CalendarDays}
+            variant="filter"
+          />
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+            Công việc
+          </p>
+          <CustomDropdown
+            value={filterForm.taskId}
+            onChange={onTaskChange}
+            options={taskOptions}
+            placeholder="Chọn công việc"
+            icon={Briefcase}
+            variant="filter"
+          />
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+            Chi tiết công việc
+          </p>
+          <CustomDropdown
+            value={filterForm.taskDetailId}
+            onChange={(value) => setFilterForm((prev) => ({ ...prev, taskDetailId: value }))}
+            options={[
+              {
+                value: "",
+                label: currentTask ? "Tất cả chi tiết" : "Chọn công việc trước",
+              },
+              ...taskDetailOptions,
+            ]}
+            placeholder="Chọn chi tiết công việc"
+            icon={ListChecks}
+            variant="filter"
+            className={!currentTask ? "opacity-70" : ""}
+          />
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+            Trạng thái
+          </p>
+          <CustomDropdown
+            value={filterForm.status}
+            onChange={(value) => setFilterForm((prev) => ({ ...prev, status: value }))}
+            options={statusOptions}
+            placeholder="Chọn trạng thái"
+            icon={ShieldAlert}
+            variant="filter"
+          />
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default OverviewFilterPanel;

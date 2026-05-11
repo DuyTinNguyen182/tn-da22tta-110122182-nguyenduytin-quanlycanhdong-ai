@@ -43,7 +43,10 @@ const getPlotsByField = async (fieldId, currentUser) => {
     query.user = currentUser.id;
   }
 
-  return await Plot.find(query).populate("field", "name address").sort({ createdAt: 1 });
+  return await Plot.find(query)
+    .populate("field", "name address")
+    .populate("user", "fullName email phone")
+    .sort({ createdAt: 1 });
 };
 
 const createPlot = async (data, userId, imageUrl = "") => {
