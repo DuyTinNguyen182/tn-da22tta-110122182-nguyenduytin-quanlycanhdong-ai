@@ -1,5 +1,28 @@
 @import "tailwindcss";
 
+.season-recommendation-editor .ql-toolbar.ql-snow {
+  border: none;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.season-recommendation-editor .ql-container.ql-snow {
+  border: none;
+  font-size: 0.95rem;
+}
+
+.season-recommendation-editor .ql-editor {
+  min-height: 180px;
+  padding: 14px 16px 18px;
+}
+
+.season-recommendation-editor .ql-editor.ql-blank::before {
+  left: 16px;
+  right: 16px;
+  color: #94a3b8;
+  font-style: normal;
+}
+
 button,
 input[type="button"],
 input[type="submit"],

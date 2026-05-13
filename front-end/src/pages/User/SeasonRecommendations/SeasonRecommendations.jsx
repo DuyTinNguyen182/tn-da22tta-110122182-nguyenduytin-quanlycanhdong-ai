@@ -44,46 +44,6 @@ const SeasonRecommendations = () => {
 
   return (
     <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-50 p-4 lg:p-5">
-      {/* <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Khuyến nghị mùa vụ</h1>
-          <p className="mt-1 max-w-3xl text-sm text-gray-500">
-            Hiển thị các khuyến cáo canh tác theo mùa vụ gốc do admin đã bật trạng thái hiển thị.
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Khuyến cáo hiển thị</p>
-          <p className="mt-1.5 text-2xl font-bold text-gray-900">{filteredRecommendations.length}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Nguồn</p>
-          <p className="mt-1.5 text-sm font-medium text-gray-600">
-            Nội dung do admin cập nhật theo từng mùa vụ gốc.
-          </p>
-        </div>
-        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Lưu ý</p>
-          <p className="mt-1.5 text-sm font-medium text-gray-600">
-            Chỉ hiển thị các khuyến cáo đã bật trạng thái công khai.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm">
-        <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="Tìm theo mùa vụ hoặc nội dung khuyến cáo..."
-            className="w-full rounded-xl border border-gray-200 bg-gray-50/80 py-2 pl-9 pr-4 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100"
-          />
-        </div>
-      </div> */}
-
       <div className="mt-0 space-y-4">
         {loading ? (
           <LoadingScreen message="Đang tải khuyến nghị mùa vụ..." />
@@ -93,7 +53,7 @@ const SeasonRecommendations = () => {
               <ShieldAlert size={28} className="text-gray-300" />
             </div>
             <p className="font-medium text-gray-500">
-              Chưa có khuyến cáo mùa vụ nào đang được bật hiển thị.
+              Chưa có khuyến nghị mùa vụ nào đang được hiển thị.
             </p>
           </div>
         ) : (
@@ -108,7 +68,9 @@ const SeasonRecommendations = () => {
                     <CalendarDays size={18} />
                   </div>
                   <div>
-                    <h2 className="text-lg font-bold text-gray-900">Vụ {item.seasonName}</h2>
+                    <h2 className="text-lg font-bold text-gray-900">
+                      Vụ {item.seasonName}
+                    </h2>
                     <p className="text-sm text-gray-500">
                       Cập nhật lần cuối: {formatDate(item.updatedAt)}
                     </p>
@@ -125,7 +87,12 @@ const SeasonRecommendations = () => {
                   <Sparkles size={15} className="text-emerald-600" />
                   Nội dung khuyến nghị
                 </div>
-                <p className="whitespace-pre-line text-sm leading-7 text-gray-700">{item.content}</p>
+                <div
+                  className="season-recommendation-content text-sm leading-7 text-gray-700 [&_h1]:mb-3 [&_h1]:text-xl [&_h1]:font-bold [&_h2]:mb-3 [&_h2]:text-lg [&_h2]:font-bold [&_p]:mb-3 [&_p:last-child]:mb-0 [&_ul]:ml-5 [&_ul]:list-disc [&_ol]:ml-5 [&_ol]:list-decimal [&_li]:mb-1 [&_strong]:font-semibold [&_em]:italic"
+                  dangerouslySetInnerHTML={{
+                    __html: item.content || "",
+                  }}
+                />
               </div>
             </section>
           ))

@@ -1,16 +1,86 @@
-import React, { useEffect, useState } from "react";
-import {
-  CalendarDays,
-  Eye,
-  EyeOff,
-  Save,
-  ShieldAlert,
-  Sparkles,
-} from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
+import { CalendarDays, Save, ShieldAlert, Sparkles } from "lucide-react";
+import Quill from "quill";
+import "quill/dist/quill.snow.css";
 import api from "../../../services/api";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomCheckbox from "../../../components/UI/CustomCheckbox";
 import { useFeedback } from "../../../hooks/useFeedback";
+
+const quillModules = {
+  toolbar: [
+    [{ header: [1, 2, false] }],
+    ["bold", "italic", "underline"],
+    [{ list: "ordered" }, { list: "bullet" }],
+    ["clean"],
+  ],
+};
+
+const quillFormats = [
+  "header",
+  "bold",
+  "italic",
+  "underline",
+  "list",
+  "bullet",
+];
+
+const isQuillEmpty = (value) => {
+  const normalized = (value || "")
+    .replace(/<p><br><\/p>/g, "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+
+  return normalized.length === 0;
+};
+
+const SeasonRecommendationEditor = ({ value, onChange, placeholder }) => {
+  const editorRef = useRef(null);
+  const quillRef = useRef(null);
+
+  useEffect(() => {
+    if (!editorRef.current || quillRef.current) {
+      return;
+    }
+
+    const quill = new Quill(editorRef.current, {
+      theme: "snow",
+      modules: quillModules,
+      formats: quillFormats,
+      placeholder,
+    });
+
+    quillRef.current = quill;
+
+    quill.on("text-change", () => {
+      onChange(quill.root.innerHTML);
+    });
+
+    const initialValue = isQuillEmpty(value) ? "" : value;
+    quill.clipboard.dangerouslyPasteHTML(initialValue);
+  }, [onChange, placeholder, value]);
+
+  useEffect(() => {
+    const quill = quillRef.current;
+    if (!quill) {
+      return;
+    }
+
+    const currentValue = quill.root.innerHTML;
+    const nextValue = isQuillEmpty(value) ? "" : value;
+
+    if (currentValue !== nextValue) {
+      const selection = quill.getSelection();
+      quill.clipboard.dangerouslyPasteHTML(nextValue);
+      if (selection) {
+        quill.setSelection(selection.index, selection.length, "silent");
+      }
+    }
+  }, [value]);
+
+  return <div ref={editorRef} className="season-recommendation-editor" />;
+};
 
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa cập nhật";
@@ -23,13 +93,33 @@ const buildDraftMap = (items = []) =>
         content: season.recommendation?.content || "",
         isVisible: season.recommendation?.isVisible === true,
       },
-    ])
+    ]),
   );
+
+const isDraftChanged = (draft = {}, originalDraft = {}) =>
+  normalizeRichText(draft.content) !==
+    normalizeRichText(originalDraft.content) ||
+  draft.isVisible !== (originalDraft.isVisible === true);
+
+const normalizeRichText = (value) => {
+  const trimmed = (value || "").trim();
+  return isRichTextEmpty(trimmed) ? "" : trimmed;
+};
+
+const isRichTextEmpty = (value) => {
+  const textOnly = (value || "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+
+  return textOnly.length === 0;
+};
 
 const AdminSeasonRecommendations = () => {
   const { toast } = useFeedback();
   const [seasons, setSeasons] = useState([]);
   const [drafts, setDrafts] = useState({});
+  const [initialDrafts, setInitialDrafts] = useState({});
   const [loading, setLoading] = useState(true);
   const [savingSeasonId, setSavingSeasonId] = useState("");
 
@@ -39,10 +129,14 @@ const AdminSeasonRecommendations = () => {
       const res = await api.get("/season-recommendations/admin/overview");
       const nextSeasons = res.data || [];
       setSeasons(nextSeasons);
-      setDrafts(buildDraftMap(nextSeasons));
+      const nextDrafts = buildDraftMap(nextSeasons);
+      setDrafts(nextDrafts);
+      setInitialDrafts(nextDrafts);
     } catch (error) {
       console.error("Lỗi tải quản lý khuyến nghị mùa vụ:", error);
-      toast.error(error.response?.data?.message || "Không thể tải dữ liệu khuyến nghị");
+      toast.error(
+        error.response?.data?.message || "Không thể tải dữ liệu khuyến nghị",
+      );
     } finally {
       setLoading(false);
     }
@@ -64,10 +158,12 @@ const AdminSeasonRecommendations = () => {
 
   const saveSeasonRecommendation = async (season) => {
     const draft = drafts[season.seasonId] || { content: "", isVisible: false };
-    const content = draft.content.trim();
+    const content = normalizeRichText(draft.content);
 
-    if (!content) {
-      toast.warning(`Vui lòng nhập nội dung khuyến nghị cho mùa vụ ${season.seasonName}.`);
+    if (isRichTextEmpty(content)) {
+      toast.warning(
+        `Vui lòng nhập nội dung khuyến nghị cho mùa vụ ${season.seasonName}.`,
+      );
       return;
     }
 
@@ -88,16 +184,6 @@ const AdminSeasonRecommendations = () => {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
-      {/* <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Khuyến nghị mùa vụ</h1>
-        <p className="mt-1 max-w-3xl text-sm text-gray-500">
-          Hệ thống tổng hợp dữ liệu nhật ký bệnh của nông dân để nhận diện các bệnh phổ biến theo từng mùa vụ. 
-          Tuy nhiên, admin có thể cập nhật thêm khuyến nghị canh tác theo mùa vụ dựa trên dữ liệu nhật ký và kiến thức chuyên môn
-           để hỗ trợ nông dân phòng ngừa và ứng phó với các rủi ro bệnh hại. Các khuyến nghị này sẽ được hiển thị công khai cho nông dân khi admin bật trạng thái hiển thị, 
-           giúp nông dân có thêm thông tin để ra quyết định canh tác phù hợp với tình hình bệnh theo mùa vụ.        
-        </p>
-      </div> */}
-
       {loading ? (
         <LoadingScreen message="Đang tải khuyến nghị mùa vụ..." />
       ) : seasons.length === 0 ? (
@@ -107,7 +193,15 @@ const AdminSeasonRecommendations = () => {
       ) : (
         <div className="space-y-5">
           {seasons.map((season) => {
-            const draft = drafts[season.seasonId] || { content: "", isVisible: false };
+            const draft = drafts[season.seasonId] || {
+              content: "",
+              isVisible: false,
+            };
+            const originalDraft = initialDrafts[season.seasonId] || {
+              content: "",
+              isVisible: false,
+            };
+            const hasChanges = isDraftChanged(draft, originalDraft);
 
             return (
               <section
@@ -121,17 +215,9 @@ const AdminSeasonRecommendations = () => {
                     </div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <h2 className="text-lg font-bold text-gray-900">{season.seasonName}</h2>
-                        {/* <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            season.seasonVisible
-                              ? "bg-emerald-100 text-emerald-700"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {season.seasonVisible ? <Eye size={13} /> : <EyeOff size={13} />}
-                          {season.seasonVisible ? "Mùa vụ đang hiển thị" : "Mùa vụ đang ẩn"}
-                        </span> */}
+                        <h2 className="text-lg font-bold text-gray-900">
+                          {season.seasonName}
+                        </h2>
                         <span
                           className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                             draft.isVisible
@@ -139,7 +225,9 @@ const AdminSeasonRecommendations = () => {
                               : "bg-amber-100 text-amber-700"
                           }`}
                         >
-                          {draft.isVisible ? "Khuyến nghị đang hiển thị" : "Khuyến nghị đang ẩn"}
+                          {draft.isVisible
+                            ? "Khuyến nghị đang hiển thị"
+                            : "Khuyến nghị đang ẩn"}
                         </span>
                       </div>
                       <p className="mt-1 text-sm text-gray-500">
@@ -154,15 +242,17 @@ const AdminSeasonRecommendations = () => {
                   <button
                     type="button"
                     onClick={() => saveSeasonRecommendation(season)}
-                    disabled={savingSeasonId === season.seasonId}
+                    disabled={!hasChanges || savingSeasonId === season.seasonId}
                     className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white ${
-                      savingSeasonId === season.seasonId
-                        ? "cursor-not-allowed bg-gray-300"
+                      !hasChanges || savingSeasonId === season.seasonId
+                        ? "cursor-not-allowed bg-gray-300 opacity-60"
                         : "bg-emerald-600 hover:bg-emerald-700"
                     }`}
                   >
                     <Save size={15} />
-                    {savingSeasonId === season.seasonId ? "Đang lưu..." : "Lưu khuyến nghị"}
+                    {savingSeasonId === season.seasonId
+                      ? "Đang lưu..."
+                      : "Lưu khuyến nghị"}
                   </button>
                 </div>
 
@@ -195,21 +285,26 @@ const AdminSeasonRecommendations = () => {
                     <Sparkles size={15} className="text-emerald-600" />
                     Nội dung khuyến nghị hiển thị cho nông dân
                   </div>
-
-                  <textarea
-                    rows={5}
-                    value={draft.content}
-                    onChange={(e) => updateDraft(season.seasonId, "content", e.target.value)}
-                    placeholder="Nhập khuyến nghị tổng quát cho mùa vụ này..."
-                    className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                  />
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                    <SeasonRecommendationEditor
+                      value={draft.content}
+                      onChange={(value) =>
+                        updateDraft(season.seasonId, "content", value)
+                      }
+                      placeholder="Nhập khuyến nghị tổng quát cho mùa vụ này..."
+                    />
+                  </div>
 
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <label className="inline-flex cursor-pointer items-center gap-3">
                       <CustomCheckbox
                         checked={draft.isVisible}
                         onChange={() =>
-                          updateDraft(season.seasonId, "isVisible", !draft.isVisible)
+                          updateDraft(
+                            season.seasonId,
+                            "isVisible",
+                            !draft.isVisible,
+                          )
                         }
                       />
                       <span className="text-sm font-medium text-gray-700">
