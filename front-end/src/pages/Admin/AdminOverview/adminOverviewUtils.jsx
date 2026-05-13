@@ -4,7 +4,10 @@ import React from "react";
 export const CURRENT_YEAR = new Date().getFullYear();
 export const ROWS_PER_PAGE = 10;
 
-export const buildDefaultFilters = (seasonId = "", year = String(CURRENT_YEAR)) => ({
+export const buildDefaultFilters = (
+  seasonId = "",
+  year = String(CURRENT_YEAR),
+) => ({
   fieldId: "",
   seasonId,
   year,
@@ -33,7 +36,9 @@ export const getFarmerGroupKey = (row) =>
 
 export const buildWarningSessionKey = (recipientKey, filters) =>
   JSON.stringify({
-    recipientKey: String(recipientKey || "").trim().toLowerCase(),
+    recipientKey: String(recipientKey || "")
+      .trim()
+      .toLowerCase(),
     fieldId: filters?.fieldId || "",
     seasonId: filters?.seasonId || "",
     year: filters?.year || "",
@@ -43,7 +48,9 @@ export const buildWarningSessionKey = (recipientKey, filters) =>
 
 export const summarizeLabels = (values, maxItems = 2) => {
   const uniqueValues = Array.from(
-    new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))
+    new Set(
+      (values || []).map((value) => String(value || "").trim()).filter(Boolean),
+    ),
   );
 
   if (uniqueValues.length === 0) return "--";
@@ -74,17 +81,22 @@ export const formatCurrentSeasonBanner = (currentSeason) => {
   const start = new Date(currentSeason.startDate);
   const now = new Date();
   const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+  const seasonYear = currentSeason?.year || start.getFullYear();
 
   return {
     content: (
       <>
         Mùa vụ hiện tại:{" "}
         <span className="font-bold">
-          {currentSeason.seasonName} {start.getFullYear()}
+          {currentSeason.seasonName} {seasonYear}
         </span>
         . Ngày bắt đầu:{" "}
-        <span className="font-semibold">{start.toLocaleDateString("vi-VN")}</span>. Mùa vụ đã bắt
-        đầu được <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span> ngày.
+        <span className="font-semibold">
+          {start.toLocaleDateString("vi-VN")}
+        </span>
+        . Mùa vụ đã bắt đầu được{" "}
+        <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span>{" "}
+        ngày.
       </>
     ),
     className: "bg-emerald-50 text-emerald-900",

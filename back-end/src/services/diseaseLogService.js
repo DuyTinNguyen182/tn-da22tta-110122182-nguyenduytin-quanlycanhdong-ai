@@ -42,6 +42,17 @@ const normalizeSource = (value, fallback = "ai_scan") =>
 const formatComparableDate = (value) =>
   value ? new Date(value).toISOString().slice(0, 10) : "";
 
+const getSeasonYear = (seasonDetail) => {
+  if (typeof seasonDetail?.year === "number") {
+    return seasonDetail.year;
+  }
+
+  const sourceDate =
+    seasonDetail?.startDate || seasonDetail?.endDate || seasonDetail?.createdAt || null;
+
+  return sourceDate ? new Date(sourceDate).getFullYear() : null;
+};
+
 const normalizeExistingAssignments = (log = {}) =>
   (log.seasonPlotAssignments || []).map((item) => (item?._id ? String(item._id) : String(item)));
 
@@ -147,7 +158,7 @@ const mapDiseaseLogOutput = (logDoc) => {
   const fieldName = fieldObj?.name || null;
   const seasonId = seasonDetail?._id || null;
   const seasonBaseName = seasonDetail?.season?.name || seasonDetail?.seasonName || null;
-  const seasonYear = seasonDetail?.startDate ? new Date(seasonDetail.startDate).getFullYear() : null;
+  const seasonYear = getSeasonYear(seasonDetail);
   const seasonLabel = seasonBaseName
     ? seasonYear
       ? `${seasonBaseName} ${seasonYear}`
@@ -185,6 +196,7 @@ const mapDiseaseLogOutput = (logDoc) => {
     fieldId,
     fieldName,
     seasonId,
+    year: seasonYear,
     seasonLabel,
     seasonStatus,
   };
@@ -198,7 +210,7 @@ const populateDiseaseLogQuery = (query) =>
         { path: "plot", select: "name area status" },
         {
           path: "seasonDetail",
-          select: "startDate endDate seasonName",
+          select: "year startDate endDate seasonName createdAt",
           populate: { path: "season", select: "name" },
         },
         { path: "field", select: "name" },

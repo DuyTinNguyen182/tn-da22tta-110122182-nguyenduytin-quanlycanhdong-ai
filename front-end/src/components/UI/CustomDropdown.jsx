@@ -93,7 +93,7 @@ const CustomDropdown = ({
           >
             <ListboxOptions
               anchor="bottom start"
-              className="z-[100] mt-1.5 w-[var(--button-width)] min-w-[180px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50 focus:outline-none"
+              className="z-[9999] mt-1.5 w-[var(--button-width)] min-w-[180px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50 focus:outline-none"
             >
               {options.map((opt) => (
                 <ListboxOption

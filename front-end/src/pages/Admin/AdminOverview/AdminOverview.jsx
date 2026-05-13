@@ -123,9 +123,12 @@ const AdminOverview = () => {
       return buildDefaultFilters();
     }
 
-    const seasonYear = currentSeason.startDate
-      ? String(new Date(currentSeason.startDate).getFullYear())
-      : undefined;
+    const seasonYear =
+      currentSeason.year !== undefined && currentSeason.year !== null
+        ? String(currentSeason.year)
+        : currentSeason.startDate
+          ? String(new Date(currentSeason.startDate).getFullYear())
+          : undefined;
 
     return buildDefaultFilters(matchedSeason._id, seasonYear);
   }, [currentSeason, options.seasons]);

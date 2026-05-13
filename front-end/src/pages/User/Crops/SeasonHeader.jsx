@@ -12,6 +12,9 @@ import {
 import CustomDropdown from "./CustomDropdown";
 import TaskFilterDropdown from "./TaskFilterDropdown";
 
+const getSeasonYear = (season) =>
+  season?.year || (season?.startDate ? new Date(season.startDate).getFullYear() : "");
+
 const SeasonHeader = ({
   selectedField,
   sortedSeasons,
@@ -52,9 +55,7 @@ const SeasonHeader = ({
     () =>
       (sortedSeasons || []).map((season) => ({
         value: season._id,
-        label: season.startDate
-          ? `${season.name} ${new Date(season.startDate).getFullYear()}`
-          : season.name,
+        label: getSeasonYear(season) ? `${season.name} ${getSeasonYear(season)}` : season.name,
         dot: season.status === "active" ? "bg-emerald-500" : "bg-gray-300",
         badge:
           season.status === "active"
@@ -237,3 +238,6 @@ const SeasonHeader = ({
 };
 
 export default SeasonHeader;
+
+
+

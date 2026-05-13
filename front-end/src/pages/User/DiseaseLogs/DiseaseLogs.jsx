@@ -53,9 +53,12 @@ const getStatusMeta = (status) => {
   return { label: "Chưa xử lý", className: "bg-amber-100 text-amber-700" };
 };
 
+const getSeasonYear = (season) =>
+  season?.year || (season?.startDate ? new Date(season.startDate).getFullYear() : "");
+
 const formatSeasonLabel = (season) => {
   if (!season) return "";
-  const year = season.startDate ? new Date(season.startDate).getFullYear() : "";
+  const year = getSeasonYear(season);
   const baseName = season.seasonName || season.name || season.seasonLabel || "Mùa vụ";
   return year ? `${baseName} ${year}` : baseName;
 };
@@ -118,7 +121,7 @@ const DiseaseLogs = () => {
       ...formSeasons.map((s) => ({
         value: s._id,
         label: (() => {
-          const year = s.startDate ? new Date(s.startDate).getFullYear() : "";
+          const year = getSeasonYear(s);
           const base = s.seasonName || s.name || "Mùa vụ";
           return year ? `${base} ${year}` : base;
         })(),

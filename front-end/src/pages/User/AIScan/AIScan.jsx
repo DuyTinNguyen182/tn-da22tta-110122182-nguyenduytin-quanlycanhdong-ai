@@ -129,13 +129,15 @@ const sortSeasons = (items = []) =>
     );
   });
 
+const getSeasonYear = (season) =>
+  season?.year || (season?.startDate ? new Date(season.startDate).getFullYear() : "");
+
 const formatSeasonLabel = (season) => {
   if (!season) return "";
-  const year = season.startDate ? new Date(season.startDate).getFullYear() : "";
+  const year = getSeasonYear(season);
   const baseName = season.seasonName || season.name || "Mùa vụ";
   return year ? `${baseName} ${year}` : baseName;
 };
-
 let transientAIScanState = {
   selectedImage: null,
   result: null,
@@ -937,3 +939,4 @@ const AIScan = () => {
 };
 
 export default AIScan;
+

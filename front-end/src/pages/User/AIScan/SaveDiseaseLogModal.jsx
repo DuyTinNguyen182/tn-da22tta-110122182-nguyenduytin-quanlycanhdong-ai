@@ -12,13 +12,15 @@ import CustomDropdown from "../../../components/UI/CustomDropdown";
 const formatPercent = (score) =>
   typeof score === "number" ? `${(score * 100).toFixed(1)}%` : "Không xác định";
 
+const getSeasonYear = (season) =>
+  season?.year || (season?.startDate ? new Date(season.startDate).getFullYear() : "");
+
 const formatSeasonLabel = (season) => {
   if (!season) return "";
-  const year = season.startDate ? new Date(season.startDate).getFullYear() : "";
+  const year = getSeasonYear(season);
   const baseName = season.seasonName || season.name || "Mùa vụ";
   return year ? `${baseName} ${year}` : baseName;
 };
-
 const buildDiagnosisDescriptionText = (diagnosisResult) => {
   if (!diagnosisResult) return "Không có dữ liệu chẩn đoán.";
 
@@ -487,3 +489,4 @@ const SaveDiseaseLogModal = ({
 };
 
 export default SaveDiseaseLogModal;
+

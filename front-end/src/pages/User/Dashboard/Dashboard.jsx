@@ -149,9 +149,12 @@ const Dashboard = () => {
       return buildDefaultFilters();
     }
 
-    const seasonYear = currentSeason.startDate
-      ? String(new Date(currentSeason.startDate).getFullYear())
-      : String(CURRENT_YEAR);
+    const seasonYear =
+      currentSeason.year !== undefined && currentSeason.year !== null
+        ? String(currentSeason.year)
+        : currentSeason.startDate
+          ? String(new Date(currentSeason.startDate).getFullYear())
+          : String(CURRENT_YEAR);
 
     return buildDefaultFilters(matchedSeason._id, seasonYear);
   }, [currentSeason, options.seasons]);
@@ -295,13 +298,14 @@ const Dashboard = () => {
     const start = new Date(currentSeason.startDate);
     const now = new Date();
     const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    const seasonYear = currentSeason.year || start.getFullYear();
 
     seasonBanner = (
       <div className="mb-0 rounded-xl bg-emerald-50 px-6 py-4 text-base font-medium text-emerald-900 shadow-sm">
         Mùa vụ hiện tại:
         {" "}
         <span className="font-bold">
-          {currentSeason.seasonName} {start.getFullYear()}
+          {currentSeason.seasonName} {seasonYear}
         </span>
         . Ngày bắt đầu:
         {" "}

@@ -5,6 +5,62 @@ const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Plot = require("../models/plotModel");
 const { getSeasonMap, resolveSeasonId, getSeasonNameById } = require("./seasonService");
 
+const inferSeasonYear = (value) => {
+  const sourceDate =
+    value?.startDate || value?.endDate || value?.createdAt || value || null;
+
+  if (!sourceDate) {
+    return null;
+  }
+
+  const parsedDate = new Date(sourceDate);
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate.getFullYear();
+};
+
+const normalizeSeasonYear = (value, fallbackValue = null) => {
+  if (value === undefined || value === null || value === "") {
+    if (fallbackValue !== null && fallbackValue !== undefined && fallbackValue !== "") {
+      return fallbackValue;
+    }
+
+    throw new Error("Nam mua vu la bat buoc");
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 2000 || parsed > 2100) {
+    throw new Error("Nam mua vu khong hop le");
+  }
+
+  return parsed;
+};
+
+const getResolvedSeasonYear = (seasonDetail) => {
+  if (seasonDetail?.year !== undefined && seasonDetail?.year !== null && seasonDetail?.year !== "") {
+    return normalizeSeasonYear(seasonDetail.year);
+  }
+
+  return inferSeasonYear(seasonDetail);
+};
+
+const buildSeasonYearRange = (year) => ({
+  $gte: new Date(year, 0, 1),
+  $lt: new Date(year + 1, 0, 1),
+});
+
+const buildSeasonYearDuplicateQuery = (seasonId, year, excludeId = null) => ({
+  season: seasonId,
+  ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+  $or: [
+    { year },
+    {
+      $and: [
+        { $or: [{ year: { $exists: false } }, { year: null }] },
+        { startDate: buildSeasonYearRange(year) },
+      ],
+    },
+  ],
+});
+
 const decorateSeasonDetail = (seasonDoc, catalogMap) => {
   const detail = seasonDoc.toObject ? seasonDoc.toObject({ virtuals: true }) : { ...seasonDoc };
   const seasonRefId =
@@ -16,19 +72,22 @@ const decorateSeasonDetail = (seasonDoc, catalogMap) => {
 
   const seasonMeta = seasonRefId ? catalogMap.get(seasonRefId) || detail.season || null : null;
   const seasonName = seasonMeta?.name || "Khong xac dinh";
+  const year = getResolvedSeasonYear(detail);
 
   return {
     ...detail,
+    year,
     seasonId: seasonRefId,
     season: seasonMeta,
     seasonName,
+    seasonLabel: year ? `${seasonName} ${year}` : seasonName,
     name: seasonName,
   };
 };
 
 const getAllSeasonDetails = async () => {
   const [seasonDocs, catalogMap] = await Promise.all([
-    SeasonDetail.find().populate("season", "name").sort({ startDate: -1, createdAt: -1 }),
+    SeasonDetail.find().populate("season", "name").sort({ year: -1, startDate: -1, createdAt: -1 }),
     getSeasonMap(),
   ]);
 
@@ -78,6 +137,7 @@ const createSeasonDetail = async (data) => {
   const seasonId = await resolveSeasonId(data);
   const catalogMap = await getSeasonMap();
   const resolvedName = catalogMap.get(seasonId)?.name || "Khong xac dinh";
+  const year = normalizeSeasonYear(data.year, inferSeasonYear({ startDate, endDate }));
 
   const now = new Date();
   const isActive = startDate && new Date(startDate) <= now && (!endDate || new Date(endDate) >= now);
@@ -85,18 +145,14 @@ const createSeasonDetail = async (data) => {
     await ensureNoOverlappingActiveSeason();
   }
 
-  if (startDate) {
-    const exists = await SeasonDetail.findOne({
-      season: seasonId,
-      startDate: new Date(startDate),
-    });
-    if (exists) {
-      throw new Error(`Mua vu "${resolvedName}" voi ngay bat dau nay da ton tai.`);
-    }
+  const exists = await SeasonDetail.findOne(buildSeasonYearDuplicateQuery(seasonId, year));
+  if (exists) {
+    throw new Error(`Mua vu "${resolvedName}" cua nam ${year} da ton tai.`);
   }
 
   const seasonDetail = await SeasonDetail.create({
     season: seasonId,
+    year,
     startDate: startDate || null,
     endDate: endDate || null,
   });
@@ -129,6 +185,12 @@ const updateSeasonDetail = async (id, data) => {
     updateData.endDate = data.endDate;
   }
 
+  const nextYear =
+    data.year !== undefined
+      ? normalizeSeasonYear(data.year)
+      : normalizeSeasonYear(existing.year, inferSeasonYear(existing));
+  updateData.year = nextYear;
+
   const now = new Date();
   const finalStartDate =
     updateData.startDate !== undefined ? updateData.startDate : existing.startDate;
@@ -143,20 +205,13 @@ const updateSeasonDetail = async (id, data) => {
   }
 
   const newSeasonId = updateData.season || existing.season;
-  const newStartDate =
-    updateData.startDate !== undefined ? updateData.startDate : existing.startDate;
+  const duplicate = await SeasonDetail.findOne(
+    buildSeasonYearDuplicateQuery(newSeasonId, nextYear, id)
+  );
 
-  if (newStartDate) {
-    const duplicate = await SeasonDetail.findOne({
-      season: newSeasonId,
-      startDate: new Date(newStartDate),
-      _id: { $ne: id },
-    });
-
-    if (duplicate) {
-      const resolvedName = await getSeasonNameById(newSeasonId);
-      throw new Error(`Mua vu "${resolvedName}" voi ngay bat dau nay da ton tai.`);
-    }
+  if (duplicate) {
+    const resolvedName = await getSeasonNameById(newSeasonId);
+    throw new Error(`Mua vu "${resolvedName}" cua nam ${nextYear} da ton tai.`);
   }
 
   const updatedDoc = await SeasonDetail.findByIdAndUpdate(id, updateData, {
@@ -218,7 +273,7 @@ const getFarmerSeasonDetails = async (userId, fieldId) => {
 
   const seasonDocs = await SeasonDetail.find()
     .populate("season", "name")
-    .sort({ startDate: -1, createdAt: -1 });
+    .sort({ year: -1, startDate: -1, createdAt: -1 });
 
   const catalogMap = await getSeasonMap();
   const plots = await Plot.find({ user: userId, field: fieldId }).lean();

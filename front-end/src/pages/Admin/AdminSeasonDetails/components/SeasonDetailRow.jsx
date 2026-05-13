@@ -1,11 +1,20 @@
 import React from "react";
 import { CalendarCheck2, Pencil, Save, Trash2, X } from "lucide-react";
 
-const formatSeasonName = (seasonDetail) => {
-  const baseName = seasonDetail.season?.name || "Không xác định";
-  const year = seasonDetail.startDate ? new Date(seasonDetail.startDate).getFullYear() : "";
-  return year ? `${baseName} ${year}` : baseName;
+const resolveSeasonYear = (seasonDetail) => {
+  if (seasonDetail?.year) {
+    return seasonDetail.year;
+  }
+
+  if (seasonDetail?.startDate) {
+    return new Date(seasonDetail.startDate).getFullYear();
+  }
+
+  return "";
 };
+
+const formatSeasonName = (seasonDetail) =>
+  seasonDetail.season?.name || "Không xác định";
 
 const formatDate = (dateString) => {
   if (!dateString) return "--/--/----";
@@ -43,21 +52,46 @@ const renderStatus = (status) => {
 const SeasonDetailRow = ({
   detail,
   isEditing,
+  editYear,
   editStartDate,
   editEndDate,
   submitting,
+  yearOptions,
   onStartEdit,
   onSaveEdit,
   onCancelEdit,
   onFinish,
   onDelete,
+  onEditYearChange,
   onEditStartDateChange,
   onEditEndDateChange,
 }) => {
   return (
     <tr className="border-t border-gray-100 transition-colors hover:bg-gray-50">
       <td className="px-5 py-4">
-        <span className="font-semibold text-gray-800">{formatSeasonName(detail)}</span>
+        <span className="font-semibold text-gray-800">
+          {formatSeasonName(detail)}
+        </span>
+      </td>
+
+      <td className="px-5 py-4">
+        {isEditing ? (
+          <select
+            value={editYear}
+            onChange={(e) => onEditYearChange(e.target.value)}
+            className="w-[110px] rounded-lg border border-gray-200 px-3 py-1.5 text-sm outline-none focus:border-emerald-500"
+          >
+            {yearOptions.map((optionYear) => (
+              <option key={optionYear} value={optionYear}>
+                {optionYear}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-gray-700">
+            {resolveSeasonYear(detail) || "--"}
+          </span>
+        )}
       </td>
 
       <td className="px-5 py-4">
@@ -125,7 +159,7 @@ const SeasonDetailRow = ({
                 disabled={submitting}
                 onClick={() => onStartEdit(detail)}
                 className="rounded-lg bg-blue-50 p-2 text-blue-700 transition-colors hover:bg-blue-100"
-                title="Chỉnh sửa ngày"
+                title="Chỉnh sửa"
               >
                 <Pencil size={16} />
               </button>

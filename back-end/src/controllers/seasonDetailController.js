@@ -29,7 +29,7 @@ exports.getFarmerSeasonDetails = async (req, res) => {
 
 exports.createSeasonDetail = async (req, res) => {
   try {
-    const { seasonName, seasonId, seasonCode, startDate, endDate, status } =
+    const { seasonName, seasonId, seasonCode, year, startDate, endDate, status } =
       req.body;
 
     if (!seasonName && !seasonId && !seasonCode) {
@@ -43,6 +43,7 @@ exports.createSeasonDetail = async (req, res) => {
       seasonName,
       seasonId,
       seasonCode,
+      year,
       startDate,
       endDate,
       status: status || "planned",

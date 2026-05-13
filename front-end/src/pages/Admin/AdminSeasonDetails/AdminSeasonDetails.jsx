@@ -6,6 +6,26 @@ import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
 import SeasonDetailRow from "./components/SeasonDetailRow";
 
+const CURRENT_YEAR = new Date().getFullYear();
+const MIN_YEAR = 2023;
+const MAX_YEAR = CURRENT_YEAR + 5;
+const YEAR_OPTIONS = Array.from(
+  { length: MAX_YEAR - MIN_YEAR + 1 },
+  (_, index) => String(MAX_YEAR - index),
+);
+
+const resolveDetailYear = (detail) => {
+  if (detail?.year) {
+    return String(detail.year);
+  }
+
+  if (detail?.startDate) {
+    return String(new Date(detail.startDate).getFullYear());
+  }
+
+  return String(CURRENT_YEAR);
+};
+
 const AdminSeasonDetails = () => {
   const { toast, confirm } = useFeedback();
   const [seasonDetails, setSeasonDetails] = useState([]);
@@ -14,10 +34,12 @@ const AdminSeasonDetails = () => {
   const [submitting, setSubmitting] = useState(false);
 
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
+  const [year, setYear] = useState(String(CURRENT_YEAR));
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
   const [editingId, setEditingId] = useState("");
+  const [editYear, setEditYear] = useState(String(CURRENT_YEAR));
   const [editStartDate, setEditStartDate] = useState("");
   const [editEndDate, setEditEndDate] = useState("");
 
@@ -52,6 +74,10 @@ const AdminSeasonDetails = () => {
       toast.warning("Vui lòng chọn danh mục mùa vụ gốc");
       return;
     }
+    if (!year) {
+      toast.warning("Vui lòng chọn năm");
+      return;
+    }
     if (!startDate) {
       toast.warning("Vui lòng chọn ngày bắt đầu");
       return;
@@ -61,6 +87,7 @@ const AdminSeasonDetails = () => {
     try {
       const res = await api.post("/season-details", {
         seasonId: selectedSeasonId,
+        year: Number(year),
         startDate,
         endDate: endDate || null,
       });
@@ -70,7 +97,9 @@ const AdminSeasonDetails = () => {
       setEndDate("");
       toast.success("Đã tạo chi tiết mùa vụ mới.");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể tạo chi tiết mùa vụ");
+      toast.error(
+        err.response?.data?.message || "Không thể tạo chi tiết mùa vụ",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -78,17 +107,29 @@ const AdminSeasonDetails = () => {
 
   const startEdit = (detail) => {
     setEditingId(detail._id);
-    setEditStartDate(detail.startDate ? new Date(detail.startDate).toISOString().slice(0, 10) : "");
-    setEditEndDate(detail.endDate ? new Date(detail.endDate).toISOString().slice(0, 10) : "");
+    setEditYear(resolveDetailYear(detail));
+    setEditStartDate(
+      detail.startDate
+        ? new Date(detail.startDate).toISOString().slice(0, 10)
+        : "",
+    );
+    setEditEndDate(
+      detail.endDate ? new Date(detail.endDate).toISOString().slice(0, 10) : "",
+    );
   };
 
   const cancelEdit = () => {
     setEditingId("");
+    setEditYear(String(CURRENT_YEAR));
     setEditStartDate("");
     setEditEndDate("");
   };
 
   const handleSaveEdit = async (id) => {
+    if (!editYear) {
+      toast.warning("Năm không được để trống");
+      return;
+    }
     if (!editStartDate) {
       toast.warning("Ngày bắt đầu không được để trống");
       return;
@@ -97,17 +138,20 @@ const AdminSeasonDetails = () => {
     setSubmitting(true);
     try {
       const res = await api.put(`/season-details/${id}`, {
+        year: Number(editYear),
         startDate: editStartDate,
         endDate: editEndDate || null,
       });
 
       setSeasonDetails((prev) =>
-        prev.map((item) => (item._id === id ? res.data : item))
+        prev.map((item) => (item._id === id ? res.data : item)),
       );
       cancelEdit();
       toast.success("Đã cập nhật chi tiết mùa vụ.");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể cập nhật thông tin");
+      toast.error(
+        err.response?.data?.message || "Không thể cập nhật thông tin",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -117,7 +161,7 @@ const AdminSeasonDetails = () => {
     const confirmed = await confirm({
       title: "Kết thúc mùa vụ?",
       message:
-        "Bạn có chắc muốn báo kết thúc mùa vụ này ngay bây giờ? Ngày kết thúc sẽ được gán là hôm nay.",
+        "Bạn có chắc muốn bao kết thúc mùa vụ này ngay bây giờ? Ngày kết thúc sẽ được gán là hôm nay.",
       confirmText: "Kết thúc",
       tone: "primary",
     });
@@ -127,7 +171,7 @@ const AdminSeasonDetails = () => {
     try {
       const res = await api.put(`/season-details/${detail._id}/finish`);
       setSeasonDetails((prev) =>
-        prev.map((item) => (item._id === detail._id ? res.data : item))
+        prev.map((item) => (item._id === detail._id ? res.data : item)),
       );
       toast.success("Đã kết thúc mùa vụ.");
     } catch (err) {
@@ -150,10 +194,14 @@ const AdminSeasonDetails = () => {
     setSubmitting(true);
     try {
       await api.delete(`/season-details/${detail._id}`);
-      setSeasonDetails((prev) => prev.filter((item) => item._id !== detail._id));
+      setSeasonDetails((prev) =>
+        prev.filter((item) => item._id !== detail._id),
+      );
       toast.success("Đã xóa lịch trình mùa vụ.");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể xóa lịch trình mùa vụ");
+      toast.error(
+        err.response?.data?.message || "Không thể xóa lịch trình mùa vụ",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -162,9 +210,11 @@ const AdminSeasonDetails = () => {
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Quản lý chi tiết mùa vụ</h1>
+        <h1 className="text-2xl font-bold text-gray-800">
+          Quản lý chi tiết mùa vụ
+        </h1>
         <p className="mt-1 text-sm text-gray-500">
-          Lên lịch và quản lý thời gian diễn ra của các vụ mùa
+          Lên lịch và quản lý thời gian diễn ra của các vụ mưa
         </p>
       </div>
 
@@ -173,7 +223,7 @@ const AdminSeasonDetails = () => {
           <h2 className="font-bold text-gray-800">Lên lịch mùa vụ mới</h2>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
           <div className="flex flex-col gap-1 px-1">
             <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
               Danh mục mùa vụ
@@ -188,6 +238,23 @@ const AdminSeasonDetails = () => {
               placeholder="Chọn mùa vụ"
               icon={Sprout}
             />
+          </div>
+
+          <div className="flex flex-col gap-1 px-1">
+            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
+              Năm
+            </label>
+            <select
+              value={year}
+              onChange={(e) => setYear(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
+            >
+              {YEAR_OPTIONS.map((optionYear) => (
+                <option key={optionYear} value={optionYear}>
+                  {optionYear}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col gap-1 px-1">
@@ -228,8 +295,10 @@ const AdminSeasonDetails = () => {
 
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h2 className="font-bold text-gray-800">Danh Sách Lịch Trình</h2>
-          <span className="text-sm font-medium text-gray-500">Tổng: {seasonDetails.length}</span>
+          <h2 className="font-bold text-gray-800">Danh sách lịch trình</h2>
+          <span className="text-sm font-medium text-gray-500">
+            Tổng: {seasonDetails.length}
+          </span>
         </div>
 
         {loading ? (
@@ -240,11 +309,14 @@ const AdminSeasonDetails = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[700px]">
+            <table className="w-full min-w-[820px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
                     Mùa vụ
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
+                    Năm
                   </th>
                   <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
                     Ngày bắt đầu
@@ -269,14 +341,17 @@ const AdminSeasonDetails = () => {
                       key={detail._id}
                       detail={detail}
                       isEditing={isEditing}
+                      editYear={editYear}
                       editStartDate={editStartDate}
                       editEndDate={editEndDate}
                       submitting={submitting}
+                      yearOptions={YEAR_OPTIONS}
                       onStartEdit={startEdit}
                       onSaveEdit={handleSaveEdit}
                       onCancelEdit={cancelEdit}
                       onFinish={handleFinish}
                       onDelete={handleDelete}
+                      onEditYearChange={setEditYear}
                       onEditStartDateChange={setEditStartDate}
                       onEditEndDateChange={setEditEndDate}
                     />

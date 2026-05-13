@@ -47,6 +47,10 @@ const normalizeFilters = (query = {}) => ({
 });
 
 const getSeasonYear = (seasonDetail) => {
+  if (typeof seasonDetail?.year === "number") {
+    return seasonDetail.year;
+  }
+
   const sourceDate =
     seasonDetail?.startDate || seasonDetail?.endDate || seasonDetail?.createdAt || null;
 
@@ -91,10 +95,20 @@ const buildSeasonDetailQuery = (filters) => {
   }
 
   if (filters.year) {
-    query.startDate = {
-      $gte: new Date(filters.year, 0, 1),
-      $lt: new Date(filters.year + 1, 0, 1),
-    };
+    query.$or = [
+      { year: filters.year },
+      {
+        $and: [
+          { $or: [{ year: { $exists: false } }, { year: null }] },
+          {
+            startDate: {
+              $gte: new Date(filters.year, 0, 1),
+              $lt: new Date(filters.year + 1, 0, 1),
+            },
+          },
+        ],
+      },
+    ];
   }
 
   return query;
@@ -198,7 +212,7 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
 
   const seasonDetails = await SeasonDetail.find(buildSeasonDetailQuery(filters))
     .populate("season", "name")
-    .sort({ startDate: -1, createdAt: -1 })
+    .sort({ year: -1, startDate: -1, createdAt: -1 })
     .lean();
 
   const seasonDetailIds = seasonDetails.map((item) => item._id);
@@ -221,7 +235,7 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
     .populate("user", "fullName email phone")
     .populate({
       path: "seasonDetail",
-      select: "season startDate endDate createdAt",
+      select: "season year startDate endDate createdAt",
       populate: { path: "season", select: "name" },
     })
     .lean();
@@ -462,10 +476,11 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
 };
 
 const getAdminPlotStatisticsOptions = async () => {
-  const [fields, seasons, tasks] = await Promise.all([
+  const [fields, seasons, tasks, seasonYears] = await Promise.all([
     Field.find().sort({ name: 1 }).select("_id name").lean(),
     Season.find({ isVisible: { $ne: false } }).sort({ name: 1 }).select("_id name").lean(),
     Task.find().sort({ name: 1 }).lean(),
+    SeasonDetail.find().select("year startDate endDate createdAt").lean(),
   ]);
 
   const taskIds = tasks.map((item) => item._id);
@@ -487,6 +502,11 @@ const getAdminPlotStatisticsOptions = async () => {
     });
   });
 
+  const availableYears = seasonYears
+    .map((item) => getSeasonYear(item))
+    .filter((year) => typeof year === "number" && !Number.isNaN(year));
+  const maxYear = Math.max(new Date().getFullYear(), ...availableYears, MIN_YEAR);
+
   return {
     fields: fields.map((item) => ({
       _id: String(item._id),
@@ -506,10 +526,7 @@ const getAdminPlotStatisticsOptions = async () => {
       { value: "done", label: "Đã làm" },
       { value: "pending", label: "Chưa làm" },
     ],
-    years: Array.from(
-      { length: new Date().getFullYear() - MIN_YEAR + 1 },
-      (_, index) => MIN_YEAR + index
-    ),
+    years: Array.from({ length: maxYear - MIN_YEAR + 1 }, (_, index) => MIN_YEAR + index),
   };
 };
 

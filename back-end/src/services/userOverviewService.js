@@ -40,6 +40,10 @@ const normalizeFilters = (query = {}) => ({
 });
 
 const getSeasonYear = (seasonDetail) => {
+  if (typeof seasonDetail?.year === "number") {
+    return seasonDetail.year;
+  }
+
   const sourceDate =
     seasonDetail?.startDate || seasonDetail?.endDate || seasonDetail?.createdAt || null;
   return sourceDate ? new Date(sourceDate).getFullYear() : null;
@@ -78,10 +82,20 @@ const buildSeasonDetailQuery = (filters) => {
   }
 
   if (typeof filters.year === "number" && !Number.isNaN(filters.year)) {
-    query.startDate = {
-      $gte: new Date(filters.year, 0, 1),
-      $lt: new Date(filters.year + 1, 0, 1),
-    };
+    query.$or = [
+      { year: filters.year },
+      {
+        $and: [
+          { $or: [{ year: { $exists: false } }, { year: null }] },
+          {
+            startDate: {
+              $gte: new Date(filters.year, 0, 1),
+              $lt: new Date(filters.year + 1, 0, 1),
+            },
+          },
+        ],
+      },
+    ];
   }
 
   return query;
@@ -153,7 +167,7 @@ const getCurrentSeasonInfo = async (user) => {
     .populate({
       path: "seasonDetail",
       populate: { path: "season", select: "name" },
-      select: "season startDate endDate",
+      select: "season year startDate endDate",
     })
     .lean();
 
@@ -187,6 +201,7 @@ const getCurrentSeasonInfo = async (user) => {
   return {
     seasonId: current.season?._id ? String(current.season._id) : "",
     seasonName: current.season?.name || "",
+    year: getSeasonYear(current),
     startDate: current.startDate,
     endDate: current.endDate || null,
   };
@@ -196,10 +211,11 @@ const getDashboardOptions = async (user) => {
   const userPlots = await Plot.find({ user: user.id }).select("_id field").lean();
   const fieldIds = [...new Set(userPlots.map((item) => String(item.field)))];
 
-  const [fields, seasons, tasks] = await Promise.all([
+  const [fields, seasons, tasks, seasonYears] = await Promise.all([
     Field.find({ _id: { $in: fieldIds } }).select("_id name").lean(),
     Season.find({ isVisible: { $ne: false } }).select("_id name").lean(),
     Task.find().select("_id name").lean(),
+    SeasonDetail.find().select("year startDate endDate createdAt").lean(),
   ]);
 
   const taskIds = tasks.map((item) => item._id);
@@ -221,6 +237,11 @@ const getDashboardOptions = async (user) => {
     });
   });
 
+  const availableYears = seasonYears
+    .map((item) => getSeasonYear(item))
+    .filter((year) => typeof year === "number" && !Number.isNaN(year));
+  const maxYear = Math.max(new Date().getFullYear(), ...availableYears, MIN_YEAR);
+
   return {
     fields: fields.map((item) => ({ _id: String(item._id), name: item.name || "" })),
     seasons: seasons.map((item) => ({ _id: String(item._id), name: item.name || "" })),
@@ -234,10 +255,7 @@ const getDashboardOptions = async (user) => {
       { value: "done", label: "Đã làm" },
       { value: "pending", label: "Chưa làm" },
     ],
-    years: Array.from(
-      { length: new Date().getFullYear() - MIN_YEAR + 1 },
-      (_, index) => MIN_YEAR + index
-    ),
+    years: Array.from({ length: maxYear - MIN_YEAR + 1 }, (_, index) => MIN_YEAR + index),
   };
 };
 
@@ -266,7 +284,7 @@ const getDashboardStatistics = async (rawFilters, user) => {
 
   const seasonDetails = await SeasonDetail.find(buildSeasonDetailQuery(filters))
     .populate("season", "name")
-    .sort({ startDate: -1, createdAt: -1 })
+    .sort({ year: -1, startDate: -1, createdAt: -1 })
     .lean();
 
   const seasonDetailIds = seasonDetails.map((item) => item._id);
@@ -297,7 +315,7 @@ const getDashboardStatistics = async (rawFilters, user) => {
     .populate("plot", "name area status")
     .populate({
       path: "seasonDetail",
-      select: "season startDate endDate createdAt",
+      select: "season year startDate endDate createdAt",
       populate: { path: "season", select: "name" },
     })
     .lean();

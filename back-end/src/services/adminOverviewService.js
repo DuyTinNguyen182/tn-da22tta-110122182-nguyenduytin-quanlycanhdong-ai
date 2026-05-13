@@ -20,6 +20,17 @@ const toNumber = (value, fallback = null) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const getSeasonYear = (seasonDetail) => {
+  if (typeof seasonDetail?.year === "number") {
+    return seasonDetail.year;
+  }
+
+  const sourceDate =
+    seasonDetail?.startDate || seasonDetail?.endDate || seasonDetail?.createdAt || null;
+
+  return sourceDate ? new Date(sourceDate).getFullYear() : null;
+};
+
 const normalizeFilters = (query = {}) => {
   const status = ["active", "completed", "planned"].includes(query.status)
     ? query.status
@@ -168,6 +179,7 @@ const getCurrentSeasonInfo = async () => {
   return {
     seasonId: currentSeason.season?._id ? String(currentSeason.season._id) : "",
     seasonName: currentSeason.season?.name || "",
+    year: getSeasonYear(currentSeason),
     startDate: currentSeason.startDate,
     endDate: currentSeason.endDate || null,
   };
@@ -199,7 +211,11 @@ const decorateSeasonInstances = (seasonDetails, assignmentsBySeason, logsBySeaso
       _id: seasonDetail._id,
       seasonId: seasonDetail.season?._id || seasonDetail.season,
       seasonName: seasonDetail.season?.name || "Khong xac dinh",
+      year: getSeasonYear(seasonDetail),
       seasonLabel: seasonDetail.season?.name || "Khong xac dinh",
+      seasonInstanceLabel: getSeasonYear(seasonDetail)
+        ? `${seasonDetail.season?.name || "Khong xac dinh"} ${getSeasonYear(seasonDetail)}`
+        : seasonDetail.season?.name || "Khong xac dinh",
       status: computedStatus,
       startDate: seasonDetail.startDate,
       endDate: seasonDetail.endDate || null,
@@ -293,7 +309,7 @@ const buildRecentActivities = (logs, seasonDetailMap, recentLimit) => {
       plotId: plot?._id || plot || null,
       plotName: plot?.name || "",
       seasonDetailId: seasonDetail?._id || seasonDetailId,
-      seasonLabel: seasonDetail?.seasonLabel || "",
+      seasonLabel: seasonDetail?.seasonInstanceLabel || seasonDetail?.seasonLabel || "",
       status: seasonDetail?.status || "",
     };
   });
