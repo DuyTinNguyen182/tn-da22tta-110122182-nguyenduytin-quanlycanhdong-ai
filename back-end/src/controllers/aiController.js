@@ -41,6 +41,33 @@ exports.diagnoseDisease = async (req, res) => {
 
   } catch (error) {
     console.error("AI Service Error:", error.message);
+    if (axios.isAxiosError(error) && error.response) {
+      const { status, data } = error.response;
+
+      if (status === 422 && data?.status === "rejected") {
+        return res.status(422).json({
+          success: false,
+          rejected: true,
+          errorCode: data.error_code || "UNSUPPORTED_IMAGE",
+          message:
+            data.message ||
+            "Ảnh tải lên không đủ điều kiện để chẩn đoán bệnh lá lúa.",
+          guidance:
+            data.guidance ||
+            "Vui lòng dùng ảnh cận cảnh lá lúa rõ nét, đủ ánh sáng.",
+          data: data.prediction || null,
+          imageName: req.file?.originalname,
+        });
+      }
+
+      if (status === 400) {
+        return res.status(400).json({
+          success: false,
+          message: data?.error || data?.message || "Ảnh đầu vào không hợp lệ.",
+        });
+      }
+    }
+
     res.status(500).json({ 
       message: "Không thể kết nối tới dịch vụ AI. Vui lòng thử lại sau.",
       details: error.message 

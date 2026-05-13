@@ -35,6 +35,10 @@ const formatFileSize = (sizeInBytes) => {
   return `${Math.max(1, Math.round(sizeInBytes / 1024))} KB`;
 };
 
+const isRejectedDiagnosis = (scanResult) =>
+  scanResult?.status === "rejected" ||
+  scanResult?.error_code === "UNSUPPORTED_IMAGE";
+
 const getConfidenceMeta = (score, isLowConfidence = false) => {
   if (isLowConfidence) {
     return {
@@ -87,8 +91,8 @@ const buildLowConfidenceMessage = (diagnosisResult) => {
   ) {
     reasons.push(
       `độ tin cậy dưới ngưỡng ${formatPercent(
-        diagnosisResult.confidence_threshold
-      )}`
+        diagnosisResult.confidence_threshold,
+      )}`,
     );
   }
 
@@ -98,28 +102,31 @@ const buildLowConfidenceMessage = (diagnosisResult) => {
     diagnosisResult.confidence_gap < diagnosisResult.confidence_gap_threshold
   ) {
     reasons.push(
-      `top 1 và top 2 chỉ lệch ${formatPercent(diagnosisResult.confidence_gap)}`
+      `top 1 và top 2 chỉ lệch ${formatPercent(diagnosisResult.confidence_gap)}`,
     );
   }
 
   return reasons.length === 0
     ? "Kết quả AI chưa đủ chắc chắn. Bạn nên kiểm tra thêm bằng ảnh rõ hơn hoặc đối chiếu thực tế."
     : `Kết quả AI chưa đủ chắc chắn vì ${reasons.join(
-      " và "
-    )}. Bạn nên kiểm tra thêm bằng ảnh rõ hơn hoặc đối chiếu thực tế.`;
+        " và ",
+      )}. Bạn nên kiểm tra thêm bằng ảnh rõ hơn hoặc đối chiếu thực tế.`;
 };
 
 const READY_NOTES = [
   // "Ảnh sẽ được crop tự động loại bỏ bớt nền thừa trước khi phân tích.",
   "Để có kết quả tốt nhất, hãy chọn ảnh rõ nét và đủ ánh sáng ở vùng lá bệnh.",
-  "AI hỗ trợ nhận diện các bệnh phổ biến như Đạo ôn, Bạc lá, Lem lép hạt..."
+  "AI hỗ trợ nhận diện các bệnh phổ biến như Đạo ôn, Bạc lá, Lem lép hạt...",
 ];
 
 const sortSeasons = (items = []) =>
   [...items].sort((a, b) => {
     if (a.status === "active" && b.status !== "active") return -1;
     if (a.status !== "active" && b.status === "active") return 1;
-    return new Date(b.startDate || b.createdAt || 0) - new Date(a.startDate || a.createdAt || 0);
+    return (
+      new Date(b.startDate || b.createdAt || 0) -
+      new Date(a.startDate || a.createdAt || 0)
+    );
   });
 
 const formatSeasonLabel = (season) => {
@@ -142,7 +149,7 @@ const AIScan = () => {
   const cameraInputRef = useRef(null);
 
   const [selectedImage, setSelectedImage] = useState(
-    () => transientAIScanState.selectedImage
+    () => transientAIScanState.selectedImage,
   );
   const [previewUrl, setPreviewUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -180,18 +187,26 @@ const AIScan = () => {
       Array.isArray(result?.top_predictions)
         ? result.top_predictions.slice(0, 3)
         : [],
-    [result]
+    [result],
   );
 
   const confidenceWarning = useMemo(
     () => buildLowConfidenceMessage(result),
-    [result]
+    [result],
   );
 
   const confidenceMeta = useMemo(
     () =>
-      getConfidenceMeta(result?.confidence ?? 0, Boolean(result?.is_low_confidence)),
-    [result]
+      getConfidenceMeta(
+        result?.confidence ?? 0,
+        Boolean(result?.is_low_confidence),
+      ),
+    [result],
+  );
+
+  const rejectedDiagnosis = useMemo(
+    () => isRejectedDiagnosis(result),
+    [result],
   );
 
   const selectedImageInfo = useMemo(() => {
@@ -212,6 +227,13 @@ const AIScan = () => {
   const resultTips = useMemo(() => {
     if (!result) return [];
 
+    if (isRejectedDiagnosis(result)) {
+      return [
+        "Chụp lại ảnh cận cảnh đúng phần lá lúa nghi nhiễm bệnh.",
+        "Đảm bảo ảnh đủ sáng, không rung và không bị che khuất.",
+      ];
+    }
+
     if (result.is_low_confidence) {
       return [
         "Quét lại bằng ảnh gần và rõ hơn.",
@@ -227,12 +249,12 @@ const AIScan = () => {
 
   const confidencePercent = Math.max(
     0,
-    Math.min(100, (result?.confidence || 0) * 100)
+    Math.min(100, (result?.confidence || 0) * 100),
   );
 
   const gapPercent = Math.max(
     0,
-    Math.min(100, (result?.confidence_gap || 0) * 100)
+    Math.min(100, (result?.confidence_gap || 0) * 100),
   );
 
   const handleAskAI = () => {
@@ -314,11 +336,41 @@ const AIScan = () => {
       setResult(scanResult);
 
       if (scanResult?.is_low_confidence) {
-        toast.warning("Kết quả AI chưa đủ chắc chắn. Hãy đối chiếu thêm top 3 dự đoán.");
+        toast.warning(
+          "Kết quả AI chưa đủ chắc chắn. Hãy đối chiếu thêm top 3 dự đoán.",
+        );
       }
     } catch (scanError) {
       console.error(scanError);
-      setError("Không thể dự đoán. Vui lòng kiểm tra lại hệ thống AI.");
+      const response = scanError?.response;
+      const payload = response?.data;
+
+      if (response?.status === 422 && payload?.rejected) {
+        setError(null);
+        setResult({
+          ...(payload?.data || {}),
+          status: "rejected",
+          error_code: payload?.errorCode || "UNSUPPORTED_IMAGE",
+          message:
+            payload?.message ||
+            "Ảnh tải lên không đủ điều kiện để chẩn đoán bệnh lá lúa.",
+          guidance:
+            payload?.guidance ||
+            "Vui lòng dùng ảnh cận cảnh lá lúa rõ nét, đủ ánh sáng.",
+        });
+        toast.warning(
+          "Ảnh chưa phù hợp để chẩn đoán. Vui lòng chụp lại ảnh lá lúa rõ hơn.",
+        );
+      } else if (response?.status === 400) {
+        setResult(null);
+        setError(
+          payload?.message ||
+            "Ảnh đầu vào không hợp lệ. Vui lòng chọn ảnh khác.",
+        );
+      } else {
+        setResult(null);
+        setError("Không thể dự đoán. Vui lòng kiểm tra lại hệ thống AI.");
+      }
     } finally {
       setLoading(false);
     }
@@ -329,7 +381,9 @@ const AIScan = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-emerald-700">Ảnh đầu vào</p>
-          <h3 className="text-xl font-bold text-slate-900">Khung ảnh dùng để quét AI</h3>
+          <h3 className="text-xl font-bold text-slate-900">
+            Khung ảnh dùng để quét AI
+          </h3>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
@@ -363,10 +417,11 @@ const AIScan = () => {
 
       <label
         htmlFor="upload-input"
-        className={`mt-4 flex min-h-[220px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[28px] border-2 border-dashed transition-colors md:min-h-0 md:flex-1 ${previewUrl
+        className={`mt-4 flex min-h-[220px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[28px] border-2 border-dashed transition-colors md:min-h-0 md:flex-1 ${
+          previewUrl
             ? "border-emerald-200 bg-emerald-50/60"
             : "border-slate-200 bg-slate-50 hover:border-emerald-300 hover:bg-emerald-50/40"
-          }`}
+        }`}
       >
         {previewUrl ? (
           <div className="relative flex min-h-[220px] w-full items-center justify-center p-4 md:h-full">
@@ -379,7 +434,9 @@ const AIScan = () => {
               Ảnh đã sẵn sàng để quét
             </div>
             <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-slate-950/70 px-4 py-3 text-white backdrop-blur-sm">
-              <p className="truncate text-sm font-semibold">{selectedImageInfo?.name}</p>
+              <p className="truncate text-sm font-semibold">
+                {selectedImageInfo?.name}
+              </p>
               <p className="mt-1 text-xs text-white/70">
                 Có thể crop lại bất cứ lúc nào trước khi quét.
               </p>
@@ -394,7 +451,8 @@ const AIScan = () => {
               Chọn ảnh lá lúa để bắt đầu
             </h4>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-              Ngay sau khi tải lên, hệ thống sẽ mở bước crop để bạn chọn đúng vùng lá cần dự đoán.
+              Ngay sau khi tải lên, hệ thống sẽ mở bước crop để bạn chọn đúng
+              vùng lá cần dự đoán.
             </p>
           </div>
         )}
@@ -458,10 +516,11 @@ const AIScan = () => {
           type="button"
           onClick={handleScan}
           disabled={!selectedImage || loading}
-          className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors sm:ml-auto sm:w-auto ${!selectedImage || loading
+          className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors sm:ml-auto sm:w-auto ${
+            !selectedImage || loading
               ? "cursor-not-allowed bg-slate-300"
               : "bg-emerald-600 hover:bg-emerald-700"
-            }`}
+          }`}
         >
           {loading ? (
             <>
@@ -483,261 +542,343 @@ const AIScan = () => {
     <section className="flex flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm md:min-h-0">
       <div className="p-5 md:flex-1 md:overflow-y-auto md:custom-scrollbar">
         {!selectedImage && !loading && !result && !error && (
-        <div className="flex h-full flex-col justify-between">
-          <div>
-            <p className="text-sm font-semibold text-emerald-700">Kết quả phân tích</p>
-            <h3 className="mt-1 text-2xl font-bold text-slate-900">Sẵn sàng quét AI</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Thực hiện các bước dưới để nhận kết quả dự đoán bệnh lúa từ AI
-            </p>
+          <div className="flex h-full flex-col justify-between">
+            <div>
+              <p className="text-sm font-semibold text-emerald-700">
+                Kết quả phân tích
+              </p>
+              <h3 className="mt-1 text-2xl font-bold text-slate-900">
+                Sẵn sàng quét AI
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Thực hiện các bước dưới để nhận kết quả dự đoán bệnh lúa từ AI
+              </p>
+
+              <div className="mt-6 space-y-3">
+                {[
+                  {
+                    step: 1,
+                    title: "Chọn ảnh lá lúa",
+                    desc: "Tải ảnh từ máy hoặc chụp trực tiếp từ camera",
+                  },
+                  {
+                    step: 2,
+                    title: "Crop vùng lá",
+                    desc: "Chọn đúng vùng lá bị bệnh cần dự đoán",
+                  },
+                  {
+                    step: 3,
+                    title: "Dự đoán",
+                    desc: 'Bấm "Dự đoán ngay" để AI phân tích',
+                  },
+                ].map((item) => (
+                  <div key={item.step} className="flex gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
+                      {item.step}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">
+                        {item.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {item.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
             <div className="mt-6 space-y-3">
-              {[
-                { step: 1, title: "Chọn ảnh lá lúa", desc: "Tải ảnh từ máy hoặc chụp trực tiếp từ camera" },
-                { step: 2, title: "Crop vùng lá", desc: "Chọn đúng vùng lá bị bệnh cần dự đoán" },
-                { step: 3, title: "Dự đoán", desc: "Bấm \"Dự đoán ngay\" để AI phân tích" },
-              ].map((item) => (
-                <div key={item.step} className="flex gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
-                    {item.step}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900">{item.title}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{item.desc}</p>
-                  </div>
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Mẹo & Lưu ý
+              </p>
+              {READY_NOTES.map((note) => (
+                <div
+                  key={note}
+                  className="rounded-[18px] border border-emerald-100 bg-emerald-50/50 px-3 py-2.5 text-xs leading-5 text-emerald-700"
+                >
+                  • {note}
                 </div>
               ))}
             </div>
           </div>
+        )}
 
-          <div className="mt-6 space-y-3">
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Mẹo & Lưu ý</p>
-            {READY_NOTES.map((note) => (
-              <div
-                key={note}
-                className="rounded-[18px] border border-emerald-100 bg-emerald-50/50 px-3 py-2.5 text-xs leading-5 text-emerald-700"
-              >
-                • {note}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {selectedImage && !loading && !result && !error && (
-        <div className="flex h-full flex-col justify-between">
-          <div className="rounded-[24px] bg-emerald-50 p-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-emerald-700">
-                <CheckCircle size={20} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-emerald-800">Ảnh đã sẵn sàng</p>
-                <h3 className="mt-1 text-xl font-bold text-slate-900">
-                  Có thể gửi AI dự đoán ngay
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Nếu cần, bạn có thể crop lại trước khi bấm dự đoán để lấy đúng vùng lá muốn phân tích.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Trạng thái ảnh
-              </p>
-              <p className="mt-2 text-base font-semibold text-slate-900">Đã crop và chờ quét</p>
-            </div>
-            <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Gợi ý
-              </p>
-              <p className="mt-2 text-base font-semibold text-slate-900">Bấm “Dự đoán ngay”</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {loading && (
-        <div className="flex h-full flex-col justify-between">
-          <div>
-            <p className="text-sm font-semibold text-emerald-700">AI đang xử lý</p>
-            <h3 className="mt-1 text-2xl font-bold text-slate-900">
-              Đang phân tích ảnh lá lúa
-            </h3>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            {[
-              "Chuẩn hóa ảnh đầu vào",
-              "So khớp với mô hình dự đoán",
-              "Tổng hợp dự đoán có khả năng cao nhất",
-            ].map((step, index) => (
-              <div
-                key={step}
-                className="rounded-[22px] border border-emerald-100 bg-emerald-50 px-4 py-4"
-              >
-                <div className="flex items-center justify-between gap-3 text-sm font-semibold text-emerald-900">
-                  <span>{step}</span>
-                  <Loader2 size={16} className="animate-spin" />
-                </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
-                  <div
-                    className="h-full animate-pulse rounded-full bg-emerald-500"
-                    style={{ width: `${68 + index * 10}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {error && !loading && (
-        <div className="flex h-full flex-col justify-between rounded-[24px] border border-rose-100 bg-rose-50 p-4">
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-rose-600">
-              <AlertCircle size={20} />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-rose-700">Không thể phân tích ảnh</p>
-              <h3 className="mt-1 text-xl font-bold text-slate-900">
-                Có lỗi trong lúc dự đoán
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-rose-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {result && !loading && (
-        <div className="flex h-full flex-col">
-          <div className={`rounded-[24px] bg-gradient-to-r p-4 text-white ${confidenceMeta.bannerClass}`}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/75">
-                  Kết quả chính
-                </p>
-                <h3 className="mt-2 text-3xl font-bold">{result.disease}</h3>
-              </div>
-              <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">
-                {confidenceMeta.label}
-              </span>
-            </div>
-          </div>
-
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Độ tin cậy
-              </p>
-              <p className={`mt-2 text-2xl font-bold ${confidenceMeta.color}`}>
-                {formatPercent(result.confidence)}
-              </p>
-              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
-                <div
-                  className={`h-full rounded-full ${confidenceMeta.barClass}`}
-                  style={{ width: `${confidencePercent}%` }}
-                />
-              </div>
-            </div>
-
-            <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                Lệch với top 2
-              </p>
-              <p className="mt-2 text-2xl font-bold text-slate-900">
-                {formatPercent(result.confidence_gap)}
-              </p>
-              <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
-                <div
-                  className="h-full rounded-full bg-slate-400"
-                  style={{ width: `${gapPercent}%` }}
-                />
-              </div>
-            </div>
-          </div>
-
-          {confidenceWarning && (
-            <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3">
+        {selectedImage && !loading && !result && !error && (
+          <div className="flex h-full flex-col justify-between">
+            <div className="rounded-[24px] bg-emerald-50 p-4">
               <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
-                  <AlertTriangle size={18} />
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-emerald-700">
+                  <CheckCircle size={20} />
                 </div>
                 <div>
-                  <p className="font-semibold text-amber-900">Kết quả cần kiểm tra thêm</p>
-                  <p className="mt-1 text-sm leading-6 text-amber-800">
-                    {confidenceWarning}
+                  <p className="text-sm font-semibold text-emerald-800">
+                    Ảnh đã sẵn sàng
+                  </p>
+                  <h3 className="mt-1 text-xl font-bold text-slate-900">
+                    Có thể gửi AI dự đoán ngay
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Nếu cần, bạn có thể crop lại trước khi bấm dự đoán để lấy
+                    đúng vùng lá muốn phân tích.
                   </p>
                 </div>
               </div>
             </div>
-          )}
 
-          <div className="mt-4 rounded-[22px] border border-slate-100 bg-slate-50 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-slate-900">Top 3 dự đoán</p>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${confidenceMeta.chipClass}`}>
-                {confidenceMeta.label}
-              </span>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Trạng thái ảnh
+                </p>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  Đã crop và chờ quét
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                  Gợi ý
+                </p>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  Bấm “Dự đoán ngay”
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex h-full flex-col justify-between">
+            <div>
+              <p className="text-sm font-semibold text-emerald-700">
+                AI đang xử lý
+              </p>
+              <h3 className="mt-1 text-2xl font-bold text-slate-900">
+                Đang phân tích ảnh lá lúa
+              </h3>
             </div>
 
-            <div className="mt-3 space-y-3">
-              {topPredictions.map((prediction, index) => (
+            <div className="mt-5 space-y-4">
+              {[
+                "Chuẩn hóa ảnh đầu vào",
+                "So khớp với mô hình dự đoán",
+                "Tổng hợp dự đoán có khả năng cao nhất",
+              ].map((step, index) => (
                 <div
-                  key={`${prediction.class_name}-${index}`}
-                  className="rounded-[18px] bg-white px-4 py-3 shadow-sm ring-1 ring-slate-100"
+                  key={step}
+                  className="rounded-[22px] border border-emerald-100 bg-emerald-50 px-4 py-4"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {index + 1}. {prediction.disease || prediction.class_name}
-                      </p>
-                    </div>
-                    <span className="text-sm font-semibold text-slate-600">
-                      {formatPercent(prediction.confidence)}
-                    </span>
+                  <div className="flex items-center justify-between gap-3 text-sm font-semibold text-emerald-900">
+                    <span>{step}</span>
+                    <Loader2 size={16} className="animate-spin" />
                   </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
                     <div
-                      className={`h-full rounded-full ${index === 0 ? confidenceMeta.barClass : "bg-slate-400"
-                        }`}
-                      style={{
-                        width: `${Math.max(
-                          0,
-                          Math.min(100, (prediction.confidence || 0) * 100)
-                        )}%`,
-                      }}
+                      className="h-full animate-pulse rounded-full bg-emerald-500"
+                      style={{ width: `${68 + index * 10}%` }}
                     />
                   </div>
                 </div>
               ))}
             </div>
           </div>
+        )}
 
-          <div className="mt-4 rounded-[22px] border border-slate-100 bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-900">Nên làm tiếp</p>
-            <div className="mt-3 space-y-2">
-              {resultTips.map((tip, index) => (
-                <div
-                  key={tip}
-                  className="flex items-start gap-3 rounded-[18px] bg-white px-4 py-3 shadow-sm ring-1 ring-slate-100"
-                >
-                  <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
-                    {index + 1}
-                  </span>
-                  <p className="text-sm leading-6 text-slate-700">{tip}</p>
-                </div>
-              ))}
+        {error && !loading && (
+          <div className="flex h-full flex-col justify-between rounded-[24px] border border-rose-100 bg-rose-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-rose-600">
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-rose-700">
+                  Không thể phân tích ảnh
+                </p>
+                <h3 className="mt-1 text-xl font-bold text-slate-900">
+                  Có lỗi trong lúc dự đoán
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-rose-700">{error}</p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {result && !loading && (
+          <div className="flex h-full flex-col">
+            {rejectedDiagnosis ? (
+              <div className="rounded-[24px] border border-amber-200 bg-gradient-to-r from-amber-500 to-orange-500 p-4 text-white">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/20 text-white">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/75">
+                      Ảnh chưa phù hợp
+                    </p>
+                    <h3 className="mt-1 text-2xl font-bold">
+                      Không thể chẩn đoán từ ảnh này
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-white/90">
+                      {result.message ||
+                        "Ảnh tải lên không đủ điều kiện để chẩn đoán bệnh lá lúa."}
+                    </p>
+                    {result.guidance && (
+                      <p className="mt-2 text-sm leading-6 text-white/90">
+                        Gợi ý: {result.guidance}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                className={`rounded-[24px] bg-gradient-to-r p-4 text-white ${confidenceMeta.bannerClass}`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/75">
+                      Kết quả chính
+                    </p>
+                    <h3 className="mt-2 text-3xl font-bold">
+                      {result.disease}
+                    </h3>
+                  </div>
+                  <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-semibold">
+                    {confidenceMeta.label}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!rejectedDiagnosis && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Độ tin cậy
+                  </p>
+                  <p
+                    className={`mt-2 text-2xl font-bold ${confidenceMeta.color}`}
+                  >
+                    {formatPercent(result.confidence)}
+                  </p>
+                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
+                    <div
+                      className={`h-full rounded-full ${confidenceMeta.barClass}`}
+                      style={{ width: `${confidencePercent}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    Lệch với top 2
+                  </p>
+                  <p className="mt-2 text-2xl font-bold text-slate-900">
+                    {formatPercent(result.confidence_gap)}
+                  </p>
+                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
+                    <div
+                      className="h-full rounded-full bg-slate-400"
+                      style={{ width: `${gapPercent}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {confidenceWarning && !rejectedDiagnosis && (
+              <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-100 text-amber-600">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-900">
+                      Kết quả cần kiểm tra thêm
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-amber-800">
+                      {confidenceWarning}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!rejectedDiagnosis && (
+              <div className="mt-4 rounded-[22px] border border-slate-100 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-slate-900">
+                    Top 3 dự đoán
+                  </p>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${confidenceMeta.chipClass}`}
+                  >
+                    {confidenceMeta.label}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-3">
+                  {topPredictions.map((prediction, index) => (
+                    <div
+                      key={`${prediction.class_name}-${index}`}
+                      className="rounded-[18px] bg-white px-4 py-3 shadow-sm ring-1 ring-slate-100"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {index + 1}.{" "}
+                            {prediction.disease || prediction.class_name}
+                          </p>
+                        </div>
+                        <span className="text-sm font-semibold text-slate-600">
+                          {formatPercent(prediction.confidence)}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={`h-full rounded-full ${
+                            index === 0
+                              ? confidenceMeta.barClass
+                              : "bg-slate-400"
+                          }`}
+                          style={{
+                            width: `${Math.max(
+                              0,
+                              Math.min(100, (prediction.confidence || 0) * 100),
+                            )}%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 rounded-[22px] border border-slate-100 bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-slate-900">
+                Nên làm tiếp
+              </p>
+              <div className="mt-3 space-y-2">
+                {resultTips.map((tip, index) => (
+                  <div
+                    key={tip}
+                    className="flex items-start gap-3 rounded-[18px] bg-white px-4 py-3 shadow-sm ring-1 ring-slate-100"
+                  >
+                    <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
+                      {index + 1}
+                    </span>
+                    <p className="text-sm leading-6 text-slate-700">{tip}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {result && !loading && (
+      {result && !loading && !rejectedDiagnosis && (
         <div className="border-t border-slate-100 bg-white p-5 pt-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <button
@@ -781,7 +922,10 @@ const AIScan = () => {
           setSelectedImage(null);
         }}
       />
-      <GuideModal open={showGuideModal} onClose={() => setShowGuideModal(false)} />
+      <GuideModal
+        open={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+      />
       <ImageCropModal
         open={Boolean(cropSourceFile)}
         imageFile={cropSourceFile}

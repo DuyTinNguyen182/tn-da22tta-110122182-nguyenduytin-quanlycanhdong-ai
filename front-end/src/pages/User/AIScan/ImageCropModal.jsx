@@ -5,7 +5,8 @@ import { Loader2, ScanLine, X } from "lucide-react";
 const UI_TEXT = {
   eyebrow: "Cắt ảnh trước khi quét",
   title: "Chọn đúng vùng lá cần chẩn đoán",
-  dragHint: "Kéo ảnh để căn vị trí, sau đó tăng hoặc giảm zoom để lấy đúng vùng lá.",
+  dragHint:
+    "Kéo ảnh để căn vị trí, sau đó tăng hoặc giảm zoom để lấy đúng vùng lá.",
   zoomLabel: "Độ phóng to",
   quickTips: "Gợi ý nhanh",
   cancel: "Hủy",
@@ -41,7 +42,7 @@ const getCroppedImg = async (imageSrc, pixelCrop, targetType) => {
     0,
     0,
     1024,
-    1024
+    1024,
   );
 
   return new Promise((resolve, reject) => {
@@ -51,11 +52,10 @@ const getCroppedImg = async (imageSrc, pixelCrop, targetType) => {
           reject(new Error("Canvas is empty"));
           return;
         }
-
         resolve(blob);
       },
       targetType,
-      0.92
+      0.92,
     );
   });
 };
@@ -105,7 +105,8 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
     setSubmitting(true);
 
     try {
-      const targetType = imageFile.type === "image/png" ? "image/png" : "image/jpeg";
+      const targetType =
+        imageFile.type === "image/png" ? "image/png" : "image/jpeg";
       const blob = await getCroppedImg(imageUrl, croppedAreaPixels, targetType);
       const extension = targetType === "image/png" ? "png" : "jpg";
       const baseName = imageFile.name.replace(/\.[^.]+$/, "");
@@ -138,10 +139,15 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
         onClick={(e) => e.stopPropagation()}
         className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[16px] border border-white/15 bg-white shadow-[0_40px_100px_-40px_rgba(15,23,42,0.7)]"
       >
-        <div className="flex items-start justify-between border-b border-slate-100 px-4 py-4 md:px-6">
+        {/* Header */}
+        <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-4 py-4 md:px-6">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-emerald-700">{UI_TEXT.eyebrow}</p>
-            <h3 className="text-lg font-bold text-slate-900 md:text-xl">{UI_TEXT.title}</h3>
+            <p className="text-sm font-semibold text-emerald-700">
+              {UI_TEXT.eyebrow}
+            </p>
+            <h3 className="text-lg font-bold text-slate-900 md:text-xl">
+              {UI_TEXT.title}
+            </h3>
           </div>
 
           <button
@@ -153,17 +159,21 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
           </button>
         </div>
 
-        <div className="overflow-y-auto px-4 py-4 md:px-0 md:py-0">
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_280px] md:gap-6 md:p-6">
-            <div className="rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,#152238_0%,#050816_75%)] p-3 shadow-inner shadow-slate-950/30">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
+        {/* Body  */}
+        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden px-4 py-4 md:px-0 md:py-0">
+          {/* Thêm md:h-[65vh] và md:min-h-[520px] để ép khung chứa phải cao lên, ảnh sẽ to ra tối đa */}
+          <div className="flex flex-col md:grid md:h-[65vh] md:min-h-[520px] gap-4 md:grid-cols-[minmax(0,1fr)_280px] md:gap-6 md:p-6">
+            {/* Vùng Cropper */}
+            <div className="flex flex-col h-full min-h-[400px] md:min-h-0 rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,#152238_0%,#050816_75%)] p-3 shadow-inner shadow-slate-950/30">
+              <div className="mb-3 self-start inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
                 <ScanLine size={14} />
                 <span>{UI_TEXT.frameHint}</span>
               </div>
 
-              <div className="relative mx-auto aspect-square w-full max-w-[520px] overflow-hidden rounded-[16px] bg-slate-950 ring-1 ring-white/10">
+              {/* Vùng không gian hiển thị ảnh sẽ tự động lấp đầy phần cao còn lại */}
+              <div className="relative flex-1 w-full overflow-hidden rounded-[16px] bg-slate-950 ring-1 ring-white/10">
                 {imageLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center text-white/90">
+                  <div className="absolute inset-0 z-20 flex items-center justify-center text-white/90">
                     <Loader2 className="animate-spin" />
                   </div>
                 )}
@@ -182,14 +192,17 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
                   }}
                 />
 
-                <div className="pointer-events-none absolute inset-0 rounded-[16px] ring-2 ring-white/90" />
+                <div className="pointer-events-none absolute inset-0 z-10 rounded-[16px] ring-2 ring-white/90" />
               </div>
             </div>
 
-            <div className="flex flex-col gap-4">
+            {/* Vùng Controls (Gợi ý và thanh trượt) */}
+            <div className="flex flex-col gap-4 overflow-y-auto md:overflow-visible">
               <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-slate-900">{UI_TEXT.zoomLabel}</p>
+                  <p className="text-sm font-semibold text-slate-900">
+                    {UI_TEXT.zoomLabel}
+                  </p>
                   <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                     {zoom.toFixed(2)}x
                   </span>
@@ -210,11 +223,15 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
                   <span>3.0x</span>
                 </div>
 
-                <p className="mt-3 text-xs leading-5 text-slate-500">{UI_TEXT.dragHint}</p>
+                <p className="mt-3 text-xs leading-5 text-slate-500">
+                  {UI_TEXT.dragHint}
+                </p>
               </div>
 
               <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/80 p-4">
-                <p className="text-sm font-semibold text-emerald-900">{UI_TEXT.quickTips}</p>
+                <p className="text-sm font-semibold text-emerald-900">
+                  {UI_TEXT.quickTips}
+                </p>
                 <div className="mt-3 space-y-2">
                   {QUICK_TIPS.map((tip) => (
                     <div
@@ -230,7 +247,8 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-4 py-4 sm:flex-row sm:justify-end md:px-6">
+        {/* Footer */}
+        <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 px-4 py-4 sm:flex-row sm:justify-end md:px-6">
           <button
             type="button"
             onClick={onClose}
@@ -245,7 +263,9 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
             onClick={handleApplyCrop}
             disabled={submitting}
             className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors sm:w-auto ${
-              submitting ? "cursor-not-allowed bg-slate-300" : "bg-emerald-600 hover:bg-emerald-700"
+              submitting
+                ? "cursor-not-allowed bg-slate-300"
+                : "bg-emerald-600 hover:bg-emerald-700"
             }`}
             aria-disabled={submitting}
           >

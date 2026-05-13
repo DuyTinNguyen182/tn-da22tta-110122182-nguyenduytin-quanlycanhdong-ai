@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 from flask import Flask, jsonify, request
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 APP_DIR = Path(__file__).resolve().parent
 DEFAULT_H5_MODEL_PATH = APP_DIR / "rice_disease_model.h5"
@@ -36,6 +36,7 @@ RESAMPLE_BILINEAR = (
 )
 DEFAULT_CONFIDENCE_THRESHOLD = 0.8
 DEFAULT_CONFIDENCE_GAP_THRESHOLD = 0.12
+DEFAULT_REJECT_LOW_CONFIDENCE = True
 
 
 def _resolve_path(env_name, fallback_path):
@@ -74,6 +75,21 @@ def _resolve_float_setting(env_name, metadata, metadata_key, default_value):
             pass
 
     return float(default_value)
+
+
+def _resolve_bool_setting(env_name, metadata, metadata_key, default_value):
+    raw_value = os.getenv(env_name, "").strip().lower()
+    if raw_value:
+        if raw_value in {"1", "true", "yes", "on"}:
+            return True
+        if raw_value in {"0", "false", "no", "off"}:
+            return False
+
+    metadata_value = metadata.get(metadata_key)
+    if isinstance(metadata_value, bool):
+        return metadata_value
+
+    return bool(default_value)
 
 
 def _resolve_class_metadata():
@@ -203,6 +219,16 @@ def _build_response(probabilities, class_names, display_names):
     }
 
 
+def _build_rejected_response(result):
+    return {
+        "status": "rejected",
+        "error_code": "UNSUPPORTED_IMAGE",
+        "message": "Ảnh tải lên không đủ điều kiện để chẩn đoán bệnh lá lúa.",
+        "guidance": "Vui lòng sử dụng ảnh cận cảnh lá lúa rõ nét, đủ ánh sáng, không bị mờ.",
+        "prediction": result,
+    }
+
+
 app = Flask(__name__)
 try:
     app.json.ensure_ascii = False
@@ -225,6 +251,12 @@ CONFIDENCE_GAP_THRESHOLD = _resolve_float_setting(
     "confidence_gap_threshold",
     DEFAULT_CONFIDENCE_GAP_THRESHOLD,
 )
+REJECT_LOW_CONFIDENCE = _resolve_bool_setting(
+    "RICE_DISEASE_REJECT_LOW_CONFIDENCE",
+    MODEL_METADATA,
+    "reject_low_confidence",
+    DEFAULT_REJECT_LOW_CONFIDENCE,
+)
 MODEL_OUTPUT_UNITS = int(MODEL.output_shape[-1])
 if len(CLASS_NAMES) != MODEL_OUTPUT_UNITS:
     raise RuntimeError(
@@ -245,6 +277,7 @@ def health_check():
             "target_size": list(TARGET_SIZE),
             "confidence_threshold": CONFIDENCE_THRESHOLD,
             "confidence_gap_threshold": CONFIDENCE_GAP_THRESHOLD,
+            "reject_low_confidence": REJECT_LOW_CONFIDENCE,
         }
     )
 
@@ -255,7 +288,15 @@ def predict():
         return jsonify({"error": "No file uploaded"}), 400
 
     file = request.files["file"]
-    image = Image.open(io.BytesIO(file.read()))
+    file_bytes = file.read()
+    if not file_bytes:
+        return jsonify({"error": "Uploaded file is empty"}), 400
+
+    try:
+        image = Image.open(io.BytesIO(file_bytes))
+    except UnidentifiedImageError:
+        return jsonify({"error": "Uploaded file is not a valid image"}), 400
+
     processed_image = prepare_image(image, TARGET_SIZE, INPUT_RANGE)
     prediction = MODEL.predict(processed_image, verbose=0)[0]
     result = _build_response(prediction, CLASS_NAMES, DISPLAY_NAMES)
@@ -266,6 +307,9 @@ def predict():
     ):
         print(f"{class_name} | {display_name}: {score:.4f}")
     print("=========================")
+
+    if REJECT_LOW_CONFIDENCE and result["is_low_confidence"]:
+        return jsonify(_build_rejected_response(result)), 422
 
     return jsonify(result)
 
