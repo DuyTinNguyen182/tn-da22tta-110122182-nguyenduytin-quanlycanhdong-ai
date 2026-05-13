@@ -131,7 +131,10 @@ const CustomDropdown = ({
                         </span>
                       )}
                       {selected && (
-                        <Check size={14} className="shrink-0 text-emerald-600" />
+                        <Check
+                          size={14}
+                          className="shrink-0 text-emerald-600"
+                        />
                       )}
                     </>
                   )}

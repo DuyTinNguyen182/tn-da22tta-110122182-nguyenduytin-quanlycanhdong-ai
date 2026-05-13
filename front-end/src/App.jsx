@@ -29,6 +29,7 @@ import AdminSeasonRecommendations from "./pages/Admin/AdminSeasonRecommendations
 import AdminAnnouncements from "./pages/Admin/AdminAnnouncements/AdminAnnouncements";
 import AdminTasks from "./pages/Admin/AdminTasks/AdminTasks";
 import AdminTaskDetails from "./pages/Admin/AdminTaskDetails/AdminTaskDetails";
+import AdminDiseaseMonitoring from "./pages/Admin/AdminDiseaseMonitoring/AdminDiseaseMonitoring";
 
 function App() {
   return (
@@ -64,6 +65,7 @@ function App() {
                 path="/admin/season-recommendations"
                 element={<AdminSeasonRecommendations />}
               />
+              <Route path="/admin/disease-monitoring" element={<AdminDiseaseMonitoring />} />
               <Route path="/admin/announcements" element={<AdminAnnouncements />} />
               <Route path="/admin/tasks" element={<AdminTasks />} />
               <Route path="/admin/task-details" element={<AdminTaskDetails />} />

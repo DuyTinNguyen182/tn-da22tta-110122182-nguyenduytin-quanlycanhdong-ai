@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
+  AlertTriangle,
   Bell,
   BookText,
   Briefcase,
@@ -24,9 +25,22 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
     { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
     { name: "Lịch mùa vụ", icon: CalendarRange, path: "/admin/season-details" },
     { name: "Công việc", icon: Briefcase, path: "/admin/tasks" },
-    { name: "Chi tiết công việc", icon: ListChecks, path: "/admin/task-details" },
+    {
+      name: "Chi tiết công việc",
+      icon: ListChecks,
+      path: "/admin/task-details",
+    },
+    {
+      name: "Theo dõi dịch bệnh",
+      icon: AlertTriangle,
+      path: "/admin/disease-monitoring",
+    },
     { name: "Thông báo & cảnh báo", icon: Bell, path: "/admin/announcements" },
-    { name: "Khuyến nghị mùa vụ", icon: BookText, path: "/admin/season-recommendations" },
+    {
+      name: "Khuyến nghị mùa vụ",
+      icon: BookText,
+      path: "/admin/season-recommendations",
+    },
   ];
 
   return (
@@ -75,7 +89,11 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
               }`}
             >
               <item.icon size={20} className="stroke-[1.5] flex-shrink-0" />
-              {!collapsed && <span className="ml-3 whitespace-nowrap text-sm">{item.name}</span>}
+              {!collapsed && (
+                <span className="ml-3 whitespace-nowrap text-sm">
+                  {item.name}
+                </span>
+              )}
 
               {collapsed && (
                 <div className="pointer-events-none absolute left-full top-1/2 z-[100] ml-4 -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-800 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-xl transition-all duration-200 group-hover:opacity-100">
