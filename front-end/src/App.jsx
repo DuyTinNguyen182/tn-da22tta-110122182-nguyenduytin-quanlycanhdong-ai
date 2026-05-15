@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { AnnouncementProvider } from "./context/AnnouncementContext";
 import FeedbackProvider from "./components/Feedback/FeedbackProvider";
 
 import ProtectedLayout from "./components/Layout/ProtectedRoute";
@@ -34,48 +35,50 @@ import AdminDiseaseMonitoring from "./pages/Admin/AdminDiseaseMonitoring/AdminDi
 function App() {
   return (
     <AuthProvider>
-      <FeedbackProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route element={<PublicRoute />}>
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-            </Route>
+      <AnnouncementProvider>
+        <FeedbackProvider>
+          <BrowserRouter>
+            <Routes>
+              <Route element={<PublicRoute />}>
+                <Route path="/" element={<LandingPage />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+              </Route>
 
-            <Route element={<ProtectedLayout />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/fields" element={<Fields />} />
-              <Route path="/crops" element={<CropsPage />} />
-              <Route path="/disease-logs" element={<DiseaseLogs />} />
-              <Route path="/announcements" element={<Announcements />} />
-              <Route path="/season-recommendations" element={<SeasonRecommendations />} />
-              <Route path="/ai-scan" element={<AIScan />} />
-              <Route path="/ask-ai" element={<AIChat />} />
-              <Route path="/account" element={<Account />} />
-            </Route>
+              <Route element={<ProtectedLayout />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/fields" element={<Fields />} />
+                <Route path="/crops" element={<CropsPage />} />
+                <Route path="/disease-logs" element={<DiseaseLogs />} />
+                <Route path="/announcements" element={<Announcements />} />
+                <Route path="/season-recommendations" element={<SeasonRecommendations />} />
+                <Route path="/ai-scan" element={<AIScan />} />
+                <Route path="/ask-ai" element={<AIChat />} />
+                <Route path="/account" element={<Account />} />
+              </Route>
 
-            <Route element={<AdminLayout />}>
-              <Route path="/admin" element={<AdminOverview />} />
-              <Route path="/admin/fields" element={<AdminFields />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              <Route path="/admin/seasons" element={<AdminSeasons />} />
-              <Route path="/admin/season-details" element={<AdminSeasonDetails />} />
-              <Route
-                path="/admin/season-recommendations"
-                element={<AdminSeasonRecommendations />}
-              />
-              <Route path="/admin/disease-monitoring" element={<AdminDiseaseMonitoring />} />
-              <Route path="/admin/announcements" element={<AdminAnnouncements />} />
-              <Route path="/admin/tasks" element={<AdminTasks />} />
-              <Route path="/admin/task-details" element={<AdminTaskDetails />} />
-            </Route>
+              <Route element={<AdminLayout />}>
+                <Route path="/admin" element={<AdminOverview />} />
+                <Route path="/admin/fields" element={<AdminFields />} />
+                <Route path="/admin/users" element={<AdminUsers />} />
+                <Route path="/admin/seasons" element={<AdminSeasons />} />
+                <Route path="/admin/season-details" element={<AdminSeasonDetails />} />
+                <Route
+                  path="/admin/season-recommendations"
+                  element={<AdminSeasonRecommendations />}
+                />
+                <Route path="/admin/disease-monitoring" element={<AdminDiseaseMonitoring />} />
+                <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+                <Route path="/admin/tasks" element={<AdminTasks />} />
+                <Route path="/admin/task-details" element={<AdminTaskDetails />} />
+              </Route>
 
-            <Route path="*" element={<Navigate to="/login" />} />
-          </Routes>
-          <ScrollToTopButton />
-        </BrowserRouter>
-      </FeedbackProvider>
+              <Route path="*" element={<Navigate to="/login" />} />
+            </Routes>
+            <ScrollToTopButton />
+          </BrowserRouter>
+        </FeedbackProvider>
+      </AnnouncementProvider>
     </AuthProvider>
   );
 }

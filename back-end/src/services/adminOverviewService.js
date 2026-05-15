@@ -210,12 +210,12 @@ const decorateSeasonInstances = (seasonDetails, assignmentsBySeason, logsBySeaso
     return {
       _id: seasonDetail._id,
       seasonId: seasonDetail.season?._id || seasonDetail.season,
-      seasonName: seasonDetail.season?.name || "Khong xac dinh",
+      seasonName: seasonDetail.season?.name || "Không xác định",
       year: getSeasonYear(seasonDetail),
-      seasonLabel: seasonDetail.season?.name || "Khong xac dinh",
+      seasonLabel: seasonDetail.season?.name || "Không xác định",
       seasonInstanceLabel: getSeasonYear(seasonDetail)
-        ? `${seasonDetail.season?.name || "Khong xac dinh"} ${getSeasonYear(seasonDetail)}`
-        : seasonDetail.season?.name || "Khong xac dinh",
+        ? `${seasonDetail.season?.name || "Không xác định"} ${getSeasonYear(seasonDetail)}`
+        : seasonDetail.season?.name || "Không xác định",
       status: computedStatus,
       startDate: seasonDetail.startDate,
       endDate: seasonDetail.endDate || null,
@@ -281,10 +281,10 @@ const getLogTaskInfo = (log) => {
 
   return {
     taskId: task?._id || task || null,
-    taskName: task?.name || "Khong xac dinh",
+    taskName: task?.name || "Không xác định",
     taskDetailId: taskDetail?._id || taskDetail || null,
     taskDetailName: taskDetail?.name || "",
-    activityName: taskDetail?.name || task?.name || "Khong xac dinh",
+    activityName: taskDetail?.name || task?.name || "Không xác định",
   };
 };
 

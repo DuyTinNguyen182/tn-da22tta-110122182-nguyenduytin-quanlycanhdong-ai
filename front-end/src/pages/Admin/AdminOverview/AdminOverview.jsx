@@ -290,7 +290,7 @@ const AdminOverview = () => {
   }, [rows]);
 
   const warnableFarmerGroups = useMemo(
-    () => Array.from(pendingFarmerGroups.values()).filter((item) => item.farmerEmail),
+    () => Array.from(pendingFarmerGroups.values()).filter((item) => item.recipientKey),
     [pendingFarmerGroups]
   );
 
@@ -381,11 +381,6 @@ const AdminOverview = () => {
       return;
     }
 
-    if (!group.farmerEmail) {
-      toast.warning("Nông dân này chưa có email để gửi cảnh báo.");
-      return;
-    }
-
     const isAlreadySentInSession = sentWarningKeys.has(
       buildWarningSessionKey(group.recipientKey, appliedFilters)
     );
@@ -395,7 +390,7 @@ const AdminOverview = () => {
         ? "Gửi lại cảnh báo cho nông dân này?"
         : "Gửi cảnh báo cho nông dân này?",
       message: `${group.farmerName} đang có ${group.rows.length} thửa chưa thực hiện "${selectedTaskLabel}".`,
-      confirmText: isAlreadySentInSession ? "Gửi lại email" : "Gửi email",
+      confirmText: isAlreadySentInSession ? "Gửi lại cảnh báo" : "Gửi cảnh báo",
       cancelText: "Hủy",
       tone: "primary",
     });
@@ -413,14 +408,20 @@ const AdminOverview = () => {
       markRecipientAsSent(group.recipientKey);
 
       const recipient = res.data?.recipients?.[0];
+      const hasWebDelivery = Boolean(recipient?.webSent);
+      const hasEmailDelivery = Boolean(recipient?.emailSent);
       toast.success(
         recipient
-          ? `Đã gửi email cảnh báo cho ${recipient.farmerName} (${recipient.pendingPlotCount} thửa).`
-          : `Đã gửi email cảnh báo cho ${group.farmerName}.`
+          ? hasWebDelivery && hasEmailDelivery
+            ? `Đã gửi cảnh báo cho ${recipient.farmerName} trên web và email (${recipient.pendingPlotCount} thửa).`
+            : hasWebDelivery
+              ? `Đã gửi cảnh báo cho ${recipient.farmerName} trên giao diện web (${recipient.pendingPlotCount} thửa).`
+              : `Đã gửi cảnh báo cho ${recipient.farmerName}.`
+          : `Đã gửi cảnh báo cho ${group.farmerName}.`
       );
     } catch (error) {
       console.error("Lỗi gửi cảnh báo cho nông dân:", error);
-      toast.error(error.response?.data?.message || "Không thể gửi email cảnh báo");
+      toast.error(error.response?.data?.message || "Không thể gửi cảnh báo");
     } finally {
       setSendingRecipientKey("");
     }
@@ -445,7 +446,7 @@ const AdminOverview = () => {
 
     const confirmed = await confirm({
       title: hasSentAnyInSession ? "Gửi lại cảnh báo cho tất cả?" : "Gửi cảnh báo cho tất cả?",
-      message: `Hệ thống sẽ gửi ${warnableFarmerGroups.length} email cho ${warnableFarmerGroups.length} nông dân và gộp ${totalPendingPlots} thửa chưa làm theo đúng người nhận.`,
+      message: `Hệ thống sẽ gửi cảnh báo lên giao diện web cho ${warnableFarmerGroups.length} nông dân và gộp ${totalPendingPlots} thửa chưa làm theo đúng người nhận.`,
       confirmText: hasSentAnyInSession ? "Gửi lại tất cả" : "Gửi tất cả",
       cancelText: "Hủy",
       tone: "primary",
@@ -470,9 +471,11 @@ const AdminOverview = () => {
       });
 
       toast.success(
-        `Đã gửi ${res.data?.sentFarmerCount || 0} email cảnh báo cho ${
-          res.data?.sentFarmerCount || 0
-        } nông dân.`
+        `Đã gửi cảnh báo web cho ${res.data?.webFarmerCount || 0} nông dân${
+          res.data?.emailedFarmerCount
+            ? ` và email cho ${res.data.emailedFarmerCount} nông dân`
+            : ""
+        }.`
       );
     } catch (error) {
       console.error("Lỗi gửi cảnh báo hàng loạt:", error);

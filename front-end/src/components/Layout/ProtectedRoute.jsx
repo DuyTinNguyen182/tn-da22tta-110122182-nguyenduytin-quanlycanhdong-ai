@@ -8,12 +8,14 @@ import Sidebar from "./Sidebar";
 
 const MOBILE_ALLOWED_PATHS = new Set([
   "/ai-scan",
+  "/announcements",
   "/disease-logs",
   "/ask-ai",
   "/account",
 ]);
 
 const MOBILE_PAGE_TITLES = {
+  "/announcements": "Thông báo",
   "/ai-scan": "AI dự đoán",
   "/disease-logs": "Nhật ký bệnh",
   "/ask-ai": "AI tư vấn",

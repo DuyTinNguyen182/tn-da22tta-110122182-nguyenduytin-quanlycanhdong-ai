@@ -6,6 +6,8 @@ const { protect, isAdmin } = require("../middlewares/authMiddleware");
 router.use(protect);
 
 router.get("/", announcementController.getVisible);
+router.get("/unread-summary", announcementController.getUnreadSummary);
+router.post("/mark-read", announcementController.markVisibleAsRead);
 router.get("/admin", isAdmin, announcementController.getAdminList);
 router.post("/admin", isAdmin, announcementController.create);
 router.put("/admin/:id", isAdmin, announcementController.update);

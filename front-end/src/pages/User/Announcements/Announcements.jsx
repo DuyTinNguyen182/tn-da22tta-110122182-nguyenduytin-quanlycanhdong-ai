@@ -1,13 +1,10 @@
-import React, { useEffect, useState } from "react";
-import {
-  BellRing,
-  CalendarClock,
-  ChevronDown,
-  ShieldAlert,
-  TriangleAlert,
-} from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+import { BellRing, ChevronDown, ShieldAlert, TriangleAlert } from "lucide-react";
 import api from "../../../services/api";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
+import { useAnnouncements } from "../../../context/AnnouncementContext";
+
+const ANNOUNCEMENT_POLL_INTERVAL_MS = 30000;
 
 const formatDateTime = (value) =>
   value
@@ -44,9 +41,11 @@ const TYPE_STYLES = {
 };
 
 const Announcements = () => {
+  const { markAllAnnouncementsRead, refreshUnreadSummary } = useAnnouncements();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMarkedReadOnVisit, setHasMarkedReadOnVisit] = useState(false);
   const [filterType, setFilterType] = useState("all");
   const [pagination, setPagination] = useState({
     page: 1,
@@ -56,54 +55,107 @@ const Announcements = () => {
     hasNextPage: false,
   });
 
-  const fetchAnnouncements = async ({ page = 1, append = false, type = filterType } = {}) => {
-    try {
-      if (append) {
-        setLoadingMore(true);
-      } else {
-        setLoading(true);
-      }
+  const fetchAnnouncements = useCallback(
+    async ({ page = 1, append = false, type = filterType, silent = false, limit = 5 } = {}) => {
+      try {
+        if (silent) {
+          // Keep current UI while refreshing in the background.
+        } else if (append) {
+          setLoadingMore(true);
+        } else {
+          setLoading(true);
+        }
 
-      const res = await api.get("/announcements", {
-        params: {
+        const res = await api.get("/announcements", {
+          params: {
+            page,
+            limit,
+            ...(type !== "all" ? { type } : {}),
+          },
+        });
+
+        const nextItems = res.data?.items || [];
+        const nextPagination = res.data?.pagination || {
           page,
-          limit: 5,
-          ...(type !== "all" ? { type } : {}),
-        },
-      });
-
-      const nextItems = res.data?.items || [];
-      const nextPagination = res.data?.pagination || {
-        page,
-        limit: 5,
-        totalItems: nextItems.length,
-        totalPages: 1,
-        hasNextPage: false,
-      };
-
-      setItems((prev) => (append ? [...prev, ...nextItems] : nextItems));
-      setPagination(nextPagination);
-    } catch (error) {
-      console.error("Lỗi tải thông báo/cảnh báo:", error);
-      if (!append) {
-        setItems([]);
-        setPagination({
-          page: 1,
-          limit: 5,
-          totalItems: 0,
+          limit,
+          totalItems: nextItems.length,
           totalPages: 1,
           hasNextPage: false,
-        });
+        };
+
+        setItems((prev) => (append ? [...prev, ...nextItems] : nextItems));
+        setPagination(nextPagination);
+      } catch (error) {
+        console.error("Lỗi tải thông báo/cảnh báo:", error);
+        if (!append && !silent) {
+          setItems([]);
+          setPagination({
+            page: 1,
+            limit: 5,
+            totalItems: 0,
+            totalPages: 1,
+            hasNextPage: false,
+          });
+        }
+      } finally {
+        if (!silent) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
+    },
+    [filterType]
+  );
 
   useEffect(() => {
     fetchAnnouncements({ page: 1, append: false, type: filterType });
-  }, [filterType]);
+  }, [fetchAnnouncements, filterType]);
+
+  useEffect(() => {
+    if (loading || hasMarkedReadOnVisit) {
+      return;
+    }
+
+    markAllAnnouncementsRead();
+    setHasMarkedReadOnVisit(true);
+  }, [hasMarkedReadOnVisit, loading, markAllAnnouncementsRead]);
+
+  useEffect(() => {
+    const refreshPageData = () => {
+      const nextLimit = Math.max(items.length, 5);
+
+      fetchAnnouncements({
+        page: 1,
+        append: false,
+        type: filterType,
+        silent: true,
+        limit: nextLimit,
+      });
+
+      refreshUnreadSummary();
+    };
+
+    const intervalId = window.setInterval(refreshPageData, ANNOUNCEMENT_POLL_INTERVAL_MS);
+
+    const handleWindowFocus = () => {
+      refreshPageData();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshPageData();
+      }
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [fetchAnnouncements, filterType, items.length, refreshUnreadSummary]);
 
   const handleLoadMore = () => {
     if (!pagination.hasNextPage || loadingMore) {
@@ -114,6 +166,7 @@ const Announcements = () => {
       page: pagination.page + 1,
       append: true,
       type: filterType,
+      limit: pagination.limit || 5,
     });
   };
 
@@ -123,7 +176,7 @@ const Announcements = () => {
         <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Thông báo và cảnh báo</h2>              
+              <h2 className="text-2xl font-bold text-gray-900">Thông báo và cảnh báo</h2>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -152,9 +205,7 @@ const Announcements = () => {
             <div className="rounded-2xl bg-gray-100 p-4 text-gray-400">
               <ShieldAlert size={28} />
             </div>
-            <p className="mt-4 text-lg font-semibold text-gray-700">
-              Chưa có thông báo nào đang hiển thị
-            </p>
+            <p className="mt-4 text-lg font-semibold text-gray-700">Chưa có thông báo nào đang hiển thị</p>
             <p className="mt-1 text-sm text-gray-500">
               Admin sẽ cập nhật thêm khi có thông tin mới cho nông dân.
             </p>
@@ -184,6 +235,12 @@ const Announcements = () => {
                             >
                               {typeStyle.label}
                             </span>
+                            {!item.isRead ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600">
+                                <span className="h-2 w-2 rounded-full bg-red-500" />
+                                Mới
+                              </span>
+                            ) : null}
                             <span className="text-xs font-medium text-gray-400">
                               {formatDateTime(item.createdAt)}
                             </span>
@@ -192,11 +249,6 @@ const Announcements = () => {
                           <h3 className="mt-2 text-xl font-bold text-gray-900">{item.title}</h3>
                         </div>
                       </div>
-
-                      {/* <div className="inline-flex items-center gap-2 rounded-2xl bg-white/80 px-3 py-2 text-sm font-medium text-gray-600">
-                        <CalendarClock size={16} className="text-emerald-600" />
-                        Mới nhất trước
-                      </div> */}
                     </div>
 
                     <div className="mt-4 rounded-2xl bg-white/80 p-4">

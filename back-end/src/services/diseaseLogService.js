@@ -179,7 +179,7 @@ const mapDiseaseLogOutput = (logDoc) => {
 
   return {
     ...log,
-    diseaseName: log.diseaseName || "Khong xac dinh",
+    diseaseName: log.diseaseName || "Không xác định",
     seasonPlotAssignments: undefined,
     plots: resolvedPlots,
     plotIds,
@@ -223,7 +223,7 @@ const getSeasonForUser = async (seasonId) => {
   const seasonDoc = await SeasonDetail.findById(seasonId).populate("season", "name");
 
   if (!seasonDoc) {
-    throw new Error("Khong tim thay mua vu");
+    throw new Error("Không tìm thấy mùa vụ");
   }
 
   return seasonDoc.toObject({ virtuals: true });
@@ -241,7 +241,7 @@ const ensureActiveSeasonForMutation = (season, action) => {
       })();
 
   if (!isActive) {
-    throw new Error(`Chi co the ${action} nhat ky benh cho vu dang canh tac`);
+    throw new Error(`Chỉ có thể ${action} nhật ký bệnh cho vụ đang canh tác`);
   }
 };
 
@@ -257,7 +257,7 @@ const getParticipantPlotsForSeason = async (seasonId, userId, fieldId = null) =>
 
   const activeAssignments = assignments.filter((item) => item.plot && item.plot.status === "active");
   if (activeAssignments.length === 0) {
-    throw new Error("Mua vu nay chua co thua nao tham gia hoac active");
+    throw new Error("Mùa vụ này chưa có thửa nào tham gia hoặc active");
   }
 
   return activeAssignments;
@@ -270,12 +270,12 @@ const resolveAffectedPlots = async ({ seasonId, userId, fieldId, scope, plotIds 
   if (scope === "selected_plots") {
     const selectedPlotIds = normalizePlotIds(plotIds);
     if (selectedPlotIds.length === 0) {
-      throw new Error("Can chon it nhat 1 thua de luu nhat ky benh");
+      throw new Error("Cần chọn ít nhất 1 thửa để lưu nhật ký bệnh");
     }
 
     const invalidPlotId = selectedPlotIds.find((plotId) => !assignmentByPlotId.has(plotId));
     if (invalidPlotId) {
-      throw new Error("Co thua ruong khong hop le hoac khong thuoc mua vu dang chon");
+      throw new Error("Có thửa ruộng không hợp lệ hoặc không thuộc mùa vụ đang chọn");
     }
 
     return selectedPlotIds.map((plotId) => assignmentByPlotId.get(plotId));
@@ -433,13 +433,13 @@ const updateDiseaseLog = async (id, data, currentUser) => {
 
   const existing = await DiseaseLog.findOne(query).populate("seasonPlotAssignments").lean();
   if (!existing) {
-    throw new Error("Khong tim thay nhat ky benh");
+    throw new Error("Không tìm thấy nhật ký bệnh");
   }
 
   const ownerUserId = existing.user?.toString?.() || existing.user;
   const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || null;
   if (!seasonId) {
-    throw new Error("Nhat ky benh khong con lien ket vu mua hop le");
+    throw new Error("Nhật ký bệnh không còn liên kết vụ mùa hợp lệ");
   }
 
   const season = await getSeasonForUser(seasonId);
@@ -488,12 +488,12 @@ const updateDiseaseLogStatus = async (id, data, currentUser) => {
 
   const existing = await DiseaseLog.findOne(query);
   if (!existing) {
-    throw new Error("Khong tim thay nhat ky benh");
+    throw new Error("Không tìm thấy nhật ký bệnh");
   }
 
   const nextStatus = normalizeStatus(data.status, null);
   if (!nextStatus) {
-    throw new Error("Trang thai xu ly khong hop le");
+    throw new Error("Trạng thái xử lý không hợp lệ");
   }
 
   applyProcessingFields(existing, data, currentUser.id);
@@ -508,13 +508,13 @@ const deleteDiseaseLog = async (id, currentUser) => {
 
   const existing = await DiseaseLog.findOne(query).populate("seasonPlotAssignments").lean();
   if (!existing) {
-    throw new Error("Khong tim thay nhat ky benh");
+    throw new Error("Không tìm thấy nhật ký bệnh");
   }
 
   const ownerUserId = existing.user?.toString?.() || existing.user;
   const seasonId = existing.seasonPlotAssignments?.[0]?.seasonDetail || null;
   if (!seasonId) {
-    throw new Error("Nhat ky benh khong con lien ket vu mua hop le");
+    throw new Error("Nhật ký bệnh không còn liên kết vụ mùa hợp lệ");
   }
 
   const season = await getSeasonForUser(seasonId, ownerUserId);

@@ -27,7 +27,7 @@ const normalizePlotIds = (plotIds = []) => {
 const getSeasonForUser = async (seasonId) => {
   const season = await SeasonDetail.findById(seasonId);
   if (!season) {
-    throw new Error("Khong tim thay vu mua");
+    throw new Error("Không tìm thấy vụ mùa");
   }
 
   return season;
@@ -41,7 +41,7 @@ const ensureActiveSeasonForMutation = (season, action) => {
     (!season.endDate || new Date(season.endDate) >= now);
 
   if (!isActive) {
-    throw new Error(`Khong the ${action} nhat ky cua vu da ket thuc`);
+    throw new Error(`Không thể ${action} nhật ký của vụ đã kết thúc`);
   }
 };
 
@@ -61,19 +61,19 @@ const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds, fieldId
       .lean();
 
     if (requestedPlots.length !== requestedPlotIds.length) {
-      throw new Error("Co thua khong hop le hoac khong thuoc nguoi dung hien tai.");
+      throw new Error("Có thửa không hợp lệ hoặc không thuộc người dùng hiện tại.");
     }
 
     const fieldIds = Array.from(new Set(requestedPlots.map((p) => String(p.field))));
     if (fieldIds.length !== 1) {
-      throw new Error("Cac thua duoc chon phai thuoc cung mot canh dong.");
+      throw new Error("Các thửa được chọn phải thuộc cùng một cánh đồng.");
     }
 
     targetFieldId = fieldIds[0];
   }
 
   if (scope === "all_plots" && !targetFieldId) {
-    throw new Error("Thieu thong tin canh dong khi ap dung cho toan bo thua.");
+    throw new Error("Thiếu thông tin cánh đồng khi áp dụng cho toàn bộ thửa.");
   }
 
   const assignments = await SeasonPlotAssignment.find({
@@ -88,7 +88,7 @@ const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds, fieldId
   const activeAssignments = assignments.filter((item) => item.plot && item.plot.status === "active");
 
   if (activeAssignments.length === 0) {
-    throw new Error("Vu mua nay chua co thua nao san sang ghi nhat ky.");
+    throw new Error("Vụ mùa này chưa có thửa nào sẵn sàng ghi nhật ký.");
   }
 
   const assignmentByPlotId = new Map(activeAssignments.map((item) => [String(item.plot._id), item]));
@@ -102,13 +102,13 @@ const resolveLogPlots = async ({ season, userId, scope, plotId, plotIds, fieldId
   }
 
   if (requestedPlotIds.length === 0) {
-    throw new Error("Can chon it nhat 1 thua de luu nhat ky.");
+    throw new Error("Cần chọn ít nhất 1 thửa để lưu nhật ký.");
   }
 
   const selectedAssignments = requestedPlotIds.map((id) => {
     const assignment = assignmentByPlotId.get(id);
     if (!assignment) {
-      throw new Error("Co thua khong hop le hoac khong tham gia vu mua dang chon.");
+      throw new Error("Có thửa không hợp lệ hoặc không tham gia vụ mùa đang chọn.");
     }
     return assignment;
   });
@@ -148,7 +148,7 @@ const mapLogOutput = (logDoc) => {
       : null;
   const taskName = task?.name || task?.label || "Khac";
   const taskDetailName = taskDetail?.name || "";
-  const title = taskDetailName || taskName || "Nhat ky mua vu";
+  const title = taskDetailName || taskName || "Nhật ký mùa vụ";
 
   return {
     ...log,
@@ -263,12 +263,12 @@ const updateLog = async (id, data, userId) => {
   const existingLog = await buildDiaryLogPopulate(DiaryLog.findOne({ _id: id, user: userId }));
 
   if (!existingLog) {
-    throw new Error("Khong tim thay nhat ky");
+    throw new Error("Không tìm thấy nhật ký");
   }
 
   const seasonId = getSeasonIdFromLog(existingLog);
   if (!seasonId) {
-    throw new Error("Nhat ky khong con lien ket vu mua hop le");
+    throw new Error("Nhật ký không còn liên kết vụ mùa hợp lệ");
   }
 
   const season = await getSeasonForUser(seasonId);
@@ -347,12 +347,12 @@ const deleteLog = async (id, userId) => {
   );
 
   if (!existingLog) {
-    throw new Error("Khong tim thay nhat ky");
+    throw new Error("Không tìm thấy nhật ký");
   }
 
   const seasonId = getSeasonIdFromLog(existingLog);
   if (!seasonId) {
-    throw new Error("Nhat ky khong con lien ket vu mua hop le");
+    throw new Error("Nhật ký không còn liên kết vụ mùa hợp lệ");
   }
 
   const season = await getSeasonForUser(seasonId);

@@ -39,12 +39,12 @@ const loginUser = async (email, password) => {
   const normalizedEmail = normalizeEmail(email);
   const user = await User.findOne({ email: normalizedEmail }).select("+password");
   if (!user) {
-    throw new Error("Email khong ton tai!");
+    throw new Error("Email không tồn tại!");
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
   if (!isMatch) {
-    throw new Error("Mat khau khong dung!");
+    throw new Error("Mật khẩu không đúng!");
   }
 
   const token = jwt.sign({ id: user._id, role: user.role }, jwtConfig.SECRET_KEY, {
@@ -65,7 +65,7 @@ const loginUser = async (email, password) => {
 const getUserById = async (id) => {
   const user = await User.findById(id).select("_id fullName email phone address role");
   if (!user) {
-    throw new Error("Khong tim thay nguoi dung");
+    throw new Error("Không tìm thấy người dùng");
   }
 
   return user;
@@ -94,7 +94,7 @@ const updateProfile = async (id, profileData) => {
   ).select("_id fullName email phone address role");
 
   if (!updatedUser) {
-    throw new Error("Khong tim thay nguoi dung");
+    throw new Error("Không tìm thấy người dùng");
   }
 
   return updatedUser;
@@ -102,17 +102,17 @@ const updateProfile = async (id, profileData) => {
 
 const changePassword = async (id, currentPassword, newPassword) => {
   if (!newPassword || newPassword.length < 6) {
-    throw new Error("Mat khau moi phai it nhat 6 ky tu");
+    throw new Error("Mật khẩu mới phải ít nhất 6 ký tự");
   }
 
   const user = await User.findById(id).select("+password");
   if (!user) {
-    throw new Error("Khong tim thay nguoi dung");
+    throw new Error("Không tìm thấy người dùng");
   }
 
   const isMatch = await bcrypt.compare(currentPassword, user.password);
   if (!isMatch) {
-    throw new Error("Mat khau hien tai khong dung");
+    throw new Error("Mật khẩu hiện tại không đúng");
   }
 
   const salt = await bcrypt.genSalt(10);

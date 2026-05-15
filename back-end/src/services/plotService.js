@@ -12,15 +12,15 @@ const normalizePlotPayload = (data = {}, fallbackStatus = "active") => {
   const status = data.status || fallbackStatus;
 
   if (!name) {
-    throw new Error("Ten thua ruong la bat buoc");
+    throw new Error("Tên thửa ruộng là bắt buộc");
   }
 
   if (!Number.isFinite(area) || area <= 0) {
-    throw new Error("Dien tich thua ruong phai lon hon 0");
+    throw new Error("Diện tích thửa ruộng phải lớn hơn 0");
   }
 
   if (!["active", "inactive"].includes(status)) {
-    throw new Error("Trang thai thua ruong khong hop le");
+    throw new Error("Trạng thái thửa ruộng không hợp lệ");
   }
 
   return { name, area, status };
@@ -29,7 +29,7 @@ const normalizePlotPayload = (data = {}, fallbackStatus = "active") => {
 const ensureFieldExists = async (fieldId) => {
   const field = await Field.findById(fieldId);
   if (!field) {
-    throw new Error("Canh dong khong ton tai");
+    throw new Error("Cánh đồng không tồn tại");
   }
 
   return field;
@@ -65,7 +65,7 @@ const updatePlot = async (id, data, currentUser, imageUrl = null) => {
   const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
   const existingPlot = await Plot.findOne(query);
   if (!existingPlot) {
-    throw new Error("Khong tim thay thua ruong");
+    throw new Error("Không tìm thấy thửa ruộng");
   }
 
   const updateData = normalizePlotPayload(data, existingPlot.status);
@@ -83,7 +83,7 @@ const deletePlot = async (id, currentUser) => {
   const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
   const plot = await Plot.findOne(query);
   if (!plot) {
-    throw new Error("Khong tim thay thua ruong");
+    throw new Error("Không tìm thấy thửa ruộng");
   }
 
   const assignments = await SeasonPlotAssignment.find({ plot: plot._id }).select("_id").lean();
@@ -98,7 +98,7 @@ const deletePlot = async (id, currentUser) => {
 
   if (assignments.length > 0 || diaryLogCount > 0 || diseaseLogCount > 0) {
     throw new Error(
-      "Thua ruong nay da tham gia mua vu hoac co nhat ky lien quan. Hay chuyen trang thai sang cho vu moi de giu lich su du lieu."
+      "Thửa ruộng này đã tham gia mùa vụ hoặc có nhật ký liên quan. Hãy chuyển trạng thái sang chờ vụ mới để giữ lịch sử dữ liệu."
     );
   }
 

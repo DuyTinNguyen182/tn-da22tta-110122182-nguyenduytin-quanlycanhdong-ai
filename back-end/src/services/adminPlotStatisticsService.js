@@ -6,6 +6,7 @@ const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Task = require("../models/taskModel");
 const TaskDetail = require("../models/taskDetailModel");
 const { buildPlotWarningEmailTemplate } = require("../templates/plotWarningEmailTemplate");
+const announcementService = require("./announcementService");
 const { sendMail } = require("./mailService");
 
 const MIN_YEAR = 2023;
@@ -155,6 +156,33 @@ const getFarmerGroupKey = (row) =>
   String(row?.farmerId || row?.farmerEmail || "")
     .trim()
     .toLowerCase();
+
+const buildPlotWarningAnnouncement = ({ farmerName, rows, selectedActivity, adminName }) => {
+  const activityLabel =
+    selectedActivity?.activityLabel || rows[0]?.activityLabel || "công việc được giao";
+  const introLine = `Mùa vụ ${selectedActivity?.seasonLabel || "không xác định"}: Hệ thống ghi nhận bạn chưa thực hiện "${activityLabel}" cho ${rows.length} thửa ruộng sau:`;
+  const plotLines = rows.map(
+    (row, index) =>
+      `${index + 1}. ${row.plotName} | ${row.fieldName} | Diện tích: ${Number(
+        row.plotArea || 0
+      ).toLocaleString("vi-VN")} m2`
+  );
+
+  return {
+    title: `[Cảnh báo] Nhắc thực hiện ${activityLabel}`,
+    content: [
+      `Xin chào ${farmerName},`,
+      "",
+      introLine,
+      ...plotLines,
+      "",
+      "Vui lòng sắp xếp thực hiện sớm để đảm bảo tiến độ mùa vụ.",
+      adminName ? `Người nhắc: ${adminName}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+  };
+};
 
 const getSelectedActivityMeta = async (filters) => {
   const [selectedTask, selectedTaskDetail] = await Promise.all([
@@ -318,7 +346,7 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
       performedAt: matchedLog?.performedAt || null,
       status: matchedLog ? "done" : "pending",
       statusLabel: matchedLog ? "Đã làm" : "Chưa làm",
-      warningAvailable: !matchedLog && Boolean(assignment.user?.email),
+      warningAvailable: !matchedLog && Boolean(assignment.user?._id || assignment.user?.email),
       recipientKey: getFarmerGroupKey({
         farmerId: assignment.user?._id ? String(assignment.user._id) : "",
         farmerEmail: assignment.user?.email || "",
@@ -371,7 +399,7 @@ const groupPendingRowsByFarmer = (rows) => {
     .filter((row) => row.status === "pending")
     .forEach((row) => {
       const groupKey = getFarmerGroupKey(row);
-      if (!groupKey || !row.farmerEmail) {
+      if (!groupKey || (!row.farmerId && !row.farmerEmail)) {
         return;
       }
 
@@ -441,19 +469,52 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
   const recipients = [];
 
   for (const target of targets) {
-    const emailContent = buildPlotWarningEmailTemplate({
+    const announcementContent = buildPlotWarningAnnouncement({
       farmerName: target.farmerName,
       rows: target.rows,
       selectedActivity: dataset.selectedActivity,
       adminName: currentUser?.fullName || "",
     });
 
-    await sendMail({
-      to: target.farmerEmail,
-      subject: emailContent.subject,
-      text: emailContent.text,
-      html: emailContent.html,
-    });
+    let emailSent = false;
+    let emailErrorMessage = "";
+
+    if (target.farmerEmail) {
+      try {
+        const emailContent = buildPlotWarningEmailTemplate({
+          farmerName: target.farmerName,
+          rows: target.rows,
+          selectedActivity: dataset.selectedActivity,
+          adminName: currentUser?.fullName || "",
+        });
+
+        await sendMail({
+          to: target.farmerEmail,
+          subject: emailContent.subject,
+          text: emailContent.text,
+          html: emailContent.html,
+        });
+
+        emailSent = true;
+      } catch (error) {
+        emailErrorMessage = error.message || "Không thể gửi email";
+      }
+    }
+
+    const createdAnnouncement = target.farmerId
+      ? await announcementService.createSystemAnnouncement({
+          type: "warning",
+          title: announcementContent.title,
+          content: announcementContent.content,
+          isVisible: true,
+          source: "plot-task-warning",
+          audience: {
+            scope: "users",
+            userIds: [target.farmerId],
+          },
+          deliveryChannels: emailSent ? ["web", "email"] : ["web"],
+        })
+      : null;
 
     recipients.push({
       recipientKey: target.groupKey,
@@ -462,6 +523,9 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
       farmerEmail: target.farmerEmail,
       pendingPlotCount: target.rows.length,
       plotNames: target.rows.map((row) => row.plotName),
+      webSent: Boolean(createdAnnouncement),
+      emailSent,
+      emailErrorMessage,
     });
   }
 
@@ -471,6 +535,11 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
       dataset.selectedActivity.activityLabel || dataset.rows[0]?.activityLabel || "Công việc",
     sentFarmerCount: recipients.length,
     sentPlotCount: recipients.reduce((total, item) => total + item.pendingPlotCount, 0),
+    webFarmerCount: recipients.filter((item) => item.webSent).length,
+    emailedFarmerCount: recipients.filter((item) => item.emailSent).length,
+    emailFailedFarmerCount: recipients.filter(
+      (item) => item.farmerEmail && !item.emailSent
+    ).length,
     recipients,
   };
 };

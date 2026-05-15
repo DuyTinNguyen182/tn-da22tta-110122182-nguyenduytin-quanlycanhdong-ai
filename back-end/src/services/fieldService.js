@@ -13,7 +13,7 @@ const normalizeFieldPayload = (data = {}) => {
   const address = (data.address || "").trim();
 
   if (!name) {
-    throw new Error("Ten canh dong la bat buoc");
+    throw new Error("Tên cánh đồng là bắt buộc");
   }
 
   return { name, address };
@@ -102,7 +102,7 @@ const enrichFields = async (fieldDocs, currentUser) => {
 
 const createField = async (data, currentUser) => {
   if (!isAdminUser(currentUser)) {
-    throw new Error("Chi admin moi duoc tao canh dong");
+    throw new Error("Chỉ admin mới được tạo cánh đồng");
   }
 
   const payload = normalizeFieldPayload(data);
@@ -111,7 +111,7 @@ const createField = async (data, currentUser) => {
   });
 
   if (exists) {
-    throw new Error("Ten canh dong da ton tai");
+    throw new Error("Tên cánh đồng đã tồn tại");
   }
 
   return await Field.create({
@@ -127,7 +127,7 @@ const getAllFields = async (currentUser) => {
 
 const updateField = async (id, data, currentUser) => {
   if (!isAdminUser(currentUser)) {
-    throw new Error("Chi admin moi duoc cap nhat canh dong");
+    throw new Error("Chỉ admin mới được cập nhật cánh đồng");
   }
 
   const payload = normalizeFieldPayload(data);
@@ -137,12 +137,12 @@ const updateField = async (id, data, currentUser) => {
   });
 
   if (duplicate) {
-    throw new Error("Ten canh dong da ton tai");
+    throw new Error("Tên cánh đồng đã tồn tại");
   }
 
   const field = await Field.findByIdAndUpdate(id, payload, { new: true }).populate("user", "fullName");
   if (!field) {
-    throw new Error("Khong tim thay canh dong");
+    throw new Error("Không tìm thấy cánh đồng");
   }
 
   const [enrichedField] = await enrichFields([field], currentUser);
@@ -152,7 +152,7 @@ const updateField = async (id, data, currentUser) => {
 const deleteFieldCascadeById = async (fieldId) => {
   const field = await Field.findById(fieldId);
   if (!field) {
-    throw new Error("Khong tim thay canh dong");
+    throw new Error("Không tìm thấy cánh đồng");
   }
 
   const [plots, assignments] = await Promise.all([
@@ -180,7 +180,7 @@ const deleteFieldCascadeById = async (fieldId) => {
 
 const deleteField = async (id, currentUser) => {
   if (!isAdminUser(currentUser)) {
-    throw new Error("Chi admin moi duoc xoa canh dong");
+    throw new Error("Chỉ admin mới được xóa cánh đồng");
   }
 
   return await deleteFieldCascadeById(id);

@@ -110,10 +110,7 @@ const OverviewFarmerTable = ({
                   const isExpanded = expandedFarmerKeys.has(group.recipientKey);
                   const isSendingGroup =
                     sendingRecipientKey && sendingRecipientKey === group.recipientKey;
-                  const canWarn =
-                    group.pendingCount > 0 &&
-                    Boolean(pendingGroup?.farmerEmail) &&
-                    Boolean(appliedFilters.taskId);
+                  const canWarn = group.pendingCount > 0 && Boolean(appliedFilters.taskId);
                   const isSentInSession = sentWarningKeys.has(
                     buildWarningSessionKey(group.recipientKey, appliedFilters)
                   );
@@ -213,9 +210,7 @@ const OverviewFarmerTable = ({
                               <BellRing size={15} />
                               {group.pendingCount === 0
                                 ? "Đã xong"
-                                : !pendingGroup?.farmerEmail
-                                  ? "Thiếu email"
-                                  : isSendingGroup
+                                : isSendingGroup
                                     ? "Đang gửi..."
                                     : isSentInSession
                                       ? "Đã gửi"

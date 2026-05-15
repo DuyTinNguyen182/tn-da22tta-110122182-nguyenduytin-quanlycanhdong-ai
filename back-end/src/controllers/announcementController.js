@@ -2,7 +2,25 @@ const announcementService = require("../services/announcementService");
 
 exports.getVisible = async (req, res) => {
   try {
-    const data = await announcementService.listVisibleAnnouncements(req.query);
+    const data = await announcementService.listVisibleAnnouncements(req.query, req.user);
+    res.json(data);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+exports.getUnreadSummary = async (req, res) => {
+  try {
+    const data = await announcementService.getUnreadAnnouncementSummary(req.user);
+    res.json(data);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+exports.markVisibleAsRead = async (req, res) => {
+  try {
+    const data = await announcementService.markVisibleAnnouncementsAsRead(req.user);
     res.json(data);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -39,7 +57,7 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     await announcementService.deleteAnnouncement(req.params.id);
-    res.json({ message: "Da xoa thong bao/canh bao" });
+    res.json({ message: "Đã xóa thông báo/cảnh báo" });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

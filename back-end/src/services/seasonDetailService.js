@@ -23,12 +23,12 @@ const normalizeSeasonYear = (value, fallbackValue = null) => {
       return fallbackValue;
     }
 
-    throw new Error("Nam mua vu la bat buoc");
+    throw new Error("Năm mùa vụ là bắt buộc");
   }
 
   const parsed = Number.parseInt(value, 10);
   if (Number.isNaN(parsed) || parsed < 2000 || parsed > 2100) {
-    throw new Error("Nam mua vu khong hop le");
+    throw new Error("Năm mùa vụ không hợp lệ");
   }
 
   return parsed;
@@ -71,7 +71,7 @@ const decorateSeasonDetail = (seasonDoc, catalogMap) => {
         : null;
 
   const seasonMeta = seasonRefId ? catalogMap.get(seasonRefId) || detail.season || null : null;
-  const seasonName = seasonMeta?.name || "Khong xac dinh";
+  const seasonName = seasonMeta?.name || "Không xác định";
   const year = getResolvedSeasonYear(detail);
 
   return {
@@ -97,7 +97,7 @@ const getAllSeasonDetails = async () => {
 const getSeasonDetailById = async (id) => {
   const seasonDoc = await SeasonDetail.findById(id).populate("season", "name");
   if (!seasonDoc) {
-    throw new Error("Khong tim thay chi tiet mua vu");
+    throw new Error("Không tìm thấy chi tiết mùa vụ");
   }
 
   const catalogMap = await getSeasonMap();
@@ -128,7 +128,7 @@ const ensureNoOverlappingActiveSeason = async (targetId = null) => {
   });
 
   if (existingActive) {
-    throw new Error("Dang co mot mua vu dang hoat dong. Hay ket thuc mua vu hien tai truoc.");
+    throw new Error("Đang có một mùa vụ đang hoạt động. Hãy kết thúc mùa vụ hiện tại trước.");
   }
 };
 
@@ -136,7 +136,7 @@ const createSeasonDetail = async (data) => {
   const { startDate, endDate } = data;
   const seasonId = await resolveSeasonId(data);
   const catalogMap = await getSeasonMap();
-  const resolvedName = catalogMap.get(seasonId)?.name || "Khong xac dinh";
+  const resolvedName = catalogMap.get(seasonId)?.name || "Không xác định";
   const year = normalizeSeasonYear(data.year, inferSeasonYear({ startDate, endDate }));
 
   const now = new Date();
@@ -147,7 +147,7 @@ const createSeasonDetail = async (data) => {
 
   const exists = await SeasonDetail.findOne(buildSeasonYearDuplicateQuery(seasonId, year));
   if (exists) {
-    throw new Error(`Mua vu "${resolvedName}" cua nam ${year} da ton tai.`);
+    throw new Error(`Mùa vụ "${resolvedName}" của năm ${year} đã tồn tại.`);
   }
 
   const seasonDetail = await SeasonDetail.create({
@@ -164,7 +164,7 @@ const createSeasonDetail = async (data) => {
 const updateSeasonDetail = async (id, data) => {
   const existing = await SeasonDetail.findById(id);
   if (!existing) {
-    throw new Error("Khong tim thay chi tiet mua vu");
+    throw new Error("Không tìm thấy chi tiết mùa vụ");
   }
 
   const updateData = {};
@@ -211,7 +211,7 @@ const updateSeasonDetail = async (id, data) => {
 
   if (duplicate) {
     const resolvedName = await getSeasonNameById(newSeasonId);
-    throw new Error(`Mua vu "${resolvedName}" cua nam ${nextYear} da ton tai.`);
+    throw new Error(`Mùa vụ "${resolvedName}" của năm ${nextYear} đã tồn tại.`);
   }
 
   const updatedDoc = await SeasonDetail.findByIdAndUpdate(id, updateData, {
@@ -225,12 +225,12 @@ const updateSeasonDetail = async (id, data) => {
 const finishSeasonDetail = async (id) => {
   const existing = await SeasonDetail.findById(id);
   if (!existing) {
-    throw new Error("Khong tim thay chi tiet mua vu");
+    throw new Error("Không tìm thấy chi tiết mùa vụ");
   }
 
   const now = new Date();
   if (existing.endDate && existing.endDate < now) {
-    throw new Error("Mua vu nay da duoc ket thuc truoc do");
+    throw new Error("Mùa vụ này đã được kết thúc trước đó");
   }
 
   const updatedDoc = await SeasonDetail.findByIdAndUpdate(
@@ -246,7 +246,7 @@ const finishSeasonDetail = async (id) => {
 const deleteSeasonDetail = async (id) => {
   const season = await SeasonDetail.findById(id);
   if (!season) {
-    throw new Error("Khong tim thay chi tiet mua vu");
+    throw new Error("Không tìm thấy chi tiết mùa vụ");
   }
 
   const assignments = await SeasonPlotAssignment.find({ seasonDetail: id }).select("_id").lean();
@@ -268,7 +268,7 @@ const deleteSeasonDetail = async (id) => {
 
 const getFarmerSeasonDetails = async (userId, fieldId) => {
   if (!fieldId) {
-    throw new Error("Yeu cau chon canh dong");
+    throw new Error("Yêu cầu chọn cánh đồng");
   }
 
   const seasonDocs = await SeasonDetail.find()
