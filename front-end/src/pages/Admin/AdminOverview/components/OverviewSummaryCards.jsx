@@ -1,6 +1,11 @@
 import React from "react";
 
-const OverviewSummaryCards = ({ summary, selectedTaskLabel, matchedSeasonText }) => {
+const OverviewSummaryCards = ({
+  summary,
+  selectedStageLabel,
+  selectedTaskLabel,
+  matchedSeasonText,
+}) => {
   const cards = [
     {
       label: "Đang hiển thị",
@@ -8,13 +13,13 @@ const OverviewSummaryCards = ({ summary, selectedTaskLabel, matchedSeasonText })
       valueClassName: "text-xl text-gray-900",
     },
     {
-      label: "Công việc đang theo dõi",
-      value: selectedTaskLabel,
+      label: "Giai đoạn đang theo dõi",
+      value: selectedStageLabel,
       valueClassName: "text-xl text-gray-900",
     },
     {
-      label: "Phạm vi mùa vụ",
-      value: matchedSeasonText,
+      label: "Công việc đang theo dõi",
+      value: selectedTaskLabel,
       valueClassName: "text-xl text-gray-900",
     },
     {
@@ -34,7 +39,9 @@ const OverviewSummaryCards = ({ summary, selectedTaskLabel, matchedSeasonText })
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-gray-400">
             {card.label}
           </p>
-          <p className={`mt-3 font-bold ${card.valueClassName}`}>{card.value}</p>
+          <p className={`mt-3 font-bold ${card.valueClassName}`}>
+            {card.value}
+          </p>
         </div>
       ))}
     </section>

@@ -18,7 +18,7 @@ const stageRoutes = require("./src/routes/stageRoute");
 const taskRoutes = require("./src/routes/taskRoute");
 const taskDetailRoutes = require("./src/routes/taskDetailRoute");
 const aiRoutes = require("./src/routes/aiRoute");
-const adminOverviewRoutes = require("./src/routes/adminOverviewRoute");
+const adminProgressRoutes = require("./src/routes/adminProgressRoute");
 const userOverviewRoutes = require("./src/routes/userOverviewRoute");
 
 const app = express();
@@ -52,7 +52,7 @@ app.use("/api/tasks", taskRoutes);
 app.use("/api/task-details", taskDetailRoutes);
 app.use("/api/ai", aiRoutes);
 
-app.use("/api/admin", adminOverviewRoutes);
+app.use("/api/admin", adminProgressRoutes);
 app.use("/api/user-overview", userOverviewRoutes);
 
 // --- Start Server ---

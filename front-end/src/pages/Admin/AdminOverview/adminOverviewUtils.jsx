@@ -11,8 +11,8 @@ export const buildDefaultFilters = (
   fieldId: "",
   seasonId,
   year,
+  stageId: "",
   taskId: "",
-  taskDetailId: "",
   status: "all",
 });
 
@@ -22,8 +22,8 @@ export const buildQueryParams = (filters) => {
   if (filters.fieldId) params.fieldId = filters.fieldId;
   if (filters.seasonId) params.seasonId = filters.seasonId;
   if (filters.year) params.year = filters.year;
+  if (filters.stageId) params.stageId = filters.stageId;
   if (filters.taskId) params.taskId = filters.taskId;
-  if (filters.taskDetailId) params.taskDetailId = filters.taskDetailId;
   if (filters.status) params.status = filters.status;
 
   return params;
@@ -42,8 +42,8 @@ export const buildWarningSessionKey = (recipientKey, filters) =>
     fieldId: filters?.fieldId || "",
     seasonId: filters?.seasonId || "",
     year: filters?.year || "",
+    stageId: filters?.stageId || "",
     taskId: filters?.taskId || "",
-    taskDetailId: filters?.taskDetailId || "",
   });
 
 export const summarizeLabels = (values, maxItems = 2) => {

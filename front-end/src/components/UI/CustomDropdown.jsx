@@ -32,6 +32,7 @@ const CustomDropdown = ({
   variant = "default",
   className = "",
   multi = false,
+  disabled = false,
 }) => {
   // Normalize selected values
   const selectedValues = multi
@@ -70,13 +71,19 @@ const CustomDropdown = ({
   };
 
   return (
-    <Listbox value={value} onChange={onChange} multiple={multi}>
+    <Listbox
+      value={value}
+      onChange={onChange}
+      multiple={multi}
+      disabled={disabled}
+    >
       {({ open }) => (
         <div className={`relative ${className}`}>
           <ListboxButton
+            disabled={disabled}
             className={`flex w-full items-center rounded-xl border font-medium outline-none transition-all ${sizeStyles[size]} ${variantBase[variant]} ${
               open ? variantOpen[variant] : ""
-            }`}
+            } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
           >
             {Icon && (
               <Icon

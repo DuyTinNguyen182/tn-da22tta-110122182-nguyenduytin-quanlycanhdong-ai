@@ -30,6 +30,7 @@ const emptySummary = {
 
 const emptyOptions = {
   fields: [],
+  stages: [],
   seasons: [],
   tasks: [],
   statuses: [],
@@ -53,6 +54,7 @@ const AdminOverview = () => {
   const [sendingAllWarnings, setSendingAllWarnings] = useState(false);
   const [sentWarningKeys, setSentWarningKeys] = useState(() => new Set());
   const [expandedFarmerKeys, setExpandedFarmerKeys] = useState(() => new Set());
+  const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
 
   useEffect(() => {
     api
@@ -89,7 +91,7 @@ const AdminOverview = () => {
         setRefreshing(false);
       }
     },
-    [toast]
+    [toast],
   );
 
   useEffect(() => {
@@ -100,7 +102,9 @@ const AdminOverview = () => {
         setBootstrapped(true);
       } catch (error) {
         console.error("Lỗi tải bộ lọc thống kê:", error);
-        toast.error(error.response?.data?.message || "Không thể tải bộ lọc thống kê");
+        toast.error(
+          error.response?.data?.message || "Không thể tải bộ lọc thống kê",
+        );
         setLoading(false);
       }
     };
@@ -118,7 +122,9 @@ const AdminOverview = () => {
       return buildDefaultFilters();
     }
 
-    const matchedSeason = options.seasons.find((item) => item._id === currentSeason.seasonId);
+    const matchedSeason = options.seasons.find(
+      (item) => item._id === currentSeason.seasonId,
+    );
     if (!matchedSeason) {
       return buildDefaultFilters();
     }
@@ -141,21 +147,55 @@ const AdminOverview = () => {
     setFilterForm(resolveInitialFilters);
     setAppliedFilters(resolveInitialFilters);
     setDefaultSeasonApplied(true);
-  }, [bootstrapped, currentSeasonLoaded, defaultSeasonApplied, resolveInitialFilters]);
+  }, [
+    bootstrapped,
+    currentSeasonLoaded,
+    defaultSeasonApplied,
+    resolveInitialFilters,
+  ]);
 
   const currentTask = useMemo(
     () => options.tasks.find((item) => item._id === filterForm.taskId) || null,
-    [options.tasks, filterForm.taskId]
+    [options.tasks, filterForm.taskId],
   );
 
-  const taskDetailOptions = useMemo(() => {
-    if (!currentTask) return [];
+  const currentStage = useMemo(
+    () =>
+      options.stages.find((item) => item._id === filterForm.stageId) || null,
+    [options.stages, filterForm.stageId],
+  );
 
-    return (currentTask.taskDetails || []).map((item) => ({
-      value: item._id,
-      label: item.name,
-    }));
-  }, [currentTask]);
+  const stageOptions = useMemo(
+    () => [
+      { value: "", label: "Tất cả giai đoạn" },
+      ...(options.stages || []).map((item) => ({
+        value: item._id,
+        label: item.name,
+      })),
+    ],
+    [options.stages],
+  );
+
+  const taskOptions = useMemo(() => {
+    const filteredTasks = currentStage
+      ? (options.tasks || []).filter(
+          (item) => item.stageId === currentStage._id,
+        )
+      : [];
+
+    return [
+      {
+        value: "",
+        label: currentStage
+          ? "Tất cả công việc trong giai đoạn"
+          : "Chọn giai đoạn trước",
+      },
+      ...filteredTasks.map((item) => ({
+        value: item._id,
+        label: item.name,
+      })),
+    ];
+  }, [currentStage, options.tasks]);
 
   const fieldOptions = useMemo(
     () => [
@@ -165,7 +205,7 @@ const AdminOverview = () => {
         label: item.name,
       })),
     ],
-    [options.fields]
+    [options.fields],
   );
 
   const seasonOptions = useMemo(
@@ -176,7 +216,7 @@ const AdminOverview = () => {
         label: item.name,
       })),
     ],
-    [options.seasons]
+    [options.seasons],
   );
 
   const yearOptions = useMemo(
@@ -187,18 +227,7 @@ const AdminOverview = () => {
         label: String(year),
       })),
     ],
-    [options.years]
-  );
-
-  const taskOptions = useMemo(
-    () => [
-      { value: "", label: "Tất cả công việc" },
-      ...(options.tasks || []).map((item) => ({
-        value: item._id,
-        label: item.name,
-      })),
-    ],
-    [options.tasks]
+    [options.years],
   );
 
   const statusOptions = useMemo(
@@ -207,14 +236,23 @@ const AdminOverview = () => {
         value: item.value,
         label: getStatusText(item.value),
       })),
-    [options.statuses]
+    [options.statuses],
   );
 
   const rows = useMemo(() => statistics?.rows || [], [statistics]);
-  const summary = useMemo(() => statistics?.summary || emptySummary, [statistics]);
+  const summary = useMemo(
+    () => statistics?.summary || emptySummary,
+    [statistics],
+  );
   const selectedActivity = statistics?.selectedActivity || {};
-  const hasSelectedTask = Boolean(appliedFilters.taskId);
-  const selectedTaskLabel = selectedActivity.activityLabel || "Tất cả công việc";
+  const hasSelectedFilter = Boolean(
+    appliedFilters.stageId || appliedFilters.taskId,
+  );
+  const canApplyFilters = Boolean(filterForm.taskId);
+  const selectedStageLabel =
+    selectedActivity.stageName || currentStage?.name || "Tất cả giai đoạn";
+  const selectedTaskLabel =
+    selectedActivity.taskName || currentTask?.name || "Tất cả công việc";
   const matchedSeasonText =
     summary.matchedSeasonCount > 0
       ? `${summary.matchedSeasonCount} lịch mùa vụ`
@@ -224,7 +262,8 @@ const AdminOverview = () => {
     const groups = new Map();
 
     rows.forEach((row) => {
-      const groupKey = getFarmerGroupKey(row) || `assignment-${row.assignmentId}`;
+      const groupKey =
+        getFarmerGroupKey(row) || `assignment-${row.assignmentId}`;
 
       if (!groups.has(groupKey)) {
         groups.set(groupKey, {
@@ -290,11 +329,17 @@ const AdminOverview = () => {
   }, [rows]);
 
   const warnableFarmerGroups = useMemo(
-    () => Array.from(pendingFarmerGroups.values()).filter((item) => item.recipientKey),
-    [pendingFarmerGroups]
+    () =>
+      Array.from(pendingFarmerGroups.values()).filter(
+        (item) => item.recipientKey,
+      ),
+    [pendingFarmerGroups],
   );
 
-  const totalPages = Math.max(1, Math.ceil(groupedFarmerRows.length / ROWS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(groupedFarmerRows.length / ROWS_PER_PAGE),
+  );
   const paginatedFarmerRows = useMemo(() => {
     const startIndex = (currentPage - 1) * ROWS_PER_PAGE;
     return groupedFarmerRows.slice(startIndex, startIndex + ROWS_PER_PAGE);
@@ -302,7 +347,9 @@ const AdminOverview = () => {
 
   useEffect(() => {
     setExpandedFarmerKeys((prev) => {
-      const validKeys = new Set(groupedFarmerRows.map((item) => item.recipientKey));
+      const validKeys = new Set(
+        groupedFarmerRows.map((item) => item.recipientKey),
+      );
       const next = new Set([...prev].filter((key) => validKeys.has(key)));
       return next.size === prev.size ? prev : next;
     });
@@ -315,13 +362,20 @@ const AdminOverview = () => {
   }, [currentPage, totalPages]);
 
   const handleApplyFilters = () => {
+    if (!filterForm.taskId) {
+      toast.warning("Vui lòng chọn công việc trước khi áp dụng bộ lọc.");
+      return;
+    }
+
     setCurrentPage(1);
+    setHasAppliedFilter(true);
     setAppliedFilters({ ...filterForm });
   };
 
   const handleResetFilters = () => {
     const nextFilters = resolveInitialFilters;
     setCurrentPage(1);
+    setHasAppliedFilter(false);
     setFilterForm(nextFilters);
     setAppliedFilters(nextFilters);
   };
@@ -331,11 +385,36 @@ const AdminOverview = () => {
   };
 
   const handleTaskChange = (value) => {
+    const nextTask = options.tasks.find((item) => item._id === value) || null;
+
     setFilterForm((prev) => ({
       ...prev,
+      stageId: nextTask?.stageId || prev.stageId,
       taskId: value,
-      taskDetailId: "",
     }));
+  };
+
+  const handleStageChange = (value) => {
+    setFilterForm((prev) => {
+      if (!value) {
+        return {
+          ...prev,
+          stageId: "",
+        };
+      }
+
+      const taskBelongsToStage =
+        prev.taskId &&
+        options.tasks.some(
+          (item) => item._id === prev.taskId && item.stageId === value,
+        );
+
+      return {
+        ...prev,
+        stageId: value,
+        taskId: taskBelongsToStage ? prev.taskId : "",
+      };
+    });
   };
 
   const toggleFarmerExpanded = (recipientKey) => {
@@ -373,16 +452,19 @@ const AdminOverview = () => {
   const handleWarning = async (groupOrRow) => {
     if (!ensureTaskSelected()) return;
 
-    const recipientKey = groupOrRow?.recipientKey || getFarmerGroupKey(groupOrRow);
+    const recipientKey =
+      groupOrRow?.recipientKey || getFarmerGroupKey(groupOrRow);
     const group = pendingFarmerGroups.get(recipientKey);
 
     if (!group) {
-      toast.warning("Nông dân này hiện không còn việc tồn đọng phù hợp để cảnh báo.");
+      toast.warning(
+        "Nông dân này hiện không còn việc tồn đọng phù hợp để cảnh báo.",
+      );
       return;
     }
 
     const isAlreadySentInSession = sentWarningKeys.has(
-      buildWarningSessionKey(group.recipientKey, appliedFilters)
+      buildWarningSessionKey(group.recipientKey, appliedFilters),
     );
 
     const confirmed = await confirm({
@@ -417,7 +499,7 @@ const AdminOverview = () => {
             : hasWebDelivery
               ? `Đã gửi cảnh báo cho ${recipient.farmerName} trên giao diện web (${recipient.pendingPlotCount} thửa).`
               : `Đã gửi cảnh báo cho ${recipient.farmerName}.`
-          : `Đã gửi cảnh báo cho ${group.farmerName}.`
+          : `Đã gửi cảnh báo cho ${group.farmerName}.`,
       );
     } catch (error) {
       console.error("Lỗi gửi cảnh báo cho nông dân:", error);
@@ -431,21 +513,27 @@ const AdminOverview = () => {
     if (!ensureTaskSelected()) return;
 
     if (warnableFarmerGroups.length === 0) {
-      toast.warning("Không có nông dân nào đủ điều kiện nhận cảnh báo trong bộ lọc hiện tại.");
+      toast.warning(
+        "Không có nông dân nào đủ điều kiện nhận cảnh báo trong bộ lọc hiện tại.",
+      );
       return;
     }
 
     const totalPendingPlots = warnableFarmerGroups.reduce(
       (total, group) => total + group.rows.length,
-      0
+      0,
     );
 
     const hasSentAnyInSession = warnableFarmerGroups.some((group) =>
-      sentWarningKeys.has(buildWarningSessionKey(group.recipientKey, appliedFilters))
+      sentWarningKeys.has(
+        buildWarningSessionKey(group.recipientKey, appliedFilters),
+      ),
     );
 
     const confirmed = await confirm({
-      title: hasSentAnyInSession ? "Gửi lại cảnh báo cho tất cả?" : "Gửi cảnh báo cho tất cả?",
+      title: hasSentAnyInSession
+        ? "Gửi lại cảnh báo cho tất cả?"
+        : "Gửi cảnh báo cho tất cả?",
       message: `Hệ thống sẽ gửi cảnh báo lên giao diện web cho ${warnableFarmerGroups.length} nông dân và gộp ${totalPendingPlots} thửa chưa làm theo đúng người nhận.`,
       confirmText: hasSentAnyInSession ? "Gửi lại tất cả" : "Gửi tất cả",
       cancelText: "Hủy",
@@ -475,18 +563,22 @@ const AdminOverview = () => {
           res.data?.emailedFarmerCount
             ? ` và email cho ${res.data.emailedFarmerCount} nông dân`
             : ""
-        }.`
+        }.`,
       );
     } catch (error) {
       console.error("Lỗi gửi cảnh báo hàng loạt:", error);
-      toast.error(error.response?.data?.message || "Không thể gửi cảnh báo hàng loạt");
+      toast.error(
+        error.response?.data?.message || "Không thể gửi cảnh báo hàng loạt",
+      );
     } finally {
       setSendingAllWarnings(false);
     }
   };
 
   if (loading && !statistics) {
-    return <LoadingScreen fullScreen={true} message="Đang tải thống kê admin..." />;
+    return (
+      <LoadingScreen fullScreen={true} message="Đang tải thống kê admin..." />
+    );
   }
 
   const seasonBanner = formatCurrentSeasonBanner(currentSeason);
@@ -505,37 +597,43 @@ const AdminOverview = () => {
           onRefresh={handleRefresh}
           onReset={handleResetFilters}
           onApply={handleApplyFilters}
+          canApplyFilters={canApplyFilters}
           filterForm={filterForm}
           setFilterForm={setFilterForm}
           fieldOptions={fieldOptions}
           seasonOptions={seasonOptions}
           yearOptions={yearOptions}
+          stageOptions={stageOptions}
           taskOptions={taskOptions}
-          taskDetailOptions={taskDetailOptions}
           statusOptions={statusOptions}
           currentTask={currentTask}
+          currentStage={currentStage}
+          onStageChange={handleStageChange}
           onTaskChange={handleTaskChange}
         />
 
-        <OverviewSummaryCards
-          summary={summary}
-          selectedTaskLabel={selectedTaskLabel}
-          matchedSeasonText={matchedSeasonText}
-        />
+        {hasAppliedFilter && rows.length > 0 ? (
+          <OverviewSummaryCards
+            summary={summary}
+            selectedStageLabel={selectedStageLabel}
+            selectedTaskLabel={selectedTaskLabel}
+            matchedSeasonText={matchedSeasonText}
+          />
+        ) : null}
 
         <OverviewFarmerTable
           loading={loading}
-          hasSelectedTask={hasSelectedTask}
+          hasSelectedFilter={hasSelectedFilter}
           warnableFarmerGroups={warnableFarmerGroups}
           sendingAllWarnings={sendingAllWarnings}
           onWarningAll={handleWarningAll}
-          rows={rows}
           paginatedFarmerRows={paginatedFarmerRows}
           pendingFarmerGroups={pendingFarmerGroups}
           expandedFarmerKeys={expandedFarmerKeys}
           sendingRecipientKey={sendingRecipientKey}
           sentWarningKeys={sentWarningKeys}
           appliedFilters={appliedFilters}
+          selectedStageLabel={selectedStageLabel}
           selectedTaskLabel={selectedTaskLabel}
           onToggleFarmer={toggleFarmerExpanded}
           onWarning={handleWarning}

@@ -3,8 +3,8 @@ const Field = require("../models/fieldModel");
 const Season = require("../models/seasonModel");
 const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
+const Stage = require("../models/stageModel");
 const Task = require("../models/taskModel");
-const TaskDetail = require("../models/taskDetailModel");
 const { buildPlotWarningEmailTemplate } = require("../templates/plotWarningEmailTemplate");
 const announcementService = require("./announcementService");
 const { sendMail } = require("./mailService");
@@ -42,8 +42,8 @@ const normalizeFilters = (query = {}) => ({
   fieldId: query.fieldId || "",
   seasonId: query.seasonId || "",
   year: normalizeYear(query.year),
+  stageId: query.stageId || "",
   taskId: query.taskId || "",
-  taskDetailId: query.taskDetailId || "",
   status: normalizeStatus(query.status),
 });
 
@@ -69,22 +69,15 @@ const buildSeasonLabel = (seasonDetail) => {
 };
 
 const getLogTaskInfo = (log) => {
-  const taskDetail = log.taskDetail || null;
-  const task = taskDetail?.task || log.task || null;
+  const task = log.task || null;
+  const stage = task?.stage || null;
 
   return {
     taskId: task?._id ? String(task._id) : task ? String(task) : "",
     taskName: task?.name || "",
-    taskDetailId: taskDetail?._id
-      ? String(taskDetail._id)
-      : taskDetail
-        ? String(taskDetail)
-        : "",
-    taskDetailName: taskDetail?.name || "",
-    activityLabel:
-      taskDetail?.name && task?.name
-        ? `${task.name} - ${taskDetail.name}`
-        : taskDetail?.name || task?.name || "Chưa xác định",
+    stageId: stage?._id ? String(stage._id) : stage ? String(stage) : "",
+    stageName: stage?.name || "",
+    activityLabel: task?.name || stage?.name || "Chưa xác định",
   };
 };
 
@@ -116,23 +109,21 @@ const buildSeasonDetailQuery = (filters) => {
 };
 
 const buildLogTaskQuery = async (filters) => {
-  if (filters.taskDetailId) {
-    return { taskDetail: filters.taskDetailId };
-  }
-
-  if (!filters.taskId) {
-    return {};
-  }
-
-  const taskDetailIds = await TaskDetail.find({ task: filters.taskId }).distinct("_id");
-
-  if (taskDetailIds.length === 0) {
+  if (filters.taskId) {
     return { task: filters.taskId };
   }
 
-  return {
-    $or: [{ task: filters.taskId }, { taskDetail: { $in: taskDetailIds } }],
-  };
+  if (!filters.stageId) {
+    return {};
+  }
+
+  const taskIds = await Task.find({ stage: filters.stageId }).distinct("_id");
+
+  if (taskIds.length === 0) {
+    return { task: { $in: [] } };
+  }
+
+  return { task: { $in: taskIds } };
 };
 
 const sortRows = (rows, statusFilter) => {
@@ -160,7 +151,7 @@ const getFarmerGroupKey = (row) =>
 const buildPlotWarningAnnouncement = ({ farmerName, rows, selectedActivity, adminName }) => {
   const activityLabel =
     selectedActivity?.activityLabel || rows[0]?.activityLabel || "công việc được giao";
-  const introLine = `Mùa vụ ${selectedActivity?.seasonLabel || "không xác định"}: Hệ thống ghi nhận bạn chưa thực hiện "${activityLabel}" cho ${rows.length} thửa ruộng sau:`;
+  const introLine = `Mùa vụ ${selectedActivity?.seasonLabel || rows[0]?.seasonLabel || "không xác định"}: Hệ thống ghi nhận bạn chưa thực hiện "${activityLabel}" cho ${rows.length} thửa ruộng sau:`;
   const plotLines = rows.map(
     (row, index) =>
       `${index + 1}. ${row.plotName} | ${row.fieldName} | Diện tích: ${Number(
@@ -186,46 +177,35 @@ const buildPlotWarningAnnouncement = ({ farmerName, rows, selectedActivity, admi
 
 const getSelectedActivityMeta = async (filters) => {
   const [selectedTask, selectedTaskDetail] = await Promise.all([
-    filters.taskId ? Task.findById(filters.taskId).lean() : null,
-    filters.taskDetailId
-      ? TaskDetail.findById(filters.taskDetailId).populate("task", "name").lean()
-      : null,
+    filters.taskId ? Task.findById(filters.taskId).populate("stage", "name order").lean() : null,
+    filters.stageId ? Stage.findById(filters.stageId).lean() : null,
   ]);
 
   if (filters.taskId && !selectedTask) {
     throw new Error("Không tìm thấy công việc đã chọn");
   }
 
-  if (filters.taskDetailId && !selectedTaskDetail) {
-    throw new Error("Không tìm thấy chi tiết công việc đã chọn");
+  if (filters.stageId && !selectedTaskDetail) {
+    throw new Error("Không tìm thấy giai đoạn đã chọn");
   }
 
   if (
     selectedTask &&
     selectedTaskDetail &&
-    String(selectedTaskDetail.task?._id || selectedTaskDetail.task) !== String(selectedTask._id)
+    String(selectedTask.stage?._id || selectedTask.stage) !== String(selectedTaskDetail._id)
   ) {
-    throw new Error("Chi tiết công việc không thuộc công việc đã chọn");
+    throw new Error("Công việc không thuộc giai đoạn đã chọn");
   }
 
-  const taskName = selectedTaskDetail?.task?.name || selectedTask?.name || "";
-  const taskDetailName = selectedTaskDetail?.name || "";
-  const activityLabel =
-    taskName && taskDetailName
-      ? `${taskName} - ${taskDetailName}`
-      : taskDetailName || taskName || "";
+  const stageName = selectedTaskDetail?.name || selectedTask?.stage?.name || "";
+  const taskName = selectedTask?.name || "";
+  const activityLabel = stageName && taskName ? `${stageName} - ${taskName}` : taskName || stageName || "";
 
   return {
-    taskId: selectedTask?._id
-      ? String(selectedTask._id)
-      : selectedTaskDetail?.task?._id
-        ? String(selectedTaskDetail.task._id)
-        : selectedTaskDetail?.task
-          ? String(selectedTaskDetail.task)
-          : "",
+    stageId: selectedTaskDetail?._id ? String(selectedTaskDetail._id) : "",
+    stageName,
+    taskId: selectedTask?._id ? String(selectedTask._id) : "",
     taskName,
-    taskDetailId: selectedTaskDetail?._id ? String(selectedTaskDetail._id) : "",
-    taskDetailName,
     activityLabel,
   };
 };
@@ -282,12 +262,11 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
     seasonPlotAssignments: { $in: assignmentIds },
     ...(await buildLogTaskQuery(filters)),
   })
-    .select("task taskDetail date createdAt seasonPlotAssignments")
-    .populate("task", "name")
+    .select("task date createdAt seasonPlotAssignments")
     .populate({
-      path: "taskDetail",
-      select: "name task",
-      populate: { path: "task", select: "name" },
+      path: "task",
+      select: "name stage",
+      populate: { path: "stage", select: "name" },
     })
     .sort({ date: -1, createdAt: -1 })
     .lean();
@@ -313,7 +292,7 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
   });
 
   const fallbackTaskName = selectedActivity.taskName || "Chưa chọn công việc";
-  const fallbackTaskDetailName = selectedActivity.taskDetailName || "";
+  const fallbackStageName = selectedActivity.stageName || "";
   const fallbackActivityLabel = selectedActivity.activityLabel || "Chưa thực hiện";
 
   const rows = assignments.map((assignment) => {
@@ -340,8 +319,8 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
       farmerPhone: assignment.user?.phone || "",
       taskId: matchedLog?.taskId || selectedActivity.taskId || "",
       taskName: matchedLog?.taskName || fallbackTaskName,
-      taskDetailId: matchedLog?.taskDetailId || selectedActivity.taskDetailId || "",
-      taskDetailName: matchedLog?.taskDetailName || fallbackTaskDetailName,
+      stageId: matchedLog?.stageId || selectedActivity.stageId || "",
+      stageName: matchedLog?.stageName || fallbackStageName,
       activityLabel: matchedLog?.activityLabel || fallbackActivityLabel,
       performedAt: matchedLog?.performedAt || null,
       status: matchedLog ? "done" : "pending",
@@ -448,7 +427,7 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
 
   const dataset = await buildPlotStatisticsDataset(payload.filters || {}, currentUser);
 
-  if (!dataset.selectedActivity.taskId && !dataset.selectedActivity.taskDetailId) {
+  if (!dataset.selectedActivity.taskId) {
     throw new Error("Vui lòng chọn công việc trước khi gửi cảnh báo");
   }
 
@@ -545,31 +524,13 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
 };
 
 const getAdminPlotStatisticsOptions = async () => {
-  const [fields, seasons, tasks, seasonYears] = await Promise.all([
+  const [fields, seasons, stages, tasks, seasonYears] = await Promise.all([
     Field.find().sort({ name: 1 }).select("_id name").lean(),
     Season.find({ isVisible: { $ne: false } }).sort({ name: 1 }).select("_id name").lean(),
-    Task.find().sort({ name: 1 }).lean(),
+    Stage.find().sort({ order: 1, name: 1 }).select("_id name order").lean(),
+    Task.find().sort({ stage: 1, order: 1, name: 1 }).populate("stage", "name order").lean(),
     SeasonDetail.find().select("year startDate endDate createdAt").lean(),
   ]);
-
-  const taskIds = tasks.map((item) => item._id);
-  const taskDetails = taskIds.length
-    ? await TaskDetail.find({ task: { $in: taskIds } }).sort({ name: 1 }).lean()
-    : [];
-
-  const taskDetailsByTaskId = new Map();
-  taskDetails.forEach((detail) => {
-    const key = String(detail.task);
-    if (!taskDetailsByTaskId.has(key)) {
-      taskDetailsByTaskId.set(key, []);
-    }
-
-    taskDetailsByTaskId.get(key).push({
-      _id: String(detail._id),
-      name: detail.name || "",
-      taskId: key,
-    });
-  });
 
   const availableYears = seasonYears
     .map((item) => getSeasonYear(item))
@@ -585,10 +546,17 @@ const getAdminPlotStatisticsOptions = async () => {
       _id: String(item._id),
       name: item.name || "",
     })),
+    stages: stages.map((item) => ({
+      _id: String(item._id),
+      name: item.name || "",
+      order: item.order ?? 0,
+    })),
     tasks: tasks.map((item) => ({
       _id: String(item._id),
       name: item.name || "",
-      taskDetails: taskDetailsByTaskId.get(String(item._id)) || [],
+      stageId: item.stage?._id ? String(item.stage._id) : item.stage ? String(item.stage) : "",
+      stageName: item.stage?.name || "",
+      order: item.order ?? 0,
     })),
     statuses: [
       { value: "all", label: "Tất cả" },

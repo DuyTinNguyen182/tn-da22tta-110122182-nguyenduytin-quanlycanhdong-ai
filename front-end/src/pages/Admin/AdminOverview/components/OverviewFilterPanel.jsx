@@ -3,10 +3,10 @@ import {
   Briefcase,
   CalendarDays,
   Filter,
-  ListChecks,
   Map as MapIcon,
   RefreshCw,
   ShieldAlert,
+  Layers3,
   Sprout,
 } from "lucide-react";
 import CustomDropdown from "../../../../components/UI/CustomDropdown";
@@ -16,15 +16,16 @@ const OverviewFilterPanel = ({
   onRefresh,
   onReset,
   onApply,
+  canApplyFilters,
   filterForm,
   setFilterForm,
   fieldOptions,
+  stageOptions,
   seasonOptions,
   yearOptions,
   taskOptions,
-  taskDetailOptions,
   statusOptions,
-  currentTask,
+  onStageChange,
   onTaskChange,
 }) => {
   return (
@@ -59,7 +60,8 @@ const OverviewFilterPanel = ({
           <button
             type="button"
             onClick={onApply}
-            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700"
+            disabled={!canApplyFilters}
+            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none"
           >
             <Filter size={16} />
             Áp dụng
@@ -74,7 +76,9 @@ const OverviewFilterPanel = ({
           </p>
           <CustomDropdown
             value={filterForm.fieldId}
-            onChange={(value) => setFilterForm((prev) => ({ ...prev, fieldId: value }))}
+            onChange={(value) =>
+              setFilterForm((prev) => ({ ...prev, fieldId: value }))
+            }
             options={fieldOptions}
             placeholder="Chọn cánh đồng"
             icon={MapIcon}
@@ -88,7 +92,9 @@ const OverviewFilterPanel = ({
           </p>
           <CustomDropdown
             value={filterForm.seasonId}
-            onChange={(value) => setFilterForm((prev) => ({ ...prev, seasonId: value }))}
+            onChange={(value) =>
+              setFilterForm((prev) => ({ ...prev, seasonId: value }))
+            }
             options={seasonOptions}
             placeholder="Chọn mùa vụ"
             icon={Sprout}
@@ -97,13 +103,31 @@ const OverviewFilterPanel = ({
         </div>
 
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">Năm</p>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+            Năm
+          </p>
           <CustomDropdown
             value={filterForm.year}
-            onChange={(value) => setFilterForm((prev) => ({ ...prev, year: value }))}
+            onChange={(value) =>
+              setFilterForm((prev) => ({ ...prev, year: value }))
+            }
             options={yearOptions}
             placeholder="Chọn năm"
             icon={CalendarDays}
+            variant="filter"
+          />
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+            Giai đoạn
+          </p>
+          <CustomDropdown
+            value={filterForm.stageId}
+            onChange={onStageChange}
+            options={stageOptions}
+            placeholder="Chọn giai đoạn"
+            icon={Layers3}
             variant="filter"
           />
         </div>
@@ -118,28 +142,8 @@ const OverviewFilterPanel = ({
             options={taskOptions}
             placeholder="Chọn công việc"
             icon={Briefcase}
+            disabled={!filterForm.stageId}
             variant="filter"
-          />
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-            Chi tiết công việc
-          </p>
-          <CustomDropdown
-            value={filterForm.taskDetailId}
-            onChange={(value) => setFilterForm((prev) => ({ ...prev, taskDetailId: value }))}
-            options={[
-              {
-                value: "",
-                label: currentTask ? "Tất cả chi tiết" : "Chọn công việc trước",
-              },
-              ...taskDetailOptions,
-            ]}
-            placeholder="Chọn chi tiết công việc"
-            icon={ListChecks}
-            variant="filter"
-            className={!currentTask ? "opacity-70" : ""}
           />
         </div>
 
@@ -149,7 +153,9 @@ const OverviewFilterPanel = ({
           </p>
           <CustomDropdown
             value={filterForm.status}
-            onChange={(value) => setFilterForm((prev) => ({ ...prev, status: value }))}
+            onChange={(value) =>
+              setFilterForm((prev) => ({ ...prev, status: value }))
+            }
             options={statusOptions}
             placeholder="Chọn trạng thái"
             icon={ShieldAlert}
