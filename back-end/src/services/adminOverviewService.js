@@ -3,7 +3,7 @@ const Plot = require("../models/plotModel");
 const Season = require("../models/seasonModel");
 const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
-const DiaryLog = require("../models/diaryLogModel");
+const DiaryLog = require("../models/farmingLogModel");
 const User = require("../models/userModel");
 
 const isAdminUser = (user) => (user?.role || "").toLowerCase() === "admin";

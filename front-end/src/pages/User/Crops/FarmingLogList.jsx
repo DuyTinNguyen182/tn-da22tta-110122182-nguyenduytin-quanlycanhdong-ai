@@ -1,14 +1,24 @@
 import React from "react";
-import { Calendar, Edit2, Layers, Plus, Sprout, Trash2, BookOpen } from "lucide-react";
+import {
+  Calendar,
+  Edit2,
+  Layers,
+  Plus,
+  Sprout,
+  Trash2,
+  BookOpen,
+} from "lucide-react";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 
 const getLogPlots = (log) => {
   if (Array.isArray(log?.plots) && log.plots.length > 0) {
     return log.plots.filter(Boolean);
   }
+
   if (log?.plot) {
     return [log.plot];
   }
+
   return [];
 };
 
@@ -16,14 +26,16 @@ const getLogScopeLabel = (log) => {
   if (log?.scope === "all_plots") {
     return "Tất cả thửa";
   }
+
   const plots = getLogPlots(log);
   if (plots.length <= 1) {
     return plots[0]?.name || "Một thửa";
   }
+
   return `${plots.length} thửa`;
 };
 
-const DiaryLogList = ({
+const FarmingLogList = ({
   loading,
   currentSeason,
   isSeasonActive,
@@ -45,7 +57,7 @@ const DiaryLogList = ({
         </div>
         <p className="font-semibold text-gray-600">Chưa có vụ nào.</p>
         <p className="mt-1.5 max-w-xs text-sm">
-          Hãy bắt đầu một vụ mới để ghi nhật ký canh tác.
+          Hãy chọn một vụ mùa để xem nhật ký canh tác.
         </p>
       </div>
     );
@@ -79,31 +91,30 @@ const DiaryLogList = ({
       {filteredLogs.map((log, index) => {
         const logPlots = getLogPlots(log);
         const cost = Number(log.cost || 0);
+
         return (
           <div key={log._id} className="group relative pl-7">
-            {/* Timeline connector */}
             {index !== filteredLogs.length - 1 && (
               <div className="absolute bottom-[-12px] left-[10px] top-7 w-[2px] bg-gradient-to-b from-emerald-200 to-gray-200" />
             )}
 
-            {/* Timeline dot */}
             <div className="absolute left-0 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ring-2 ring-emerald-200">
               <div className="h-2 w-2 rounded-full bg-emerald-500" />
             </div>
 
-            {/* Log card */}
             <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm transition-all duration-200 hover:border-gray-200 hover:shadow-md">
               <div className="p-3.5">
                 <div className="flex items-start justify-between gap-3">
-                  {/* Left: task name + meta */}
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2.5">                      
-                      {log.taskDetailName && (
-                        <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-100">
-                          {log.taskName}
-                        </span>
-                      )}
-                      <h3 className="truncate text-sm font-bold text-gray-800">{log.title || log.taskName}</h3>
+                    <div className="flex items-center gap-2.5">
+                      <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-100">
+                        {log.task?.stage?.name ||
+                          log.task?.stageName ||
+                          "Giai đoạn"}
+                      </span>
+                      <h3 className="truncate text-sm font-bold text-gray-800">
+                        {log.title || log.taskLabel || log.taskName}
+                      </h3>
                     </div>
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
                       <span className="flex items-center gap-1">
@@ -117,12 +128,13 @@ const DiaryLogList = ({
                     </div>
                   </div>
 
-                  {/* Right: cost + actions */}
                   <div className="flex shrink-0 items-center gap-2">
                     {cost > 0 && (
                       <span className="rounded-lg bg-gray-50 px-2.5 py-1 text-sm font-bold text-gray-700 ring-1 ring-gray-100">
                         {cost.toLocaleString()}
-                        <span className="ml-0.5 text-[10px] font-normal text-gray-400">đ</span>
+                        <span className="ml-0.5 text-[10px] font-normal text-gray-400">
+                          đ
+                        </span>
                       </span>
                     )}
                     {isSeasonActive && (
@@ -146,14 +158,12 @@ const DiaryLogList = ({
                   </div>
                 </div>
 
-                {/* Description */}
                 {log.description && (
                   <p className="mt-2.5 rounded-lg bg-gray-50/80 p-2.5 text-sm leading-relaxed text-gray-600 ring-1 ring-gray-100">
                     {log.description}
                   </p>
                 )}
 
-                {/* Plot tags — only show if NOT "all_plots" scope and has multiple */}
                 {log.scope !== "all_plots" && logPlots.length > 1 && (
                   <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {logPlots.map((plot) => (
@@ -175,4 +185,4 @@ const DiaryLogList = ({
   );
 };
 
-export default DiaryLogList;
+export default FarmingLogList;

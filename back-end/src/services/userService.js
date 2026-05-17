@@ -3,7 +3,7 @@ const Field = require("../models/fieldModel");
 const Plot = require("../models/plotModel");
 
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
-const DiaryLog = require("../models/diaryLogModel");
+const DiaryLog = require("../models/farmingLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
 const { deleteFieldCascadeById } = require("./fieldService");
 

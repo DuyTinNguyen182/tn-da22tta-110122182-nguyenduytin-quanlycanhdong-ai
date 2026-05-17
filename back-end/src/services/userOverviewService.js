@@ -5,7 +5,7 @@ const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Task = require("../models/taskModel");
 const TaskDetail = require("../models/taskDetailModel");
-const DiaryLog = require("../models/diaryLogModel");
+const DiaryLog = require("../models/farmingLogModel");
 
 const MIN_YEAR = 2023;
 

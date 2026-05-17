@@ -28,8 +28,8 @@ import AdminSeasons from "./pages/Admin/AdminSeasons/AdminSeasons";
 import AdminSeasonDetails from "./pages/Admin/AdminSeasonDetails/AdminSeasonDetails";
 import AdminSeasonRecommendations from "./pages/Admin/AdminSeasonRecommendations/AdminSeasonRecommendations";
 import AdminAnnouncements from "./pages/Admin/AdminAnnouncements/AdminAnnouncements";
+import AdminStages from "./pages/Admin/AdminStages/AdminStages";
 import AdminTasks from "./pages/Admin/AdminTasks/AdminTasks";
-import AdminTaskDetails from "./pages/Admin/AdminTaskDetails/AdminTaskDetails";
 import AdminDiseaseMonitoring from "./pages/Admin/AdminDiseaseMonitoring/AdminDiseaseMonitoring";
 
 function App() {
@@ -51,7 +51,10 @@ function App() {
                 <Route path="/crops" element={<CropsPage />} />
                 <Route path="/disease-logs" element={<DiseaseLogs />} />
                 <Route path="/announcements" element={<Announcements />} />
-                <Route path="/season-recommendations" element={<SeasonRecommendations />} />
+                <Route
+                  path="/season-recommendations"
+                  element={<SeasonRecommendations />}
+                />
                 <Route path="/ai-scan" element={<AIScan />} />
                 <Route path="/ask-ai" element={<AIChat />} />
                 <Route path="/account" element={<Account />} />
@@ -62,15 +65,24 @@ function App() {
                 <Route path="/admin/fields" element={<AdminFields />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
                 <Route path="/admin/seasons" element={<AdminSeasons />} />
-                <Route path="/admin/season-details" element={<AdminSeasonDetails />} />
+                <Route
+                  path="/admin/season-details"
+                  element={<AdminSeasonDetails />}
+                />
                 <Route
                   path="/admin/season-recommendations"
                   element={<AdminSeasonRecommendations />}
                 />
-                <Route path="/admin/disease-monitoring" element={<AdminDiseaseMonitoring />} />
-                <Route path="/admin/announcements" element={<AdminAnnouncements />} />
+                <Route
+                  path="/admin/disease-monitoring"
+                  element={<AdminDiseaseMonitoring />}
+                />
+                <Route
+                  path="/admin/announcements"
+                  element={<AdminAnnouncements />}
+                />
+                <Route path="/admin/stages" element={<AdminStages />} />
                 <Route path="/admin/tasks" element={<AdminTasks />} />
-                <Route path="/admin/task-details" element={<AdminTaskDetails />} />
               </Route>
 
               <Route path="*" element={<Navigate to="/login" />} />

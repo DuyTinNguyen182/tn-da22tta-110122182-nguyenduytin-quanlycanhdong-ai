@@ -1,4 +1,4 @@
-const DiaryLog = require("../models/diaryLogModel");
+const DiaryLog = require("../models/farmingLogModel");
 const Task = require("../models/taskModel");
 const TaskDetail = require("../models/taskDetailModel");
 const { resolveTaskId } = require("./taskService");

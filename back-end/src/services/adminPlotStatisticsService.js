@@ -1,4 +1,4 @@
-const DiaryLog = require("../models/diaryLogModel");
+const DiaryLog = require("../models/farmingLogModel");
 const Field = require("../models/fieldModel");
 const Season = require("../models/seasonModel");
 const SeasonDetail = require("../models/seasonDetailModel");

@@ -1,5 +1,5 @@
 const SeasonDetail = require("../models/seasonDetailModel");
-const DiaryLog = require("../models/diaryLogModel");
+const DiaryLog = require("../models/farmingLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Plot = require("../models/plotModel");

@@ -1,7 +1,7 @@
 const Plot = require("../models/plotModel");
 const Field = require("../models/fieldModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
-const DiaryLog = require("../models/diaryLogModel");
+const DiaryLog = require("../models/farmingLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
 
 const isAdminUser = (user) => (user?.role || "").toLowerCase() === "admin";

@@ -24,11 +24,11 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
     { name: "Người dùng", icon: Users, path: "/admin/users" },
     { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
     { name: "Lịch mùa vụ", icon: CalendarRange, path: "/admin/season-details" },
-    { name: "Công việc", icon: Briefcase, path: "/admin/tasks" },
+    { name: "Giai đoạn", icon: ListChecks, path: "/admin/stages" },
     {
-      name: "Chi tiết công việc",
-      icon: ListChecks,
-      path: "/admin/task-details",
+      name: "Công việc",
+      icon: Briefcase,
+      path: "/admin/tasks",
     },
     {
       name: "Theo dõi dịch bệnh",
