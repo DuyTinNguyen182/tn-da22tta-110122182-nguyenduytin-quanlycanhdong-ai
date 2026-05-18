@@ -2,6 +2,7 @@ import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   AlertTriangle,
+  BarChart3,
   Bell,
   BookText,
   Briefcase,
@@ -19,23 +20,24 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
   const location = useLocation();
 
   const navItems = [
-    { name: "Quản lý tiến độ", icon: LayoutDashboard, path: "/admin/progress" },
+    { name: "Tổng quan", icon: LayoutDashboard, path: "/admin/dashboard" },
+    { name: "Quản lý tiến độ", icon: BarChart3, path: "/admin/progress" },
     { name: "Cánh đồng", icon: Map, path: "/admin/fields" },
     { name: "Người dùng", icon: Users, path: "/admin/users" },
     { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
     { name: "Lịch mùa vụ", icon: CalendarRange, path: "/admin/season-details" },
     { name: "Giai đoạn", icon: ListChecks, path: "/admin/stages" },
-    {
-      name: "Công việc",
-      icon: Briefcase,
-      path: "/admin/tasks",
-    },
+    { name: "Công việc", icon: Briefcase, path: "/admin/tasks" },
     {
       name: "Theo dõi dịch bệnh",
       icon: AlertTriangle,
       path: "/admin/disease-monitoring",
     },
-    { name: "Thông báo & cảnh báo", icon: Bell, path: "/admin/announcements" },
+    {
+      name: "Thông báo & cảnh báo",
+      icon: Bell,
+      path: "/admin/announcements",
+    },
     {
       name: "Khuyến nghị mùa vụ",
       icon: BookText,
@@ -50,7 +52,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
       }`}
     >
       <div className="flex h-16 flex-shrink-0 items-center border-b border-gray-800 px-6">
-        <Link to="/admin/progress" className="flex items-center gap-3">
+        <Link to="/admin/dashboard" className="flex items-center gap-3">
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-lg">
             <ShieldCheck className="text-white" size={20} />
           </div>
@@ -74,7 +76,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
         {navItems.map((item) => {
           const isActive =
             location.pathname === item.path ||
-            (item.path !== "/admin/progress" &&
+            (item.path !== "/admin/dashboard" &&
               location.pathname.startsWith(item.path));
 
           return (

@@ -1,5 +1,16 @@
 const adminProgressService = require("../services/adminProgressService");
 const adminPlotStatisticsService = require("../services/adminPlotStatisticsService");
+const adminDashboardService = require("../services/adminDashboardService");
+
+const getDashboard = async (req, res) => {
+  try {
+    const dashboard = await adminDashboardService.getDashboardData(req.query.seasonId || "");
+    res.status(200).json(dashboard);
+  } catch (error) {
+    const statusCode = error.message?.includes("Không tìm thấy") ? 404 : 500;
+    res.status(statusCode).json({ message: error.message });
+  }
+};
 
 const getOverview = async (req, res) => {
   try {
@@ -53,6 +64,7 @@ const getCurrentSeasonInfo = async (_req, res) => {
 };
 
 module.exports = {
+  getDashboard,
   getOverview,
   getPlotStatisticsOptions,
   getPlotTaskStatistics,

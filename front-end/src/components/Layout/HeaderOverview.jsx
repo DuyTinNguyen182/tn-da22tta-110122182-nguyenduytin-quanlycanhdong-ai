@@ -31,7 +31,7 @@ const getWeatherInfo = (code) => {
   return { label: "Bình thường", icon: Cloud, color: "text-slate-500" };
 };
 
-const FarmerHeaderOverview = ({ className = "", showSource = true }) => {
+const HeaderOverview = ({ className = "" }) => {
   const [weatherData, setWeatherData] = useState(null);
   const [locationName, setLocationName] = useState(DEFAULT_LOCATION);
   const [isLoadingWeather, setIsLoadingWeather] = useState(true);
@@ -55,6 +55,11 @@ const FarmerHeaderOverview = ({ className = "", showSource = true }) => {
         const response = await fetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto`
         );
+
+        if (!response.ok) {
+          throw new Error("Khong the tai du lieu thoi tiet");
+        }
+
         const data = await response.json();
         applyWeather(data);
       } catch (error) {
@@ -66,23 +71,8 @@ const FarmerHeaderOverview = ({ className = "", showSource = true }) => {
     };
 
     const fetchFallbackWeather = () => {
-      fetchWeather(DEFAULT_LAT, DEFAULT_LON);
       applyLocation(DEFAULT_LOCATION);
-    };
-
-    const fetchWeatherByIP = () => {
-      fetch("https://ipapi.co/json/")
-        .then((response) => response.json())
-        .then((data) => {
-          if (data.latitude && data.longitude) {
-            fetchWeather(data.latitude, data.longitude);
-            applyLocation(data.city ? `${data.city}, ${data.region}` : "Khu vực của bạn");
-            return;
-          }
-
-          fetchFallbackWeather();
-        })
-        .catch(() => fetchFallbackWeather());
+      fetchWeather(DEFAULT_LAT, DEFAULT_LON);
     };
 
     if ("geolocation" in navigator) {
@@ -96,13 +86,13 @@ const FarmerHeaderOverview = ({ className = "", showSource = true }) => {
             return;
           }
 
-          fetchWeatherByIP();
+          fetchFallbackWeather();
         },
-        () => fetchWeatherByIP(),
+        () => fetchFallbackWeather(),
         { timeout: 7000 }
       );
     } else {
-      fetchWeatherByIP();
+      fetchFallbackWeather();
     }
 
     return () => {
@@ -142,7 +132,6 @@ const FarmerHeaderOverview = ({ className = "", showSource = true }) => {
             <>
               <WeatherIcon size={16} className={`shrink-0 ${weatherInfo.color}`} />
               <span>{Math.round(currentWeather.temperature_2m)}°C</span>
-              {/* <span className="text-sky-700">{weatherInfo.label}</span> */}
             </>
           ) : (
             <span className="text-sky-700">Chưa lấy được dữ liệu thời tiết</span>
@@ -153,12 +142,6 @@ const FarmerHeaderOverview = ({ className = "", showSource = true }) => {
           <MapPin size={13} className="shrink-0 text-emerald-500" />
           <span className="truncate">{locationName}</span>
         </div>
-
-        {/* {showSource ? (
-          <div className="inline-flex max-w-full items-center gap-2 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-500 ring-1 ring-gray-200">
-            <span className="whitespace-nowrap">Nguồn: Open-Meteo</span>
-          </div>
-        ) : null} */}
 
         {currentWeather ? (
           <>
@@ -183,4 +166,4 @@ const FarmerHeaderOverview = ({ className = "", showSource = true }) => {
   );
 };
 
-export default FarmerHeaderOverview;
+export default HeaderOverview;

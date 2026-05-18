@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.use(protect, isAdmin);
 
+router.get("/dashboard", adminProgressController.getDashboard);
 router.get("/overview", adminProgressController.getOverview);
 router.get("/current-season", adminProgressController.getCurrentSeasonInfo);
 router.get("/plot-statistics/options", adminProgressController.getPlotStatisticsOptions);

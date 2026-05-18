@@ -9,7 +9,7 @@ const PublicRoute = () => {
   // Nếu ĐÃ CÓ user (đã đăng nhập) -> Chuyển hướng thẳng vào Dashboard hoặc Admin
   if (user) {
     if (role === "admin") {
-      return <Navigate to="/admin/progress" replace />;
+      return <Navigate to="/admin/dashboard" replace />;
     }
     return <Navigate to="/dashboard" replace />;
   }
