@@ -21,7 +21,7 @@ import SeasonRecommendations from "./pages/User/SeasonRecommendations/SeasonReco
 import AIScan from "./pages/User/AIScan/AIScan";
 import AIChat from "./pages/User/AIChat/AIChat";
 import Account from "./pages/User/Account/Account";
-import AdminOverview from "./pages/Admin/AdminOverview/AdminOverview";
+import AdminProgress from "./pages/Admin/AdminProgress/AdminProgress";
 import AdminUsers from "./pages/Admin/AdminUsers/AdminUsers";
 import AdminFields from "./pages/Admin/AdminFields/AdminFields";
 import AdminSeasons from "./pages/Admin/AdminSeasons/AdminSeasons";
@@ -61,7 +61,7 @@ function App() {
               </Route>
 
               <Route element={<AdminLayout />}>
-                <Route path="/admin" element={<AdminOverview />} />
+                <Route path="/admin/progress" element={<AdminProgress />} />
                 <Route path="/admin/fields" element={<AdminFields />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
                 <Route path="/admin/seasons" element={<AdminSeasons />} />

@@ -15,7 +15,7 @@ import {
   getStatusClasses,
   getStatusText,
   summarizeLabels,
-} from "./adminOverviewUtils.jsx";
+} from "./adminProgressUtils.jsx";
 
 const emptySummary = {
   totalPlotCount: 0,
@@ -37,7 +37,7 @@ const emptyOptions = {
   years: [],
 };
 
-const AdminOverview = () => {
+const AdminProgress = () => {
   const { toast, confirm } = useFeedback();
   const [options, setOptions] = useState(emptyOptions);
   const [statistics, setStatistics] = useState(null);
@@ -651,4 +651,4 @@ const AdminOverview = () => {
   );
 };
 
-export default AdminOverview;
+export default AdminProgress;

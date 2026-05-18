@@ -19,7 +19,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
   const location = useLocation();
 
   const navItems = [
-    { name: "Thống kê", icon: LayoutDashboard, path: "/admin" },
+    { name: "Quản lý tiến độ", icon: LayoutDashboard, path: "/admin/progress" },
     { name: "Cánh đồng", icon: Map, path: "/admin/fields" },
     { name: "Người dùng", icon: Users, path: "/admin/users" },
     { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
@@ -50,7 +50,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
       }`}
     >
       <div className="flex h-16 flex-shrink-0 items-center border-b border-gray-800 px-6">
-        <Link to="/admin" className="flex items-center gap-3">
+        <Link to="/admin/progress" className="flex items-center gap-3">
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-lg">
             <ShieldCheck className="text-white" size={20} />
           </div>
@@ -74,7 +74,8 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
         {navItems.map((item) => {
           const isActive =
             location.pathname === item.path ||
-            (item.path !== "/admin" && location.pathname.startsWith(item.path));
+            (item.path !== "/admin/progress" &&
+              location.pathname.startsWith(item.path));
 
           return (
             <Link
