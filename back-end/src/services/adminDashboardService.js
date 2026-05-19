@@ -69,6 +69,8 @@ const getDashboardData = async (querySeasonDetailId = "") => {
     costByStage,
     recentFarmingLogs,
     recentDiseaseLogs,
+    cropProgress,
+    topDiseases,
   ] = await Promise.all([
     User.countDocuments({ role: "farmer" }),
     plotIds.length
@@ -126,11 +128,26 @@ const getDashboardData = async (querySeasonDetailId = "") => {
               categoryName: {
                 $switch: {
                   branches: [
-                    { case: { $eq: ["$_id.category", "FERTILIZER"] }, then: "Phân bón" },
-                    { case: { $eq: ["$_id.category", "PESTICIDE"] }, then: "Thuốc BVTV" },
-                    { case: { $eq: ["$_id.category", "LABOR"] }, then: "Nhân công" },
-                    { case: { $eq: ["$_id.category", "SEED"] }, then: "Lúa giống" },
-                    { case: { $eq: ["$_id.category", "WATER"] }, then: "Bơm nước" },
+                    {
+                      case: { $eq: ["$_id.category", "FERTILIZER"] },
+                      then: "Phân bón",
+                    },
+                    {
+                      case: { $eq: ["$_id.category", "PESTICIDE"] },
+                      then: "Thuốc BVTV",
+                    },
+                    {
+                      case: { $eq: ["$_id.category", "LABOR"] },
+                      then: "Nhân công",
+                    },
+                    {
+                      case: { $eq: ["$_id.category", "SEED"] },
+                      then: "Lúa giống",
+                    },
+                    {
+                      case: { $eq: ["$_id.category", "WATER"] },
+                      then: "Bơm nước",
+                    },
                   ],
                   default: "Khác",
                 },
@@ -214,6 +231,114 @@ const getDashboardData = async (querySeasonDetailId = "") => {
           .limit(5)
           .lean()
       : Promise.resolve([]),
+
+    // [THÊM MỚI 1] Biểu đồ 1: Tiến độ mùa vụ theo diện tích (Crop Progress by Stage)
+    assignmentIds.length
+      ? SeasonPlotAssignment.aggregate([
+          { $match: { _id: { $in: assignmentIds } } },
+          {
+            $lookup: {
+              from: "plots",
+              localField: "plot",
+              foreignField: "_id",
+              as: "plotData",
+            },
+          },
+          { $unwind: "$plotData" },
+          {
+            // Tìm farming log mới nhất của thửa ruộng này để biết đang ở giai đoạn nào
+            $lookup: {
+              from: "farming_logs",
+              let: { assignmentId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $in: [
+                        "$$assignmentId",
+                        { $ifNull: ["$seasonPlotAssignments", []] },
+                      ],
+                    },
+                  },
+                },
+                { $sort: { date: -1, createdAt: -1 } },
+                { $limit: 1 },
+              ],
+              as: "latestLog",
+            },
+          },
+          { $unwind: { path: "$latestLog", preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: "tasks",
+              localField: "latestLog.task",
+              foreignField: "_id",
+              as: "taskData",
+            },
+          },
+          { $unwind: { path: "$taskData", preserveNullAndEmptyArrays: true } },
+          {
+            $lookup: {
+              from: "stages",
+              localField: "taskData.stage",
+              foreignField: "_id",
+              as: "stageData",
+            },
+          },
+          { $unwind: { path: "$stageData", preserveNullAndEmptyArrays: true } },
+          {
+            // Nhóm theo Giai đoạn (Stage) và tính tổng diện tích
+            $group: {
+              _id: {
+                stageId: "$stageData._id",
+                stageName: {
+                  $ifNull: ["$stageData.name", "Chưa bắt đầu / Khác"],
+                },
+                stageOrder: { $ifNull: ["$stageData.order", 0] },
+              },
+              totalArea: { $sum: "$plotData.area" },
+            },
+          },
+          { $sort: { "_id.stageOrder": 1 } },
+          {
+            $project: {
+              _id: 0,
+              stageName: "$_id.stageName",
+              totalArea: 1,
+            },
+          },
+        ])
+      : Promise.resolve([]),
+
+    // [THÊM MỚI 2] Biểu đồ 2: Top rủi ro dịch bệnh
+    assignmentIds.length
+      ? DiseaseLog.aggregate([
+          { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
+          {
+            $group: {
+              _id: "$diseaseName",
+              totalCount: { $sum: 1 },
+              unprocessedCount: {
+                $sum: { $cond: [{ $eq: ["$status", "unprocessed"] }, 1, 0] },
+              },
+              processedCount: {
+                $sum: { $cond: [{ $eq: ["$status", "processed"] }, 1, 0] },
+              },
+            },
+          },
+          { $sort: { totalCount: -1 } }, // Xếp theo bệnh xuất hiện nhiều nhất
+          { $limit: 5 },
+          {
+            $project: {
+              _id: 0,
+              diseaseName: "$_id",
+              totalCount: 1,
+              unprocessedCount: 1,
+              processedCount: 1,
+            },
+          },
+        ])
+      : Promise.resolve([]),
   ]);
 
   return {
@@ -228,6 +353,8 @@ const getDashboardData = async (querySeasonDetailId = "") => {
     charts: {
       costByCategory,
       costByStage,
+      cropProgress,
+      topDiseases,
     },
     liveFeeds: {
       recentFarmingLogs,
