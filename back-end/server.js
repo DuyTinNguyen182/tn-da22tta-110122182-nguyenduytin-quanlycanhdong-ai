@@ -16,7 +16,6 @@ const farmingLogRoutes = require("./src/routes/farmingLogRoute");
 const diseaseLogRoutes = require("./src/routes/diseaseLogRoute");
 const stageRoutes = require("./src/routes/stageRoute");
 const taskRoutes = require("./src/routes/taskRoute");
-const taskDetailRoutes = require("./src/routes/taskDetailRoute");
 const aiRoutes = require("./src/routes/aiRoute");
 const adminProgressRoutes = require("./src/routes/adminProgressRoute");
 const farmerDashboardRoutes = require("./src/routes/farmerDashboardRoute");
@@ -49,7 +48,6 @@ app.use("/api/farming-logs", farmingLogRoutes);
 app.use("/api/disease-logs", diseaseLogRoutes);
 app.use("/api/stages", stageRoutes);
 app.use("/api/tasks", taskRoutes);
-app.use("/api/task-details", taskDetailRoutes);
 app.use("/api/ai", aiRoutes);
 
 app.use("/api/admin", adminProgressRoutes);
