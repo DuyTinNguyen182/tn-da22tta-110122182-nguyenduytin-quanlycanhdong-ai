@@ -7,6 +7,7 @@ router.use(protect);
 
 // Public route — farmer can get the currently active season detail
 router.get("/active", seasonDetailController.getActiveSeasonDetail);
+router.get("/all", seasonDetailController.getFarmerSeasonDetails);
 router.get("/member", seasonDetailController.getFarmerSeasonDetails);
 
 // Admin-only routes

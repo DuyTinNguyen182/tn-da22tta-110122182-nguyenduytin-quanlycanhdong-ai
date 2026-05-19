@@ -1,619 +1,554 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Briefcase,
-  CalendarDays,
-  Filter,
-  ListChecks,
+  BarChart3,
+  Bug,
+  Layers,
   Map,
+  PieChart as PieChartIcon,
   RefreshCw,
-  ShieldAlert,
   Sprout,
+  Wallet,
+  Activity,
+  ShieldAlert,
 } from "lucide-react";
-import api from "../../../services/api";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
-import PaginationControls from "../../../components/Common/PaginationControls";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
 import { useFeedback } from "../../../hooks/useFeedback";
-import StatCard from "./StatCard";
+import api from "../../../services/api";
 
-const CURRENT_YEAR = new Date().getFullYear();
-const ROWS_PER_PAGE = 10;
-
-const buildDefaultFilters = (seasonId = "", year = String(CURRENT_YEAR)) => ({
-  fieldId: "",
-  seasonId,
-  year,
-  taskId: "",
-  taskDetailId: "",
-  status: "all",
-});
-
-const buildQueryParams = (filters) => {
-  const params = {};
-  if (filters.fieldId) params.fieldId = filters.fieldId;
-  if (filters.seasonId) params.seasonId = filters.seasonId;
-  if (filters.year) params.year = filters.year;
-  if (filters.taskId) params.taskId = filters.taskId;
-  if (filters.taskDetailId) params.taskDetailId = filters.taskDetailId;
-  if (filters.status) params.status = filters.status;
-  return params;
+const EMPTY_DASHBOARD = {
+  seasonDetailId: "",
+  currentSeasonName: "",
+  kpis: {
+    totalArea: 0,
+    totalCost: 0,
+    totalActivePlots: 0,
+    costPer1000m2: 0,
+    comparison: { text: "", type: "neutral" },
+  },
+  charts: {
+    costByCategory: [],
+    costByStage: [],
+    cropProgress: [],
+  },
+  alerts: {
+    unprocessedDiseases: [],
+  },
+  liveFeeds: {
+    recentFarmingLogs: [],
+  },
 };
 
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString("vi-VN") : "Chưa thực hiện";
+const PIE_COLORS = [
+  "#047857",
+  "#0f766e",
+  "#2563eb",
+  "#ea580c",
+  "#dc2626",
+  "#7c3aed",
+];
 
-const getStatusClasses = (status) =>
-  status === "done"
-    ? "bg-emerald-100 text-emerald-700"
-    : "bg-amber-100 text-amber-700";
+const formatNumber = (value) =>
+  new Intl.NumberFormat("vi-VN", {
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
 
-const getStatusText = (status) => {
-  if (status === "done") return "Đã làm";
-  if (status === "pending") return "Chưa làm";
-  return "Tất cả";
+const formatCurrency = (value) =>
+  new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+
+const formatDateOnly = (value) => {
+  if (!value) return "--";
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
 };
 
-const Dashboard = () => {
-  const { toast } = useFeedback();
-  const [options, setOptions] = useState({
-    fields: [],
-    seasons: [],
-    tasks: [],
-    statuses: [],
-    years: [],
-  });
-  const [statistics, setStatistics] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [bootstrapped, setBootstrapped] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [currentSeason, setCurrentSeason] = useState(null);
-  const [currentSeasonLoaded, setCurrentSeasonLoaded] = useState(false);
-  const [defaultSeasonApplied, setDefaultSeasonApplied] = useState(false);
-  const [filterForm, setFilterForm] = useState(buildDefaultFilters);
-  const [appliedFilters, setAppliedFilters] = useState(buildDefaultFilters);
+const buildSeasonOptionLabel = (item) => {
+  const seasonName =
+    item?.seasonName || item?.season?.name || item?.name || "Mùa vụ";
+  const year =
+    item?.year ||
+    (item?.startDate ? new Date(item.startDate).getFullYear() : "");
+  return year ? `${seasonName} ${year}` : seasonName;
+};
 
-  const fetchCurrentSeason = async () => {
-    try {
-      const res = await api.get("/user-overview/dashboard/current-season");
-      setCurrentSeason(res.data || null);
-    } catch (_error) {
-      setCurrentSeason(null);
-    } finally {
-      setCurrentSeasonLoaded(true);
-    }
-  };
-
-  const fetchOptions = async () => {
-    const res = await api.get("/user-overview/dashboard/options");
-    setOptions(
-      res.data || {
-        fields: [],
-        seasons: [],
-        tasks: [],
-        statuses: [],
-        years: [],
-      }
-    );
-  };
-
-  const fetchStatistics = async (filters, { silent = false } = {}) => {
-    try {
-      if (silent) {
-        setRefreshing(true);
-      } else {
-        setLoading(true);
-      }
-
-      const res = await api.get("/user-overview/dashboard/statistics", {
-        params: buildQueryParams(filters),
-      });
-
-      setStatistics(res.data);
-    } catch (error) {
-      console.error("Lỗi tải thống kê dashboard:", error);
-      toast.error(error.response?.data?.message || "Không thể tải thống kê");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCurrentSeason();
-  }, []);
-
-  useEffect(() => {
-    const bootstrap = async () => {
-      try {
-        setLoading(true);
-        await fetchOptions();
-        setBootstrapped(true);
-      } catch (error) {
-        console.error("Lỗi tải bộ lọc dashboard:", error);
-        toast.error(error.response?.data?.message || "Không thể tải bộ lọc dashboard");
-        setLoading(false);
-      }
-    };
-
-    bootstrap();
-  }, [toast]);
-
-  const resolveInitialFilters = useMemo(() => {
-    if (!currentSeason?.seasonId) {
-      return buildDefaultFilters();
-    }
-
-    const matchedSeason = options.seasons.find((item) => item._id === currentSeason.seasonId);
-    if (!matchedSeason) {
-      return buildDefaultFilters();
-    }
-
-    const seasonYear =
-      currentSeason.year !== undefined && currentSeason.year !== null
-        ? String(currentSeason.year)
-        : currentSeason.startDate
-          ? String(new Date(currentSeason.startDate).getFullYear())
-          : String(CURRENT_YEAR);
-
-    return buildDefaultFilters(matchedSeason._id, seasonYear);
-  }, [currentSeason, options.seasons]);
-
-  useEffect(() => {
-    if (!bootstrapped || !currentSeasonLoaded || defaultSeasonApplied) {
-      return;
-    }
-
-    setFilterForm(resolveInitialFilters);
-    setAppliedFilters(resolveInitialFilters);
-    setDefaultSeasonApplied(true);
-  }, [bootstrapped, currentSeasonLoaded, defaultSeasonApplied, resolveInitialFilters]);
-
-  useEffect(() => {
-    if (!bootstrapped || !defaultSeasonApplied) {
-      return;
-    }
-
-    fetchStatistics(appliedFilters);
-  }, [appliedFilters, bootstrapped, defaultSeasonApplied]);
-
-  const currentTask = useMemo(
-    () => options.tasks.find((item) => item._id === filterForm.taskId) || null,
-    [options.tasks, filterForm.taskId]
-  );
-
-  const taskDetailOptions = useMemo(() => {
-    if (!currentTask) return [];
-
-    return (currentTask.taskDetails || []).map((item) => ({
-      value: item._id,
-      label: item.name,
-    }));
-  }, [currentTask]);
-
-  const fieldOptions = useMemo(
-    () => [
-      { value: "", label: "Tất cả cánh đồng" },
-      ...(options.fields || []).map((item) => ({
-        value: item._id,
-        label: item.name,
-      })),
-    ],
-    [options.fields]
-  );
-
-  const seasonOptions = useMemo(
-    () => [
-      { value: "", label: "Tất cả mùa vụ" },
-      ...(options.seasons || []).map((item) => ({
-        value: item._id,
-        label: item.name,
-      })),
-    ],
-    [options.seasons]
-  );
-
-  const yearOptions = useMemo(
-    () => [
-      { value: "", label: "Tất cả năm" },
-      ...(options.years || []).map((year) => ({
-        value: String(year),
-        label: String(year),
-      })),
-    ],
-    [options.years]
-  );
-
-  const taskOptions = useMemo(
-    () => [
-      { value: "", label: "Tất cả công việc" },
-      ...(options.tasks || []).map((item) => ({
-        value: item._id,
-        label: item.name,
-      })),
-    ],
-    [options.tasks]
-  );
-
-  const statusOptions = useMemo(
-    () =>
-      (options.statuses || []).map((item) => ({
-        value: item.value,
-        label: getStatusText(item.value),
-      })),
-    [options.statuses]
-  );
-
-  const rows = statistics?.rows || [];
-  const summary = statistics?.summary || {
-    totalPlotCount: 0,
-    doneCount: 0,
-    pendingCount: 0,
-    visibleCount: 0,
-    completionRate: 0,
-    matchedSeasonCount: 0,
-  };
-
-  const totalPages = Math.max(1, Math.ceil(rows.length / ROWS_PER_PAGE));
-  const paginatedRows = useMemo(() => {
-    const startIndex = (currentPage - 1) * ROWS_PER_PAGE;
-    return rows.slice(startIndex, startIndex + ROWS_PER_PAGE);
-  }, [rows, currentPage]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
-
-  const handleApplyFilters = () => {
-    setCurrentPage(1);
-    setAppliedFilters({ ...filterForm });
-  };
-
-  const handleResetFilters = () => {
-    setCurrentPage(1);
-    setFilterForm(resolveInitialFilters);
-    setAppliedFilters(resolveInitialFilters);
-  };
-
-  const handleRefresh = () => {
-    fetchStatistics(appliedFilters, { silent: true });
-  };
-
-  const handleTaskChange = (value) => {
-    setFilterForm((prev) => ({
-      ...prev,
-      taskId: value,
-      taskDetailId: "",
-    }));
-  };
-
-  if (loading && !statistics) {
-    return <LoadingScreen fullScreen={true} message="Đang tải thống kê..." />;
-  }
-
-  let seasonBanner = null;
-  if (currentSeason && currentSeason.seasonName && currentSeason.startDate) {
-    const start = new Date(currentSeason.startDate);
-    const now = new Date();
-    const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
-    const seasonYear = currentSeason.year || start.getFullYear();
-
-    seasonBanner = (
-      <div className="mb-0 rounded-xl bg-emerald-50 px-6 py-4 text-base font-medium text-emerald-900 shadow-sm">
-        Mùa vụ hiện tại:
-        {" "}
-        <span className="font-bold">
-          {currentSeason.seasonName} {seasonYear}
-        </span>
-        . Ngày bắt đầu:
-        {" "}
-        <span className="font-semibold">{start.toLocaleDateString("vi-VN")}</span>
-        . Mùa vụ đã bắt đầu được
-        {" "}
-        <span className="font-semibold">{diffDays >= 0 ? diffDays : 0}</span>
-        {" "}
-        ngày.
-      </div>
-    );
-  } else {
-    seasonBanner = (
-      <div className="mb-0 rounded-xl bg-amber-50 px-6 py-4 text-base font-medium text-amber-900 shadow-sm">
-        Không có mùa vụ nào đang canh tác.
-      </div>
-    );
-  }
+// Đã thêm subtext cực nhỏ gọn để nhét vừa dòng So sánh chi phí
+const KpiCard = ({
+  title,
+  value,
+  icon,
+  accentClass,
+  iconClass,
+  subtext,
+  subtextClass,
+}) => {
+  const IconComponent = icon;
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-6">
-      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-3">
-        {seasonBanner}
-
-        <section className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xl font-bold uppercase tracking-[0.1em] text-emerald-700">
-                <Filter size={18} />
-                Bộ lọc thống kê
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition-all hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
-                Làm mới
-              </button>
-
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="inline-flex items-center gap-2 rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
-              >
-                Đặt lại bộ lọc
-              </button>
-
-              <button
-                type="button"
-                onClick={handleApplyFilters}
-                className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700"
-              >
-                <Filter size={16} />
-                Áp dụng
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Cánh đồng
-              </p>
-              <CustomDropdown
-                value={filterForm.fieldId}
-                onChange={(value) => setFilterForm((prev) => ({ ...prev, fieldId: value }))}
-                options={fieldOptions}
-                placeholder="Chọn cánh đồng"
-                icon={Map}
-                variant="filter"
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Mùa vụ
-              </p>
-              <CustomDropdown
-                value={filterForm.seasonId}
-                onChange={(value) => setFilterForm((prev) => ({ ...prev, seasonId: value }))}
-                options={seasonOptions}
-                placeholder="Chọn mùa vụ"
-                icon={Sprout}
-                variant="filter"
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Năm
-              </p>
-              <CustomDropdown
-                value={filterForm.year}
-                onChange={(value) => setFilterForm((prev) => ({ ...prev, year: value }))}
-                options={yearOptions}
-                placeholder="Chọn năm"
-                icon={CalendarDays}
-                variant="filter"
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Công việc
-              </p>
-              <CustomDropdown
-                value={filterForm.taskId}
-                onChange={handleTaskChange}
-                options={taskOptions}
-                placeholder="Chọn công việc"
-                icon={Briefcase}
-                variant="filter"
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Chi tiết công việc
-              </p>
-              <CustomDropdown
-                value={filterForm.taskDetailId}
-                onChange={(value) =>
-                  setFilterForm((prev) => ({ ...prev, taskDetailId: value }))
-                }
-                options={[
-                  {
-                    value: "",
-                    label: currentTask ? "Tất cả chi tiết" : "Chọn công việc trước",
-                  },
-                  ...taskDetailOptions,
-                ]}
-                placeholder="Chọn chi tiết công việc"
-                icon={ListChecks}
-                variant="filter"
-                className={!currentTask ? "opacity-70" : ""}
-              />
-            </div>
-
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                Trạng thái
-              </p>
-              <CustomDropdown
-                value={filterForm.status}
-                onChange={(value) => setFilterForm((prev) => ({ ...prev, status: value }))}
-                options={statusOptions}
-                placeholder="Chọn trạng thái"
-                icon={ShieldAlert}
-                variant="filter"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-4 xl:grid-cols-4">
-          <StatCard
-            title="Tổng số thửa"
-            value={summary.totalPlotCount}
-            unit="thửa"
-            icon={Map}
-            color="emerald"
-          />
-          <StatCard
-            title="Đã hoàn thành"
-            value={summary.doneCount}
-            unit="lượt"
-            icon={Briefcase}
-            color="blue"
-          />
-          <StatCard
-            title="Chưa hoàn thành"
-            value={summary.pendingCount}
-            unit="lượt"
-            icon={ShieldAlert}
-            color="amber"
-          />
-          <StatCard
-            title="Tỉ lệ hoàn thành"
-            value={`${summary.completionRate}%`}
-            unit=""
-            icon={ListChecks}
-            color="violet"
-          />
-        </section>
-
-        <section className="rounded-[28px] border border-gray-100 bg-white shadow-sm">
-          <div className="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Bảng thống kê theo thửa ruộng</h2>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
-              <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
-                <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                Đã làm
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700">
-                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-                Chưa làm
-              </span>
-            </div>
-          </div>
-
-          {loading ? (
-            <LoadingScreen message="Đang cập nhật bảng thống kê..." />
-          ) : rows.length === 0 ? (
-            <div className="flex h-72 flex-col items-center justify-center px-6 text-center">
-              <div className="rounded-3xl bg-amber-50 p-4 text-amber-600">
-                <ShieldAlert size={28} />
-              </div>
-              <p className="mt-4 text-lg font-semibold text-gray-800">Chưa có dữ liệu phù hợp</p>
-              <p className="mt-2 max-w-xl text-sm leading-6 text-gray-500">
-                Hãy thử đổi mùa vụ, năm, công việc hoặc trạng thái. Nếu đang lọc theo chi tiết công
-                việc, cần kiểm tra xem công việc cha đã được chọn đúng chưa.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[1180px]">
-                  <thead className="bg-gray-50 text-left text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
-                    <tr>
-                      <th className="px-5 py-4">Thửa ruộng</th>
-                      <th className="px-5 py-4">Cánh đồng</th>
-                      <th className="px-5 py-4">Mùa vụ</th>
-                      <th className="px-5 py-4">Công việc</th>
-                      <th className="px-5 py-4">Ngày thực hiện</th>
-                      <th className="px-5 py-4">Trạng thái</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {paginatedRows.map((row) => (
-                      <tr key={row.assignmentId} className="border-t border-gray-100 align-top">
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-gray-900">{row.plotName}</p>
-                          <p className="mt-1 text-sm text-gray-500">
-                            Diện tích: {Number(row.plotArea || 0).toLocaleString("vi-VN")} m2
-                          </p>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <div className="inline-flex items-center gap-2 rounded-2xl bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700">
-                            <Map size={14} />
-                            {row.fieldName}
-                          </div>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-gray-900">{row.seasonLabel}</p>
-                          <p className="mt-1 text-sm text-gray-500">Năm: {row.year || "--"}</p>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-gray-900">{row.activityLabel}</p>
-                          <p className="mt-1 text-sm text-gray-500">
-                            {row.taskDetailName ? row.taskName : "Công việc chung"}
-                          </p>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <p
-                            className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-                              row.performedAt
-                                ? "bg-emerald-50 text-emerald-700"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
-                          >
-                            {formatDate(row.performedAt)}
-                          </p>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getStatusClasses(row.status)}`}
-                          >
-                            {getStatusText(row.status)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-sm text-gray-500">
-                  Hiển thị {paginatedRows.length} dòng trong tổng số {rows.length} dòng theo bộ lọc
-                  hiện tại.
-                </p>
-
-                <PaginationControls
-                  page={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  disabled={loading}
-                />
-              </div>
-            </div>
+    <div className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm flex flex-col justify-between">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-xs font-medium text-gray-500">{title}</p>
+          <p className="mt-1 text-base font-bold text-gray-900">{value}</p>
+          {subtext && (
+            <p
+              className={`mt-1 text-[10px] font-medium leading-tight ${subtextClass}`}
+            >
+              {subtext}
+            </p>
           )}
-        </section>
+        </div>
+        <div className={`rounded-lg p-2 ${accentClass}`}>
+          <IconComponent className={`h-4 w-4 ${iconClass}`} />
+        </div>
       </div>
     </div>
   );
 };
 
-export default Dashboard;
+const FeedItem = ({
+  title,
+  subtitle,
+  meta,
+  icon,
+  iconClass,
+  bgClass = "bg-gray-50",
+  borderClass = "border-gray-100",
+}) => {
+  const IconComponent = icon;
+
+  return (
+    <div
+      className={`flex items-start gap-2 rounded-lg border px-2 py-1.5 ${bgClass} ${borderClass}`}
+    >
+      <div className="mt-0.5 rounded-lg bg-white p-1 shadow-sm border border-gray-50">
+        <IconComponent className={`h-3 w-3 ${iconClass}`} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-semibold text-gray-900">{title}</p>
+        <p className="mt-0.5 truncate text-xs text-gray-600">{subtitle}</p>
+        <p className="mt-0.5 text-xs text-gray-500">{meta}</p>
+      </div>
+    </div>
+  );
+};
+
+const EmptyBlock = ({ text }) => (
+  <div className="flex min-h-[100px] items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 px-2 text-center text-xs text-gray-500">
+    {text}
+  </div>
+);
+
+const FarmerDashboard = () => {
+  const { toast } = useFeedback();
+  const [dashboard, setDashboard] = useState(EMPTY_DASHBOARD);
+  const [seasonDetails, setSeasonDetails] = useState([]);
+  const [selectedSeasonId, setSelectedSeasonId] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const isFirstDashboardLoad = useRef(true);
+  const skipNextDashboardFetch = useRef(false);
+
+  useEffect(() => {
+    const fetchSeasonDetails = async () => {
+      try {
+        const res = await api.get("/season-details/all"); // Route tương ứng của Farmer
+        setSeasonDetails(res.data || []);
+      } catch (error) {
+        toast.error(
+          error.response?.data?.message || "Không thể tải danh sách mùa vụ",
+        );
+      }
+    };
+    fetchSeasonDetails();
+  }, [toast]);
+
+  useEffect(() => {
+    if (skipNextDashboardFetch.current) {
+      skipNextDashboardFetch.current = false;
+      return;
+    }
+
+    const fetchDashboard = async () => {
+      try {
+        if (isFirstDashboardLoad.current) setLoading(true);
+        else setRefreshing(true);
+
+        const res = await api.get("/farmer-dashboard", {
+          params: selectedSeasonId ? { seasonId: selectedSeasonId } : {},
+        });
+
+        const nextDashboard = res.data || EMPTY_DASHBOARD;
+        setDashboard(nextDashboard);
+
+        if (!selectedSeasonId && nextDashboard?.seasonDetailId) {
+          skipNextDashboardFetch.current = true;
+          setSelectedSeasonId(nextDashboard.seasonDetailId);
+        }
+      } catch (error) {
+        toast.error(error.response?.data?.message || "Không thể tải dashboard");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        isFirstDashboardLoad.current = false;
+      }
+    };
+
+    fetchDashboard();
+  }, [selectedSeasonId, toast]);
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      const res = await api.get("/farmer-dashboard", {
+        params: selectedSeasonId ? { seasonId: selectedSeasonId } : {},
+      });
+      setDashboard(res.data || EMPTY_DASHBOARD);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Không thể làm mới dữ liệu");
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const { kpis, charts, alerts, liveFeeds } = dashboard;
+
+  if (loading) {
+    return (
+      <LoadingScreen
+        fullScreen={true}
+        message="Đang tải tổng quan cánh đồng..."
+      />
+    );
+  }
+
+  // Set màu sắc cho text so sánh
+  let compColor = "text-gray-500";
+  if (kpis.comparison.type === "good") compColor = "text-emerald-600";
+  if (kpis.comparison.type === "bad") compColor = "text-red-600";
+
+  return (
+    <div className="h-full overflow-y-auto bg-gray-100 px-2 py-2 sm:px-4 lg:px-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-2">
+        {/* ROW 1: KPIs & Bộ Lọc (Grid 5 cột y hệt Admin) */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <KpiCard
+            title="Số thửa đang canh tác"
+            value={formatNumber(kpis.totalActivePlots)}
+            icon={Layers}
+            accentClass="bg-fuchsia-50"
+            iconClass="text-fuchsia-700"
+          />
+          <KpiCard
+            title="Tổng diện tích"
+            value={`${formatNumber(kpis.totalArea)} m2`}
+            icon={Map}
+            accentClass="bg-sky-50"
+            iconClass="text-sky-700"
+          />
+          <KpiCard
+            title="Tổng chi phí"
+            value={formatCurrency(kpis.totalCost)}
+            icon={Wallet}
+            accentClass="bg-amber-50"
+            iconClass="text-amber-700"
+          />
+          <KpiCard
+            title="Chi phí / 1000m²"
+            value={formatCurrency(kpis.costPer1000m2)}
+            icon={BarChart3}
+            accentClass="bg-emerald-50"
+            iconClass="text-emerald-700"
+            subtext={kpis.comparison.text}
+            subtextClass={compColor}
+          />
+
+          <div className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm">
+            <div className="flex h-full items-end gap-2">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-600">
+                  Bộ lọc mùa vụ
+                </label>
+                <div className="mt-1">
+                  <CustomDropdown
+                    value={selectedSeasonId}
+                    onChange={setSelectedSeasonId}
+                    placeholder="Mùa vụ đang hoạt động"
+                    variant="filter"
+                    size="small"
+                    icon={Sprout}
+                    options={[
+                      { value: "", label: "Mùa vụ đang hoạt động" },
+                      ...seasonDetails.map((item) => ({
+                        value: item._id,
+                        label: buildSeasonOptionLabel(item),
+                      })),
+                    ]}
+                  />
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex h-[34px] items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 text-xs font-semibold text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw
+                  className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`}
+                />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 2: Chi phí theo danh mục & Giai đoạn */}
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm xl:col-span-3">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="rounded-lg bg-emerald-50 p-2">
+                <Wallet className="h-4 w-4 text-emerald-700" />
+              </div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                Chi phí theo vật tư
+              </h2>
+            </div>
+
+            {charts.costByCategory.length === 0 ? (
+              <EmptyBlock text="Chưa có dữ liệu chi phí." />
+            ) : (
+              <div className="h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={charts.costByCategory}
+                    margin={{ top: 4, right: 4, left: 0, bottom: 4 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#e5e7eb"
+                    />
+                    <XAxis
+                      dataKey="categoryName"
+                      tick={{ fill: "#6b7280", fontSize: 10 }}
+                    />
+                    <YAxis
+                      tick={{ fill: "#6b7280", fontSize: 10 }}
+                      tickFormatter={(value) => formatNumber(value)}
+                    />
+                    <Tooltip
+                      formatter={(value) => [formatCurrency(value), "Chi phí"]}
+                      contentStyle={{
+                        borderRadius: "8px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "10px",
+                      }}
+                    />
+                    <Bar
+                      dataKey="totalCost"
+                      fill="#059669"
+                      radius={[6, 6, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm xl:col-span-2">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="rounded-lg bg-indigo-50 p-2">
+                <PieChartIcon className="h-4 w-4 text-indigo-700" />
+              </div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                Chi phí theo giai đoạn
+              </h2>
+            </div>
+
+            {charts.costByStage.length === 0 ? (
+              <EmptyBlock text="Chưa có dữ liệu cơ cấu." />
+            ) : (
+              <div className="h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={charts.costByStage}
+                      dataKey="totalCost"
+                      nameKey="stageName"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={2}
+                    >
+                      {charts.costByStage.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={PIE_COLORS[index % PIE_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) => formatCurrency(value)}
+                      contentStyle={{
+                        borderRadius: "8px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "10px",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ROW 3: Tiến độ canh tác & Cảnh báo sâu bệnh */}
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+          {/* Tiến độ (Biểu đồ ngang) */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="rounded-lg bg-sky-50 p-1.5">
+                <Activity className="h-4 w-4 text-sky-600" />
+              </div>
+              <h2 className="text-xs font-semibold text-gray-900">
+                Tiến độ ruộng của bạn
+              </h2>
+            </div>
+
+            {charts.cropProgress.length === 0 ? (
+              <EmptyBlock text="Chưa bắt đầu làm đất." />
+            ) : (
+              <div className="h-[180px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={charts.cropProgress}
+                    layout="vertical"
+                    margin={{ top: 2, right: 10, left: 15, bottom: 2 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                      stroke="#e5e7eb"
+                    />
+                    <XAxis
+                      type="number"
+                      tick={{ fill: "#6b7280", fontSize: 9 }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="stageName"
+                      tick={{ fill: "#374151", fontSize: 9 }}
+                      width={70}
+                    />
+                    <Tooltip
+                      formatter={(value) => [
+                        `${formatNumber(value)} m²`,
+                        "Diện tích",
+                      ]}
+                      contentStyle={{
+                        borderRadius: "12px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "11px",
+                      }}
+                    />
+                    <Bar
+                      dataKey="totalArea"
+                      name="Diện tích"
+                      radius={[0, 8, 8, 0]}
+                      fill="#0ea5e9"
+                      barSize={16}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Cảnh báo dịch bệnh (Thay cho biểu đồ Top bệnh của Admin) */}
+          {/* <div className="rounded-2xl border border-red-200 bg-red-50 p-2.5 shadow-sm">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="rounded-lg bg-red-100 p-1.5">
+                <ShieldAlert className="h-4 w-4 text-red-600" />
+              </div>
+              <h2 className="text-xs font-semibold text-red-900">
+                Cảnh báo chưa xử lý (Của bạn)
+              </h2>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              {alerts.unprocessedDiseases.length === 0 ? (
+                <EmptyBlock text="Tuyệt vời! Ruộng của bạn không có cảnh báo nào." />
+              ) : (
+                alerts.unprocessedDiseases
+                  .slice(0, 3)
+                  .map((item) => (
+                    <FeedItem
+                      key={item._id}
+                      icon={Bug}
+                      iconClass="text-red-600"
+                      bgClass="bg-white"
+                      borderClass="border-red-100"
+                      title={item.diseaseName || "Bệnh chưa xác định"}
+                      subtitle={`Tại ruộng: ${item.seasonPlotAssignments?.[0]?.plot?.name || "Đang xử lý"}`}
+                      meta={`Phát hiện: ${formatDateOnly(item.detectedAt)}`}
+                    />
+                  ))
+              )}
+            </div>
+          </div> */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
+            <div className="mb-2 flex items-center gap-2">
+              <div className="rounded-lg bg-emerald-50 p-1.5">
+                <Sprout className="h-4 w-4 text-emerald-700" />
+              </div>
+              <h2 className="text-xs font-semibold text-gray-900">
+                Hoạt động vừa ghi
+              </h2>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              {liveFeeds.recentFarmingLogs.length === 0 ? (
+                <EmptyBlock text="Chưa có nhật ký nào." />
+              ) : (
+                liveFeeds.recentFarmingLogs
+                  .slice(0, 3)
+                  .map((item) => (
+                    <FeedItem
+                      key={item._id}
+                      icon={Sprout}
+                      iconClass="text-emerald-700"
+                      title={item.task?.name || "Công việc"}
+                      subtitle={formatDateOnly(item.createdAt)}
+                      meta={`Chi phí: ${formatCurrency(item.cost)}`}
+                    />
+                  ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ROW 4: Nhật ký hoạt động */}
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-2"></div>
+      </div>
+    </div>
+  );
+};
+
+export default FarmerDashboard;

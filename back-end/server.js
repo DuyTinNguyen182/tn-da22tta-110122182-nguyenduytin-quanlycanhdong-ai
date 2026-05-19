@@ -19,7 +19,7 @@ const taskRoutes = require("./src/routes/taskRoute");
 const taskDetailRoutes = require("./src/routes/taskDetailRoute");
 const aiRoutes = require("./src/routes/aiRoute");
 const adminProgressRoutes = require("./src/routes/adminProgressRoute");
-const userOverviewRoutes = require("./src/routes/userOverviewRoute");
+const farmerDashboardRoutes = require("./src/routes/farmerDashboardRoute");
 
 const app = express();
 
@@ -30,7 +30,7 @@ app.use(
   cors({
     origin: FRONTEND_URL,
     credentials: true,
-  })
+  }),
 );
 
 // --- Database Connection ---
@@ -53,7 +53,7 @@ app.use("/api/task-details", taskDetailRoutes);
 app.use("/api/ai", aiRoutes);
 
 app.use("/api/admin", adminProgressRoutes);
-app.use("/api/user-overview", userOverviewRoutes);
+app.use("/api/farmer-dashboard", farmerDashboardRoutes);
 
 // --- Start Server ---
 app.listen(PORT, () => {

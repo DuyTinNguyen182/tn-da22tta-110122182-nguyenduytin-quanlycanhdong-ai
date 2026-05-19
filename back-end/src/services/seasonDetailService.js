@@ -267,16 +267,21 @@ const deleteSeasonDetail = async (id) => {
 };
 
 const getFarmerSeasonDetails = async (userId, fieldId) => {
-  if (!fieldId) {
-    throw new Error("Yêu cầu chọn cánh đồng");
-  }
-
   const seasonDocs = await SeasonDetail.find()
     .populate("season", "name")
     .sort({ year: -1, startDate: -1, createdAt: -1 });
 
   const catalogMap = await getSeasonMap();
-  const plots = await Plot.find({ user: userId, field: fieldId }).lean();
+  const plotQuery = {
+    user: userId,
+    ...(fieldId ? { field: fieldId } : {}),
+  };
+  const assignmentQuery = {
+    user: userId,
+    ...(fieldId ? { field: fieldId } : {}),
+  };
+  const plots = await Plot.find(plotQuery).lean();
+  const activePlots = plots.filter((plot) => plot.status === "active");
   const results = [];
 
   for (const doc of seasonDocs) {
@@ -285,7 +290,11 @@ const getFarmerSeasonDetails = async (userId, fieldId) => {
     let seasonStatus = "planned";
     if (doc.endDate && doc.endDate < now) {
       seasonStatus = "completed";
-    } else if (doc.startDate && doc.startDate <= now && (!doc.endDate || doc.endDate >= now)) {
+    } else if (
+      doc.startDate &&
+      doc.startDate <= now &&
+      (!doc.endDate || doc.endDate >= now)
+    ) {
       seasonStatus = "active";
     }
 
@@ -293,18 +302,23 @@ const getFarmerSeasonDetails = async (userId, fieldId) => {
 
     let assignments = await SeasonPlotAssignment.find({
       seasonDetail: doc._id,
-      user: userId,
-      field: fieldId,
+      ...assignmentQuery,
     })
       .populate("plot", "name area status")
       .lean();
 
-    if (assignments.length === 0 && seasonStatus === "active") {
-      const activePlots = plots.filter((plot) => plot.status === "active");
-      if (activePlots.length > 0) {
-        const payload = activePlots.map((plot) => ({
+    if (seasonStatus === "active" && activePlots.length > 0) {
+      const assignedPlotIds = new Set(
+        assignments.map((item) => String(item.plot?._id || item.plot)),
+      );
+      const missingPlots = activePlots.filter(
+        (plot) => !assignedPlotIds.has(String(plot._id)),
+      );
+
+      if (missingPlots.length > 0) {
+        const payload = missingPlots.map((plot) => ({
           seasonDetail: doc._id,
-          field: fieldId,
+          field: plot.field,
           plot: plot._id,
           user: userId,
           status: "active",
@@ -313,8 +327,7 @@ const getFarmerSeasonDetails = async (userId, fieldId) => {
         await SeasonPlotAssignment.insertMany(payload);
         assignments = await SeasonPlotAssignment.find({
           seasonDetail: doc._id,
-          user: userId,
-          field: fieldId,
+          ...assignmentQuery,
         })
           .populate("plot", "name area status")
           .lean();
@@ -325,15 +338,25 @@ const getFarmerSeasonDetails = async (userId, fieldId) => {
       continue;
     }
 
-    const activeAssignments = assignments.filter((item) => item.status === "active");
-    const loggableAssignments = activeAssignments.filter((item) => item.plot?.status === "active");
+    const activeAssignments = assignments.filter(
+      (item) => item.status === "active",
+    );
+    const loggableAssignments = activeAssignments.filter(
+      (item) => item.plot?.status === "active",
+    );
 
     Object.assign(seasonDecorated, {
       assignments,
-      assignedPlotIds: activeAssignments.map((item) => String(item.plot?._id || item.plot)),
+      assignedPlotIds: activeAssignments.map((item) =>
+        String(item.plot?._id || item.plot),
+      ),
       assignedPlots: activeAssignments.map((item) => item.plot).filter(Boolean),
-      loggablePlotIds: loggableAssignments.map((item) => String(item.plot?._id || item.plot)),
-      loggablePlots: loggableAssignments.map((item) => item.plot).filter(Boolean),
+      loggablePlotIds: loggableAssignments.map((item) =>
+        String(item.plot?._id || item.plot),
+      ),
+      loggablePlots: loggableAssignments
+        .map((item) => item.plot)
+        .filter(Boolean),
       totalPlotCount: assignments.length,
       activePlotCount: activeAssignments.length,
       loggablePlotCount: loggableAssignments.length,
