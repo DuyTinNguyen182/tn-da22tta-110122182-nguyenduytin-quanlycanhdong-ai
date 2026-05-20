@@ -39,7 +39,7 @@ const detectCycleDFS = async (
   taskId,
   visited = new Map(),
   recStack = new Map(),
-  allTaskPrerequisites = null
+  allTaskPrerequisites = null,
 ) => {
   const taskIdStr = String(taskId);
 
@@ -69,12 +69,7 @@ const detectCycleDFS = async (
       if (!visited.has(prereqStr)) {
         // Recursively check this prerequisite
         if (
-          await detectCycleDFS(
-            prereq,
-            visited,
-            recStack,
-            allTaskPrerequisites
-          )
+          await detectCycleDFS(prereq, visited, recStack, allTaskPrerequisites)
         ) {
           return true;
         }
@@ -105,7 +100,7 @@ const validateNoCircularDependency = async (taskId, prerequisites = []) => {
   const hasCycle = await detectCycleDFS(taskId);
   if (hasCycle) {
     throw new Error(
-      "Phát hiện vòng phụ thuộc trong các công việc tiên quyết. Một công việc không thể yêu cầu chính nó trực tiếp hoặc gián tiếp."
+      "Phát hiện vòng phụ thuộc trong các công việc tiên quyết. Một công việc không thể yêu cầu chính nó trực tiếp hoặc gián tiếp.",
     );
   }
 };
@@ -196,41 +191,26 @@ const createTask = async (payload) => {
       category,
       isRepeatable = true,
       prerequisites,
+      recommendation,
     } = payload;
 
-    // Normalize prerequisites to array of IDs
-    if (!prerequisites) {
-      prerequisites = [];
-    } else if (!Array.isArray(prerequisites)) {
-      prerequisites = [prerequisites];
-    } else {
-      // Extract IDs from objects if needed (in case frontend sends {value, label} format)
-      prerequisites = prerequisites.map((p) => (typeof p === "object" ? p.value || p._id : p));
-    }
+    if (!prerequisites) prerequisites = [];
+    else if (!Array.isArray(prerequisites)) prerequisites = [prerequisites];
+    else
+      prerequisites = prerequisites.map((p) =>
+        typeof p === "object" ? p.value || p._id : p,
+      );
 
-    // Validate required fields
-    if (!stage) {
-      throw new Error("Vui lòng cung cấp ID giai đoạn.");
-    }
-
-    if (!name || !name.trim()) {
+    if (!stage) throw new Error("Vui lòng cung cấp ID giai đoạn.");
+    if (!name || !name.trim())
       throw new Error("Vui lòng cung cấp tên công việc.");
-    }
-
-    if (typeof order !== "number" || order < 0) {
-      throw new Error("Thứ tự công việc phải là một số không âm.");
-    }
+    if (typeof order !== "number" || order < 0)
+      throw new Error("Thứ tự công việc phải là số không âm.");
 
     const normalizedCategory = normalizeTaskCategory(category);
-
-    // Verify stage exists
     const stageDoc = await Stage.findById(stage).lean();
-    if (!stageDoc) {
-      throw new Error("Giai đoạn tham chiếu không tồn tại.");
-    }
+    if (!stageDoc) throw new Error("Giai đoạn tham chiếu không tồn tại.");
 
-    // Create temporary task to validate circular dependencies
-    // The temporary ID is used for cycle detection
     const tempTask = new Task({
       stage,
       name: name.trim(),
@@ -238,153 +218,88 @@ const createTask = async (payload) => {
       category: normalizedCategory,
       isRepeatable,
       prerequisites: prerequisites.map((p) => String(p)),
+      recommendation: recommendation || { isSuggested: false },
     });
 
-    // Validate circular dependencies
     if (prerequisites && prerequisites.length > 0) {
       const hasCycle = await detectCycleDFS(tempTask._id);
-      if (hasCycle) {
-        throw new Error(
-          "Phát hiện vòng phụ thuộc trong các công việc tiên quyết. Một công việc không thể yêu cầu chính nó trực tiếp hoặc gián tiếp."
-        );
-      }
+      if (hasCycle) throw new Error("Phát hiện vòng phụ thuộc tiên quyết.");
     }
 
-    // Check for duplicate task name within the same stage
     const existingTask = await Task.findOne({
       stage,
       name: { $regex: new RegExp(`^${name.trim()}$`, "i") },
     }).lean();
 
-    if (existingTask) {
-      throw new Error(`Đã tồn tại công việc với tên "${name}" trong giai đoạn này`);
-    }
+    if (existingTask) throw new Error(`Đã tồn tại công việc với tên "${name}"`);
 
-    // Validate that all prerequisites exist and belong to same or previous stages
-    if (prerequisites && prerequisites.length > 0) {
-      const prereqTasks = await Task.find({
-        _id: { $in: prerequisites },
-      })
-        .select("stage name")
-        .lean();
-
-      if (prereqTasks.length !== prerequisites.length) {
-        throw new Error("Một hoặc nhiều công việc tiên quyết không tồn tại");
-      }
-
-      // Verify all prerequisites are valid Task IDs (optional: can enforce stage ordering)
-      const invalidPrereqs = prerequisites.filter(
-        (p) =>
-          !prereqTasks.find(
-            (task) => String(task._id) === String(p)
-          )
-      );
-
-      if (invalidPrereqs.length > 0) {
-        throw new Error("Các ID công việc tiên quyết không hợp lệ được cung cấp");
-      }
-    }
-
-    // Save the task
     await tempTask.save();
-
-    // Return populated task
     return await getTaskById(tempTask._id);
   } catch (error) {
     throw new Error(`Tạo công việc thất bại: ${error.message}`);
   }
 };
 
-/**
- * Update a task
- */
 const updateTask = async (taskId, payload) => {
   try {
-    const { stage, name, order, category, isRepeatable, prerequisites } = payload;
-
+    const {
+      stage,
+      name,
+      order,
+      category,
+      isRepeatable,
+      prerequisites,
+      recommendation,
+    } = payload;
     const task = await Task.findById(taskId).lean();
-    if (!task) {
-      throw new Error("Không tìm thấy công việc");
-    }
+    if (!task) throw new Error("Không tìm thấy công việc");
 
     const updateData = {};
 
-    // Validate and update stage
     if (stage !== undefined) {
       const stageDoc = await Stage.findById(stage).lean();
-      if (!stageDoc) {
-        throw new Error("Giai đoạn tham chiếu không tồn tại.");
-      }
+      if (!stageDoc) throw new Error("Giai đoạn tham chiếu không tồn tại.");
       updateData.stage = stage;
     }
 
-    // Validate and update name
     if (name !== undefined && name.trim()) {
       const existingTask = await Task.findOne({
         _id: { $ne: taskId },
         stage: stage || task.stage,
         name: { $regex: new RegExp(`^${name.trim()}$`, "i") },
       }).lean();
-
-      if (existingTask) {
+      if (existingTask)
         throw new Error(`Đã tồn tại công việc với tên "${name}"`);
-      }
-
       updateData.name = name.trim();
     }
 
-    // Validate and update order
-    if (order !== undefined && typeof order === "number" && order >= 0) {
+    if (order !== undefined && typeof order === "number" && order >= 0)
       updateData.order = order;
-    }
-
-    if (category !== undefined) {
+    if (category !== undefined)
       updateData.category = normalizeTaskCategory(category);
-    }
-
-    // Validate and update isRepeatable
-    if (isRepeatable !== undefined && typeof isRepeatable === "boolean") {
+    if (isRepeatable !== undefined && typeof isRepeatable === "boolean")
       updateData.isRepeatable = isRepeatable;
+
+    if (recommendation !== undefined) {
+      updateData.recommendation = recommendation;
     }
 
-    // Validate and update prerequisites
     if (prerequisites !== undefined) {
-      // Normalize prerequisites to array of IDs
       let normalizedPrerequisites = prerequisites;
       if (!Array.isArray(normalizedPrerequisites)) {
-        if (normalizedPrerequisites === null || normalizedPrerequisites === "") {
-          normalizedPrerequisites = [];
-        } else {
-          normalizedPrerequisites = [normalizedPrerequisites];
-        }
+        normalizedPrerequisites = normalizedPrerequisites
+          ? [normalizedPrerequisites]
+          : [];
       } else {
-        // Extract IDs from objects if needed (in case frontend sends {value, label} format)
-        normalizedPrerequisites = normalizedPrerequisites.map((p) => 
-          typeof p === "object" ? (p.value || p._id) : p
+        normalizedPrerequisites = normalizedPrerequisites.map((p) =>
+          typeof p === "object" ? p.value || p._id : p,
         );
       }
 
       if (normalizedPrerequisites.length > 0) {
-        // Check for circular dependencies
         const hasCycle = await detectCycleDFS(taskId);
-        if (hasCycle) {
-          throw new Error(
-            "Phát hiện vòng phụ thuộc trong các công việc tiên quyết. Một công việc không thể yêu cầu chính nó trực tiếp hoặc gián tiếp."
-          );
-        }
-
-        // Verify all prerequisites exist
-        const prereqTasks = await Task.find({
-          _id: { $in: normalizedPrerequisites },
-        })
-          .select("_id")
-          .lean();
-
-        if (prereqTasks.length !== normalizedPrerequisites.length) {
-          throw new Error("Một hoặc nhiều công việc tiên quyết không tồn tại");
-        }
+        if (hasCycle) throw new Error("Phát hiện vòng phụ thuộc tiên quyết.");
       }
-
       updateData.prerequisites = normalizedPrerequisites.map((p) => String(p));
     }
 
@@ -410,7 +325,9 @@ const deleteTask = async (taskId) => {
     }).lean();
 
     if (dependentTasks) {
-      throw new Error("Không thể xóa công việc vì nó là công việc tiên quyết của công việc khác");
+      throw new Error(
+        "Không thể xóa công việc vì nó là công việc tiên quyết của công việc khác",
+      );
     }
 
     // Check if any diary logs reference this task

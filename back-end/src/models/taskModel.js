@@ -32,6 +32,13 @@ const taskSchema = new mongoose.Schema(
         ref: "Task",
       },
     ],
+    // ------
+    recommendation: {
+      isSuggested: { type: Boolean, default: false },
+      isSowingTask: { type: Boolean, default: false }, // Đánh dấu đây là Mốc Số 0
+      startDay: { type: Number, default: null },       // Lưu số âm nếu trước sạ
+      endDay: { type: Number, default: null }
+    }
   },
   {
     timestamps: true,
