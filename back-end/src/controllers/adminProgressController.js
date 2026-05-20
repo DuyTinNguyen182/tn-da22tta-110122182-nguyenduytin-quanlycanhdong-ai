@@ -1,20 +1,12 @@
 const adminProgressService = require("../services/adminProgressService");
 const adminPlotStatisticsService = require("../services/adminPlotStatisticsService");
-const adminDashboardService = require("../services/adminDashboardService");
-
-const getDashboard = async (req, res) => {
-  try {
-    const dashboard = await adminDashboardService.getDashboardData(req.query.seasonId || "");
-    res.status(200).json(dashboard);
-  } catch (error) {
-    const statusCode = error.message?.includes("Không tìm thấy") ? 404 : 500;
-    res.status(statusCode).json({ message: error.message });
-  }
-};
 
 const getOverview = async (req, res) => {
   try {
-    const overview = await adminProgressService.getAdminOverview(req.query, req.user);
+    const overview = await adminProgressService.getAdminOverview(
+      req.query,
+      req.user,
+    );
     res.json(overview);
   } catch (error) {
     const statusCode = error.message?.includes("admin") ? 403 : 500;
@@ -24,7 +16,8 @@ const getOverview = async (req, res) => {
 
 const getPlotStatisticsOptions = async (_req, res) => {
   try {
-    const options = await adminPlotStatisticsService.getAdminPlotStatisticsOptions();
+    const options =
+      await adminPlotStatisticsService.getAdminPlotStatisticsOptions();
     res.json(options);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -33,10 +26,11 @@ const getPlotStatisticsOptions = async (_req, res) => {
 
 const getPlotTaskStatistics = async (req, res) => {
   try {
-    const statistics = await adminPlotStatisticsService.getAdminPlotTaskStatistics(
-      req.query,
-      req.user
-    );
+    const statistics =
+      await adminPlotStatisticsService.getAdminPlotTaskStatistics(
+        req.query,
+        req.user,
+      );
     res.json(statistics);
   } catch (error) {
     const statusCode = error.message?.includes("admin") ? 403 : 400;
@@ -46,7 +40,10 @@ const getPlotTaskStatistics = async (req, res) => {
 
 const sendPlotTaskWarnings = async (req, res) => {
   try {
-    const result = await adminPlotStatisticsService.sendPlotTaskWarnings(req.body, req.user);
+    const result = await adminPlotStatisticsService.sendPlotTaskWarnings(
+      req.body,
+      req.user,
+    );
     res.json(result);
   } catch (error) {
     const statusCode = error.message?.includes("admin") ? 403 : 400;
@@ -64,7 +61,6 @@ const getCurrentSeasonInfo = async (_req, res) => {
 };
 
 module.exports = {
-  getDashboard,
   getOverview,
   getPlotStatisticsOptions,
   getPlotTaskStatistics,

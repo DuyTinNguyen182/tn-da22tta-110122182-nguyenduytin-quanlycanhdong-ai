@@ -6,11 +6,17 @@ const router = express.Router();
 
 router.use(protect, isAdmin);
 
-router.get("/dashboard", adminProgressController.getDashboard);
+router.get("/", adminProgressController.getOverview);
 router.get("/overview", adminProgressController.getOverview);
 router.get("/current-season", adminProgressController.getCurrentSeasonInfo);
-router.get("/plot-statistics/options", adminProgressController.getPlotStatisticsOptions);
+router.get(
+  "/plot-statistics/options",
+  adminProgressController.getPlotStatisticsOptions,
+);
 router.get("/plot-statistics", adminProgressController.getPlotTaskStatistics);
-router.post("/plot-statistics/warnings", adminProgressController.sendPlotTaskWarnings);
+router.post(
+  "/plot-statistics/warnings",
+  adminProgressController.sendPlotTaskWarnings,
+);
 
 module.exports = router;

@@ -18,6 +18,7 @@ const stageRoutes = require("./src/routes/stageRoute");
 const taskRoutes = require("./src/routes/taskRoute");
 const aiRoutes = require("./src/routes/aiRoute");
 const adminProgressRoutes = require("./src/routes/adminProgressRoute");
+const adminDashboardRoutes = require("./src/routes/adminDashboardRoute");
 const farmerDashboardRoutes = require("./src/routes/farmerDashboardRoute");
 
 const app = express();
@@ -50,7 +51,8 @@ app.use("/api/stages", stageRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/ai", aiRoutes);
 
-app.use("/api/admin", adminProgressRoutes);
+app.use("/api/admin/progress", adminProgressRoutes);
+app.use("/api/admin/dashboard", adminDashboardRoutes);
 app.use("/api/farmer-dashboard", farmerDashboardRoutes);
 
 // --- Start Server ---

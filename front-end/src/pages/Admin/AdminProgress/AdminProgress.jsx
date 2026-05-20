@@ -58,14 +58,14 @@ const AdminProgress = () => {
 
   useEffect(() => {
     api
-      .get("/admin/current-season")
+      .get("/admin/progress/current-season")
       .then((res) => setCurrentSeason(res.data))
       .catch(() => setCurrentSeason(null))
       .finally(() => setCurrentSeasonLoaded(true));
   }, []);
 
   const fetchOptions = useCallback(async () => {
-    const res = await api.get("/admin/plot-statistics/options");
+    const res = await api.get("/admin/progress/plot-statistics/options");
     setOptions(res.data || emptyOptions);
   }, []);
 
@@ -78,7 +78,7 @@ const AdminProgress = () => {
           setLoading(true);
         }
 
-        const res = await api.get("/admin/plot-statistics", {
+        const res = await api.get("/admin/progress/plot-statistics", {
           params: buildQueryParams(filters),
         });
 
@@ -482,7 +482,7 @@ const AdminProgress = () => {
     try {
       setSendingRecipientKey(group.recipientKey);
 
-      const res = await api.post("/admin/plot-statistics/warnings", {
+      const res = await api.post("/admin/progress/plot-statistics/warnings", {
         filters: appliedFilters,
         recipientKey: group.recipientKey,
       });
@@ -545,7 +545,7 @@ const AdminProgress = () => {
     try {
       setSendingAllWarnings(true);
 
-      const res = await api.post("/admin/plot-statistics/warnings", {
+      const res = await api.post("/admin/progress/plot-statistics/warnings", {
         filters: appliedFilters,
         sendAll: true,
       });
