@@ -28,6 +28,8 @@ import CustomDropdown from "../../../components/UI/CustomDropdown";
 import { useFeedback } from "../../../hooks/useFeedback";
 import api from "../../../services/api";
 
+import AssistantCard from "./components/AssistantCard";
+
 const EMPTY_DASHBOARD = {
   seasonDetailId: "",
   currentSeasonName: "",
@@ -513,7 +515,8 @@ const FarmerDashboard = () => {
               )}
             </div>
           </div> */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
+          <AssistantCard />
+          {/* <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
             <div className="mb-2 flex items-center gap-2">
               <div className="rounded-lg bg-emerald-50 p-1.5">
                 <Sprout className="h-4 w-4 text-emerald-700" />
@@ -541,7 +544,7 @@ const FarmerDashboard = () => {
                   ))
               )}
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* ROW 4: Nhật ký hoạt động */}
