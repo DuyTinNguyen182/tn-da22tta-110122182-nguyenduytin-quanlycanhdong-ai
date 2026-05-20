@@ -6,5 +6,10 @@ const router = express.Router();
 
 // Chỉ cần protect để lấy được req.user._id
 router.get("/", protect, farmerDashboardController.getDashboard);
+router.get(
+  "/recommendations",
+  protect,
+  farmerDashboardController.getRecommendations,
+);
 
 module.exports = router;

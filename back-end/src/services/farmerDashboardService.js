@@ -4,6 +4,7 @@ const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Plot = require("../models/plotModel");
 const FarmingLog = require("../models/farmingLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
+const Task = require("../models/taskModel");
 
 const toObjectId = (id) => new mongoose.Types.ObjectId(id);
 const EMPTY_DASHBOARD = {
@@ -398,5 +399,168 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
     liveFeeds: { recentFarmingLogs },
   };
 };
+const getDailyRecommendations = async (farmerId) => {
+  try {
+    const now = new Date();
 
-module.exports = { getFarmerDashboardData };
+    // 1. Tìm mùa vụ đang diễn ra
+    const activeSeasonDetail = await SeasonDetail.findOne({
+      startDate: { $lte: now },
+      $or: [{ endDate: null }, { endDate: { $gte: now } }],
+    }).lean();
+
+    if (!activeSeasonDetail) return [];
+
+    // 2. Lấy phân công canh tác của Nông dân này
+    const assignments = await SeasonPlotAssignment.find({
+      seasonDetail: activeSeasonDetail._id,
+      user: farmerId,
+      status: "active",
+    })
+      .populate("plot", "name")
+      .lean();
+
+    if (!assignments.length) return [];
+
+    // 3. Lấy dữ liệu cấu hình Task từ DB
+    const sowingTask = await Task.findOne({
+      "recommendation.isSowingTask": true,
+    }).lean();
+    const allPrepTasks = await Task.find({
+      "recommendation.isSuggested": true,
+      "recommendation.startDay": { $lt: 0 },
+    }).lean();
+
+    let recommendations = [];
+
+    // ---------------------------------------------------------
+    // [LÕI NÂNG CẤP]: HÀM KIỂM TRA ĐIỀU KIỆN TIÊN QUYẾT
+    // ---------------------------------------------------------
+    const checkPrerequisites = (task, completedTaskIdsSet) => {
+      if (!task.prerequisites || task.prerequisites.length === 0) return true; // Không yêu cầu gì -> Pass
+      // Kiểm tra xem MỌI công việc tiên quyết đều đã được nông dân làm (nằm trong set)
+      return task.prerequisites.every((prereqId) =>
+        completedTaskIdsSet.has(String(prereqId)),
+      );
+    };
+
+    // 4. CHẠY THUẬT TOÁN GỢI Ý CHO TỪNG THỬA RUỘNG
+    for (const assignment of assignments) {
+      const plotName = assignment.plot?.name || "Thửa chưa rõ";
+      const plotId = assignment.plot?._id;
+
+      // [QUAN TRỌNG]: Lấy TẤT CẢ nhật ký đã ghi của thửa này để làm đối chứng
+      const completedLogs = await FarmingLog.find({
+        seasonPlotAssignments: assignment._id,
+      })
+        .select("task date createdAt")
+        .lean();
+      const completedTaskIds = new Set(
+        completedLogs.map((log) => String(log.task)),
+      );
+
+      // Tìm nhật ký gieo sạ
+      let sowingLog = null;
+      if (sowingTask && completedTaskIds.has(String(sowingTask._id))) {
+        sowingLog = completedLogs.find(
+          (log) => String(log.task) === String(sowingTask._id),
+        );
+      }
+
+      if (sowingLog) {
+        // --- GIAI ĐOẠN 2: ĐÃ GIEO SẠ (Đếm tuổi lúa) ---
+        const logDate = new Date(sowingLog.date || sowingLog.createdAt);
+        const daysSinceSowing = Math.floor(
+          (now - logDate) / (1000 * 60 * 60 * 24),
+        );
+
+        const dueTasks = await Task.find({
+          "recommendation.isSuggested": true,
+          "recommendation.isSowingTask": false,
+          "recommendation.startDay": { $gte: 0, $lte: daysSinceSowing },
+          "recommendation.endDay": { $gte: daysSinceSowing },
+        }).lean();
+
+        for (const task of dueTasks) {
+          const isDone = completedTaskIds.has(String(task._id));
+
+          if (!isDone) {
+            // Kể cả chăm sóc sau sạ cũng áp dụng luật tuần tự
+            const isReady = checkPrerequisites(task, completedTaskIds);
+
+            if (isReady) {
+              recommendations.push({
+                plotId,
+                plotName,
+                taskId: task._id,
+                taskName: task.name,
+                type: "CARE",
+                message: `Lúa đang ${daysSinceSowing} ngày tuổi. Đã đến lịch ${task.name}.`,
+                urgency:
+                  daysSinceSowing === task.recommendation.endDay
+                    ? "HIGH"
+                    : "NORMAL",
+              });
+            }
+          }
+        }
+      } else {
+        // --- GIAI ĐOẠN 1: CHƯA GIEO SẠ (Checklist Chuẩn bị có tuần tự) ---
+        if (now >= new Date(activeSeasonDetail.startDate)) {
+          let pendingPrepCount = 0;
+
+          for (const task of allPrepTasks) {
+            const isDone = completedTaskIds.has(String(task._id));
+
+            if (!isDone) {
+              pendingPrepCount++;
+              // CHỈ GỢI Ý CÔNG VIỆC NÀY NẾU NÔNG DÂN ĐÃ LÀM XONG VIỆC TRƯỚC ĐÓ
+              const isReady = checkPrerequisites(task, completedTaskIds);
+
+              if (isReady) {
+                recommendations.push({
+                  plotId,
+                  plotName,
+                  taskId: task._id,
+                  taskName: task.name,
+                  type: "PREP",
+                  message: "Công việc chuẩn bị đồng ruộng đến hạn.",
+                  urgency: "NORMAL",
+                });
+              }
+            }
+          }
+
+          if (sowingTask && !completedTaskIds.has(String(sowingTask._id))) {
+            // SẠ LÚA LÀ BƯỚC CUỐI CÙNG: Chỉ hiện Sạ lúa khi đã xử lý giống và làm đất xong!
+            const isSowingReady = checkPrerequisites(
+              sowingTask,
+              completedTaskIds,
+            );
+
+            if (isSowingReady) {
+              recommendations.push({
+                plotId,
+                plotName,
+                taskId: sowingTask._id,
+                taskName: sowingTask.name,
+                type: "SOWING",
+                message:
+                  pendingPrepCount > 0
+                    ? "Hoàn tất các việc chuẩn bị để sẵn sàng gieo sạ."
+                    : "Đồng ruộng đã sẵn sàng, hãy tiến hành gieo sạ theo lịch!",
+                urgency: pendingPrepCount > 0 ? "NORMAL" : "HIGH",
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return recommendations;
+  } catch (error) {
+    throw new Error(`Lỗi khi tạo gợi ý: ${error.message}`);
+  }
+};
+
+module.exports = { getFarmerDashboardData, getDailyRecommendations };
