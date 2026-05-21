@@ -16,9 +16,12 @@ const DEFAULT_LON = 105.7469;
 const DEFAULT_LOCATION = "Đồng bằng sông Cửu Long";
 
 const getWeatherInfo = (code) => {
-  if (code === 0) return { label: "Trời nắng", icon: Sun, color: "text-amber-500" };
-  if ([1, 2, 3].includes(code)) return { label: "Nhiều mây", icon: Cloud, color: "text-slate-500" };
-  if ([45, 48].includes(code)) return { label: "Sương mù", icon: CloudFog, color: "text-slate-400" };
+  if (code === 0)
+    return { label: "Trời nắng", icon: Sun, color: "text-amber-500" };
+  if ([1, 2, 3].includes(code))
+    return { label: "Nhiều mây", icon: Cloud, color: "text-slate-500" };
+  if ([45, 48].includes(code))
+    return { label: "Sương mù", icon: CloudFog, color: "text-slate-400" };
   if ([51, 53, 55, 56, 57].includes(code)) {
     return { label: "Mưa phùn", icon: CloudRain, color: "text-sky-500" };
   }
@@ -26,7 +29,11 @@ const getWeatherInfo = (code) => {
     return { label: "Có mưa", icon: CloudRain, color: "text-blue-500" };
   }
   if ([95, 96, 99].includes(code)) {
-    return { label: "Mưa dông", icon: CloudLightning, color: "text-violet-600" };
+    return {
+      label: "Mưa dông",
+      icon: CloudLightning,
+      color: "text-violet-600",
+    };
   }
   return { label: "Bình thường", icon: Cloud, color: "text-slate-500" };
 };
@@ -52,9 +59,11 @@ const HeaderOverview = ({ className = "" }) => {
 
     const fetchWeather = async (lat, lon) => {
       try {
-        const response = await fetch(
-          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto`
-        );
+        const OPEN_METEO_BASE =
+          import.meta.env.VITE_OPEN_METEO_URL?.trim() ||
+          "https://api.open-meteo.com/v1/forecast";
+        const url = `${OPEN_METEO_BASE}?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=auto`;
+        const response = await fetch(url);
 
         if (!response.ok) {
           throw new Error("Khong the tai du lieu thoi tiet");
@@ -80,7 +89,12 @@ const HeaderOverview = ({ className = "" }) => {
         (position) => {
           const { latitude, longitude } = position.coords;
 
-          if (latitude >= 8 && latitude <= 24 && longitude >= 102 && longitude <= 110) {
+          if (
+            latitude >= 8 &&
+            latitude <= 24 &&
+            longitude >= 102 &&
+            longitude <= 110
+          ) {
             fetchWeather(latitude, longitude);
             applyLocation("Vị trí của bạn");
             return;
@@ -89,7 +103,7 @@ const HeaderOverview = ({ className = "" }) => {
           fetchFallbackWeather();
         },
         () => fetchFallbackWeather(),
-        { timeout: 7000 }
+        { timeout: 7000 },
       );
     } else {
       fetchFallbackWeather();
@@ -108,11 +122,13 @@ const HeaderOverview = ({ className = "" }) => {
         month: "long",
         year: "numeric",
       }).format(new Date()),
-    []
+    [],
   );
 
   const currentWeather = weatherData?.current;
-  const weatherInfo = currentWeather ? getWeatherInfo(currentWeather.weather_code) : null;
+  const weatherInfo = currentWeather
+    ? getWeatherInfo(currentWeather.weather_code)
+    : null;
   const WeatherIcon = weatherInfo?.icon || Sun;
   const humidityUnit = weatherData?.current_units?.relative_humidity_2m || "%";
   const windUnit = weatherData?.current_units?.wind_speed_10m || "km/h";
@@ -130,11 +146,16 @@ const HeaderOverview = ({ className = "" }) => {
             <span className="text-sky-700">Đang tải thời tiết...</span>
           ) : currentWeather && weatherInfo ? (
             <>
-              <WeatherIcon size={16} className={`shrink-0 ${weatherInfo.color}`} />
+              <WeatherIcon
+                size={16}
+                className={`shrink-0 ${weatherInfo.color}`}
+              />
               <span>{Math.round(currentWeather.temperature_2m)}°C</span>
             </>
           ) : (
-            <span className="text-sky-700">Chưa lấy được dữ liệu thời tiết</span>
+            <span className="text-sky-700">
+              Chưa lấy được dữ liệu thời tiết
+            </span>
           )}
         </div>
 
