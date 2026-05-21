@@ -39,7 +39,7 @@ const buildFieldStatsMap = async () => {
         totalArea: item.totalArea || 0,
         farmerCount: item.farmerIds?.length || 0,
       },
-    ])
+    ]),
   );
 
   return { plotMap };
@@ -68,7 +68,7 @@ const buildUserPlotMap = async (currentUser) => {
         myPlotCount: item.myPlotCount || 0,
         myTotalArea: item.myTotalArea || 0,
       },
-    ])
+    ]),
   );
 };
 
@@ -107,7 +107,10 @@ const createField = async (data, currentUser) => {
 
   const payload = normalizeFieldPayload(data);
   const exists = await Field.findOne({
-    name: { $regex: `^${payload.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+    name: {
+      $regex: `^${payload.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+      $options: "i",
+    },
   });
 
   if (exists) {
@@ -120,8 +123,30 @@ const createField = async (data, currentUser) => {
   });
 };
 
-const getAllFields = async (currentUser) => {
-  const fields = await Field.find().populate("user", "fullName").sort({ createdAt: -1 });
+const getAllFields = async (currentUser, options = {}) => {
+  const { assignedOnly = false, my = false } = options || {};
+
+  if (assignedOnly) {
+    const filter = {};
+    if (my && !isAdminUser(currentUser)) {
+      filter.user = new mongoose.Types.ObjectId(currentUser.id);
+    }
+
+    const fieldIds = await SeasonPlotAssignment.distinct("field", filter);
+    if (!fieldIds || fieldIds.length === 0) {
+      return [];
+    }
+
+    const fields = await Field.find({ _id: { $in: fieldIds } })
+      .populate("user", "fullName")
+      .sort({ createdAt: -1 });
+
+    return await enrichFields(fields, currentUser);
+  }
+
+  const fields = await Field.find()
+    .populate("user", "fullName")
+    .sort({ createdAt: -1 });
   return await enrichFields(fields, currentUser);
 };
 
@@ -133,14 +158,19 @@ const updateField = async (id, data, currentUser) => {
   const payload = normalizeFieldPayload(data);
   const duplicate = await Field.findOne({
     _id: { $ne: id },
-    name: { $regex: `^${payload.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, $options: "i" },
+    name: {
+      $regex: `^${payload.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+      $options: "i",
+    },
   });
 
   if (duplicate) {
     throw new Error("Tên cánh đồng đã tồn tại");
   }
 
-  const field = await Field.findByIdAndUpdate(id, payload, { new: true }).populate("user", "fullName");
+  const field = await Field.findByIdAndUpdate(id, payload, {
+    new: true,
+  }).populate("user", "fullName");
   if (!field) {
     throw new Error("Không tìm thấy cánh đồng");
   }
@@ -171,7 +201,9 @@ const deleteFieldCascadeById = async (fieldId) => {
       ? DiseaseLog.deleteMany({ seasonPlotAssignments: { $in: assignmentIds } })
       : Promise.resolve(),
     SeasonPlotAssignment.deleteMany({ field: fieldId }),
-    plotIds.length ? Plot.deleteMany({ _id: { $in: plotIds } }) : Promise.resolve(),
+    plotIds.length
+      ? Plot.deleteMany({ _id: { $in: plotIds } })
+      : Promise.resolve(),
   ]);
 
   await Field.deleteOne({ _id: fieldId });
@@ -237,7 +269,11 @@ const getFieldSummary = async (currentUser) => {
       .lean(),
   ]);
 
-  const totals = userPlotStats[0] || { plotCount: 0, totalArea: 0, fieldIds: [] };
+  const totals = userPlotStats[0] || {
+    plotCount: 0,
+    totalArea: 0,
+    fieldIds: [],
+  };
 
   return {
     role: "farmer",

@@ -43,7 +43,7 @@ const statusOptions = [
   },
   {
     value: "inactive",
-    label: "Chờ vụ mới",
+    label: "Đang nghỉ",
     dot: "bg-orange-400",
   },
 ];
@@ -213,7 +213,7 @@ const Fields = () => {
 
   const totalArea = useMemo(
     () => plots.reduce((sum, plot) => sum + Number(plot.area || 0), 0),
-    [plots]
+    [plots],
   );
 
   const filteredFields = useMemo(() => {
@@ -221,7 +221,9 @@ const Fields = () => {
     if (!keyword) return fields;
 
     return fields.filter((field) => {
-      const haystack = normalizeText([field.name, field.address].filter(Boolean).join(" "));
+      const haystack = normalizeText(
+        [field.name, field.address].filter(Boolean).join(" "),
+      );
       return haystack.includes(keyword);
     });
   }, [fieldKeyword, fields]);
@@ -229,14 +231,19 @@ const Fields = () => {
   const visibleFields = filteredFields;
 
   if (loadingFields && fields.length === 0) {
-    return <LoadingScreen fullScreen={true} message="Đang chuẩn bị không gian canh tác..." />;
+    return (
+      <LoadingScreen
+        fullScreen={true}
+        message="Đang chuẩn bị không gian canh tác..."
+      />
+    );
   }
 
   return (
     <div className="flex h-[calc(100vh-80px)] overflow-hidden bg-gray-50 font-sans">
       <aside className="z-10 flex w-[300px] shrink-0 flex-col border-r border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-4 py-4">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <div className="rounded-lg bg-emerald-50 p-1.5">
               <Sprout size={16} className="text-emerald-600" />
             </div>
@@ -246,7 +253,10 @@ const Fields = () => {
             Chọn cánh đồng để quản lý các thửa ruộng.
           </p>
           <div className="relative mt-3">
-            <MapPin size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <MapPin
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            />
             <input
               value={fieldKeyword}
               onChange={(e) => setFieldKeyword(e.target.value)}
@@ -270,15 +280,20 @@ const Fields = () => {
                 <MapPin size={24} className="text-gray-300" />
               </div>
               <p className="text-sm font-medium text-gray-500">
-                {fieldKeyword.trim() ? "Không tìm thấy cánh đồng phù hợp." : "Chưa có cánh đồng nào."}
+                {fieldKeyword.trim()
+                  ? "Không tìm thấy cánh đồng phù hợp."
+                  : "Chưa có cánh đồng nào."}
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                {fieldKeyword.trim() ? "Thử nhập từ khóa ngắn hơn hoặc một phần tên cánh đồng." : "Nhờ admin HTX tạo trước."}
+                {fieldKeyword.trim()
+                  ? "Thử nhập từ khóa ngắn hơn hoặc một phần tên cánh đồng."
+                  : "Nhờ admin HTX tạo trước."}
               </p>
             </div>
           ) : (
             visibleFields.map((field) => {
               const isSelected = selectedField?._id === field._id;
+              const isOwned = Number(field.myPlotCount || 0) > 0;
               return (
                 <button
                   key={field._id}
@@ -286,7 +301,7 @@ const Fields = () => {
                     setSelectedField(field);
                     fetchPlots(field._id);
                   }}
-                  className={`w-full rounded-xl border p-3 text-left transition-all duration-200 ${
+                  className={`w-full relative rounded-xl border p-3 text-left transition-all duration-200 ${
                     isSelected
                       ? "border-emerald-200 bg-emerald-50/80 shadow-sm shadow-emerald-100"
                       : "border-transparent hover:bg-gray-50 hover:shadow-sm"
@@ -316,8 +331,17 @@ const Fields = () => {
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-medium text-gray-500">
-                    <span className="rounded-md bg-gray-100 px-2 py-0.5">{field.plotCount || 0} thửa</span>
-                    <span className="rounded-md bg-gray-100 px-2 py-0.5">{field.farmerCount || 0} nông dân</span>
+                    <span className="rounded-md bg-gray-100 px-2 py-0.5">
+                      {field.plotCount || 0} thửa
+                    </span>
+                    <span className="rounded-md bg-gray-100 px-2 py-0.5">
+                      {field.farmerCount || 0} nông dân
+                    </span>
+                    {isOwned && (
+                      <span className="rounded-md bg-emerald-600 px-2 py-0.5 text-white font-semibold shadow-sm ring-1 ring-emerald-200">
+                        Bạn có {field.myPlotCount} thửa
+                      </span>
+                    )}
                   </div>
                 </button>
               );
@@ -331,7 +355,9 @@ const Fields = () => {
           <>
             <div className="z-10 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 shadow-sm">
               <div>
-                <h1 className="text-xl font-bold text-gray-800">{selectedField.name}</h1>
+                <h1 className="text-xl font-bold text-gray-800">
+                  {selectedField.name}
+                </h1>
                 <div className="mt-1 flex flex-wrap items-center gap-3 text-xs font-medium text-gray-500">
                   <span className="flex items-center gap-1">
                     <MapPin size={13} className="text-gray-400" />
@@ -399,7 +425,11 @@ const Fields = () => {
                                 alt={plot.name}
                                 onClick={() => {
                                   if (plot.imageUrl) {
-                                    window.open(plot.imageUrl, '_blank', 'noopener,noreferrer');
+                                    window.open(
+                                      plot.imageUrl,
+                                      "_blank",
+                                      "noopener,noreferrer",
+                                    );
                                   }
                                 }}
                                 className="cursor-pointer h-10 w-10 rounded-lg object-cover ring-1 ring-gray-200"
@@ -408,7 +438,9 @@ const Fields = () => {
                               <Tractor size={16} />
                             )}
                           </div>
-                          <p className="text-sm font-semibold text-gray-800">{plot.name}</p>
+                          <p className="text-sm font-semibold text-gray-800">
+                            {plot.name}
+                          </p>
                         </div>
 
                         <span className="inline-flex w-fit rounded-lg bg-gray-100 px-2.5 py-1 font-mono text-xs font-medium text-gray-600 ring-1 ring-gray-200/50">
@@ -427,7 +459,9 @@ const Fields = () => {
                           ) : (
                             <AlertCircle size={12} />
                           )}
-                          {plot.status === "active" ? "Đang canh tác" : "Chờ vụ mới"}
+                          {plot.status === "active"
+                            ? "Đang canh tác"
+                            : "Chờ vụ mới"}
                         </span>
 
                         {/* <p className="truncate text-xs text-gray-600" title="">
@@ -462,9 +496,12 @@ const Fields = () => {
             <div className="mb-4 rounded-2xl bg-gray-100 p-5">
               <LayoutGrid size={40} className="text-gray-300" />
             </div>
-            <h3 className="text-lg font-bold text-gray-600">Chưa có cánh đồng để chọn</h3>
+            <h3 className="text-lg font-bold text-gray-600">
+              Chưa có cánh đồng để chọn
+            </h3>
             <p className="mt-2 max-w-sm text-center text-sm text-gray-400">
-              Khi admin tạo cánh đồng cho hợp tác xã, bạn sẽ chọn ở đây để thêm thửa ruộng.
+              Khi admin tạo cánh đồng cho hợp tác xã, bạn sẽ chọn ở đây để thêm
+              thửa ruộng.
             </p>
           </div>
         )}
@@ -552,7 +589,11 @@ const Fields = () => {
                       alt="Preview"
                       onClick={() => {
                         if (imagePreview) {
-                          window.open(imagePreview, '_blank', 'noopener,noreferrer');
+                          window.open(
+                            imagePreview,
+                            "_blank",
+                            "noopener,noreferrer",
+                          );
                         }
                       }}
                       className="cursor-pointer h-40 w-full object-cover"
@@ -565,7 +606,9 @@ const Fields = () => {
                       <X size={14} />
                     </button>
                     <p className="px-3 py-1.5 text-xs text-gray-500">
-                      {plotForm.imageFile ? plotForm.imageFile.name : "Ảnh hiện tại"}
+                      {plotForm.imageFile
+                        ? plotForm.imageFile.name
+                        : "Ảnh hiện tại"}
                     </p>
                   </div>
                 ) : (
@@ -577,7 +620,9 @@ const Fields = () => {
                     <p className="text-xs font-medium text-gray-400">
                       Nhấp để chọn ảnh
                     </p>
-                    <p className="text-[11px] text-gray-300">JPG, PNG, WebP — tối đa 10MB</p>
+                    <p className="text-[11px] text-gray-300">
+                      JPG, PNG, WebP — tối đa 10MB
+                    </p>
                   </label>
                 )}
                 <input

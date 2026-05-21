@@ -170,14 +170,12 @@ const Crops = () => {
     const loadBootstrap = async () => {
       try {
         const [fieldRes, stageRes, taskRes] = await Promise.all([
-          api.get("/fields"),
+          api.get("/fields", { params: { assignedOnly: true, my: true } }),
           api.get("/stages"),
           api.get("/tasks"),
         ]);
 
-        const nextFields = (fieldRes.data || []).filter(
-          (field) => Number(field.myPlotCount || 0) > 0,
-        );
+        const nextFields = fieldRes.data || [];
         setFields(nextFields);
         setStages(stageRes.data || []);
         setTasks(taskRes.data || []);

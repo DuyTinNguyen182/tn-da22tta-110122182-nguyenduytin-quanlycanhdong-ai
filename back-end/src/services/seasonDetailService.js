@@ -3,7 +3,11 @@ const DiaryLog = require("../models/farmingLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Plot = require("../models/plotModel");
-const { getSeasonMap, resolveSeasonId, getSeasonNameById } = require("./seasonService");
+const {
+  getSeasonMap,
+  resolveSeasonId,
+  getSeasonNameById,
+} = require("./seasonService");
 
 const inferSeasonYear = (value) => {
   const sourceDate =
@@ -19,7 +23,11 @@ const inferSeasonYear = (value) => {
 
 const normalizeSeasonYear = (value, fallbackValue = null) => {
   if (value === undefined || value === null || value === "") {
-    if (fallbackValue !== null && fallbackValue !== undefined && fallbackValue !== "") {
+    if (
+      fallbackValue !== null &&
+      fallbackValue !== undefined &&
+      fallbackValue !== ""
+    ) {
       return fallbackValue;
     }
 
@@ -35,7 +43,11 @@ const normalizeSeasonYear = (value, fallbackValue = null) => {
 };
 
 const getResolvedSeasonYear = (seasonDetail) => {
-  if (seasonDetail?.year !== undefined && seasonDetail?.year !== null && seasonDetail?.year !== "") {
+  if (
+    seasonDetail?.year !== undefined &&
+    seasonDetail?.year !== null &&
+    seasonDetail?.year !== ""
+  ) {
     return normalizeSeasonYear(seasonDetail.year);
   }
 
@@ -62,7 +74,9 @@ const buildSeasonYearDuplicateQuery = (seasonId, year, excludeId = null) => ({
 });
 
 const decorateSeasonDetail = (seasonDoc, catalogMap) => {
-  const detail = seasonDoc.toObject ? seasonDoc.toObject({ virtuals: true }) : { ...seasonDoc };
+  const detail = seasonDoc.toObject
+    ? seasonDoc.toObject({ virtuals: true })
+    : { ...seasonDoc };
   const seasonRefId =
     detail.season && typeof detail.season === "object" && detail.season._id
       ? String(detail.season._id)
@@ -70,7 +84,9 @@ const decorateSeasonDetail = (seasonDoc, catalogMap) => {
         ? String(detail.season)
         : null;
 
-  const seasonMeta = seasonRefId ? catalogMap.get(seasonRefId) || detail.season || null : null;
+  const seasonMeta = seasonRefId
+    ? catalogMap.get(seasonRefId) || detail.season || null
+    : null;
   const seasonName = seasonMeta?.name || "Không xác định";
   const year = getResolvedSeasonYear(detail);
 
@@ -87,7 +103,9 @@ const decorateSeasonDetail = (seasonDoc, catalogMap) => {
 
 const getAllSeasonDetails = async () => {
   const [seasonDocs, catalogMap] = await Promise.all([
-    SeasonDetail.find().populate("season", "name").sort({ year: -1, startDate: -1, createdAt: -1 }),
+    SeasonDetail.find()
+      .populate("season", "name")
+      .sort({ year: -1, startDate: -1, createdAt: -1 }),
     getSeasonMap(),
   ]);
 
@@ -128,7 +146,9 @@ const ensureNoOverlappingActiveSeason = async (targetId = null) => {
   });
 
   if (existingActive) {
-    throw new Error("Đang có một mùa vụ đang hoạt động. Hãy kết thúc mùa vụ hiện tại trước.");
+    throw new Error(
+      "Đang có một mùa vụ đang hoạt động. Hãy kết thúc mùa vụ hiện tại trước.",
+    );
   }
 };
 
@@ -137,15 +157,23 @@ const createSeasonDetail = async (data) => {
   const seasonId = await resolveSeasonId(data);
   const catalogMap = await getSeasonMap();
   const resolvedName = catalogMap.get(seasonId)?.name || "Không xác định";
-  const year = normalizeSeasonYear(data.year, inferSeasonYear({ startDate, endDate }));
+  const year = normalizeSeasonYear(
+    data.year,
+    inferSeasonYear({ startDate, endDate }),
+  );
 
   const now = new Date();
-  const isActive = startDate && new Date(startDate) <= now && (!endDate || new Date(endDate) >= now);
+  const isActive =
+    startDate &&
+    new Date(startDate) <= now &&
+    (!endDate || new Date(endDate) >= now);
   if (isActive) {
     await ensureNoOverlappingActiveSeason();
   }
 
-  const exists = await SeasonDetail.findOne(buildSeasonYearDuplicateQuery(seasonId, year));
+  const exists = await SeasonDetail.findOne(
+    buildSeasonYearDuplicateQuery(seasonId, year),
+  );
   if (exists) {
     throw new Error(`Mùa vụ "${resolvedName}" của năm ${year} đã tồn tại.`);
   }
@@ -157,7 +185,10 @@ const createSeasonDetail = async (data) => {
     endDate: endDate || null,
   });
 
-  const seasonDoc = await SeasonDetail.findById(seasonDetail._id).populate("season", "name");
+  const seasonDoc = await SeasonDetail.findById(seasonDetail._id).populate(
+    "season",
+    "name",
+  );
   return decorateSeasonDetail(seasonDoc, catalogMap);
 };
 
@@ -193,8 +224,11 @@ const updateSeasonDetail = async (id, data) => {
 
   const now = new Date();
   const finalStartDate =
-    updateData.startDate !== undefined ? updateData.startDate : existing.startDate;
-  const finalEndDate = updateData.endDate !== undefined ? updateData.endDate : existing.endDate;
+    updateData.startDate !== undefined
+      ? updateData.startDate
+      : existing.startDate;
+  const finalEndDate =
+    updateData.endDate !== undefined ? updateData.endDate : existing.endDate;
   const isActive =
     finalStartDate &&
     new Date(finalStartDate) <= now &&
@@ -206,7 +240,7 @@ const updateSeasonDetail = async (id, data) => {
 
   const newSeasonId = updateData.season || existing.season;
   const duplicate = await SeasonDetail.findOne(
-    buildSeasonYearDuplicateQuery(newSeasonId, nextYear, id)
+    buildSeasonYearDuplicateQuery(newSeasonId, nextYear, id),
   );
 
   if (duplicate) {
@@ -236,7 +270,7 @@ const finishSeasonDetail = async (id) => {
   const updatedDoc = await SeasonDetail.findByIdAndUpdate(
     id,
     { endDate: now },
-    { new: true }
+    { new: true },
   ).populate("season", "name");
 
   const catalogMap = await getSeasonMap();
@@ -249,7 +283,9 @@ const deleteSeasonDetail = async (id) => {
     throw new Error("Không tìm thấy chi tiết mùa vụ");
   }
 
-  const assignments = await SeasonPlotAssignment.find({ seasonDetail: id }).select("_id").lean();
+  const assignments = await SeasonPlotAssignment.find({ seasonDetail: id })
+    .select("_id")
+    .lean();
   const assignmentIds = assignments.map((item) => item._id);
 
   await Promise.all([
@@ -307,32 +343,32 @@ const getFarmerSeasonDetails = async (userId, fieldId) => {
       .populate("plot", "name area status")
       .lean();
 
-    if (seasonStatus === "active" && activePlots.length > 0) {
-      const assignedPlotIds = new Set(
-        assignments.map((item) => String(item.plot?._id || item.plot)),
-      );
-      const missingPlots = activePlots.filter(
-        (plot) => !assignedPlotIds.has(String(plot._id)),
-      );
+    // if (seasonStatus === "active" && activePlots.length > 0) {
+    //   const assignedPlotIds = new Set(
+    //     assignments.map((item) => String(item.plot?._id || item.plot)),
+    //   );
+    //   const missingPlots = activePlots.filter(
+    //     (plot) => !assignedPlotIds.has(String(plot._id)),
+    //   );
 
-      if (missingPlots.length > 0) {
-        const payload = missingPlots.map((plot) => ({
-          seasonDetail: doc._id,
-          field: plot.field,
-          plot: plot._id,
-          user: userId,
-          status: "active",
-        }));
+    //   if (missingPlots.length > 0) {
+    //     const payload = missingPlots.map((plot) => ({
+    //       seasonDetail: doc._id,
+    //       field: plot.field,
+    //       plot: plot._id,
+    //       user: userId,
+    //       status: "active",
+    //     }));
 
-        await SeasonPlotAssignment.insertMany(payload);
-        assignments = await SeasonPlotAssignment.find({
-          seasonDetail: doc._id,
-          ...assignmentQuery,
-        })
-          .populate("plot", "name area status")
-          .lean();
-      }
-    }
+    //     await SeasonPlotAssignment.insertMany(payload);
+    //     assignments = await SeasonPlotAssignment.find({
+    //       seasonDetail: doc._id,
+    //       ...assignmentQuery,
+    //     })
+    //       .populate("plot", "name area status")
+    //       .lean();
+    //   }
+    // }
 
     if (assignments.length === 0 && seasonStatus !== "active") {
       continue;

@@ -11,7 +11,12 @@ const create = async (req, res) => {
 
 const getAll = async (req, res) => {
   try {
-    const fields = await fieldService.getAllFields(req.user);
+    const options = {
+      assignedOnly:
+        req.query.assignedOnly === "true" || req.query.assignedOnly === "1",
+      my: req.query.my === "true" || req.query.my === "1",
+    };
+    const fields = await fieldService.getAllFields(req.user, options);
     res.json(fields);
   } catch (error) {
     res.status(500).json({ message: error.message });
