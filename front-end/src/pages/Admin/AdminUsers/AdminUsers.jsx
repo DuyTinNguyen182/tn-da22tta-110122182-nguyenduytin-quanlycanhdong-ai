@@ -10,8 +10,9 @@ import { useFeedback } from "../../../hooks/useFeedback";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import UserTable from "./components/UserTable";
 import UserFormModal from "./components/UserFormModal";
-import ResetPasswordModal from "./components/ResetPasswordModal";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
+
+const USERS_PER_PAGE = 10;
 
 const emptyForm = {
   fullName: "",
@@ -37,24 +38,14 @@ const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
   const [showModal, setShowModal] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [resetPasswordUser, setResetPasswordUser] = useState(null);
-  const [newPassword, setNewPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const closeUserModal = () => {
     setShowModal(false);
     setEditingUser(null);
     setFormData(emptyForm);
-  };
-
-  const closePasswordModal = () => {
-    setShowPasswordModal(false);
-    setResetPasswordUser(null);
-    setNewPassword("");
-    setShowPassword(false);
   };
 
   const fetchUsers = async () => {
@@ -98,6 +89,23 @@ const AdminUsers = () => {
     }),
     [users]
   );
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * USERS_PER_PAGE;
+    return filteredUsers.slice(startIndex, startIndex + USERS_PER_PAGE);
+  }, [currentPage, filteredUsers]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [roleFilter, searchTerm]);
 
   const handleFormChange = (event) => {
     const { name, value } = event.target;
@@ -170,6 +178,7 @@ const AdminUsers = () => {
       await api.put(`/users/${editingUser._id}`, {
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
+        password: formData.password.trim(),
         phone: formData.phone.trim(),
         address: formData.address.trim(),
         role: formData.role,
@@ -204,31 +213,6 @@ const AdminUsers = () => {
       await fetchUsers();
     } catch (err) {
       toast.error(err.response?.data?.message || "Không thể xóa người dùng.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleResetPassword = async (event) => {
-    event.preventDefault();
-
-    if (!resetPasswordUser) return;
-
-    if (!newPassword || newPassword.length < 6) {
-      toast.warning("Mật khẩu mới phải có ít nhất 6 ký tự.");
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-      await api.post(`/users/${resetPasswordUser._id}/reset-password`, {
-        newPassword,
-      });
-
-      toast.success("Đặt lại mật khẩu thành công.");
-      closePasswordModal();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể đặt lại mật khẩu.");
     } finally {
       setSubmitting(false);
     }
@@ -305,14 +289,14 @@ const AdminUsers = () => {
           </div>
         ) : (
           <UserTable
-            users={filteredUsers}
+            users={paginatedUsers}
             currentUser={currentUser}
             submitting={submitting}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalUsers={filteredUsers.length}
+            onPageChange={setCurrentPage}
             onEdit={handleOpenEdit}
-            onResetPassword={(user) => {
-              setResetPasswordUser(user);
-              setShowPasswordModal(true);
-            }}
             onDelete={handleDeleteUser}
           />
         )}
@@ -328,18 +312,6 @@ const AdminUsers = () => {
         onRoleChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
         onClose={closeUserModal}
         onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
-      />
-
-      <ResetPasswordModal
-        open={showPasswordModal}
-        resetPasswordUser={resetPasswordUser}
-        newPassword={newPassword}
-        showPassword={showPassword}
-        submitting={submitting}
-        onChange={(event) => setNewPassword(event.target.value)}
-        onToggleShowPassword={() => setShowPassword((prev) => !prev)}
-        onClose={closePasswordModal}
-        onSubmit={handleResetPassword}
       />
     </div>
   );

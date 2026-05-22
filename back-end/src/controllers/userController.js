@@ -70,7 +70,7 @@ const createUser = async (req, res) => {
 // UPDATE user
 const updateUser = async (req, res) => {
   try {
-    const { fullName, email, phone, address, role } = req.body;
+    const { fullName, email, password, phone, address, role } = req.body;
     const userId = req.params.id;
 
     // Kiểm tra email trùng (nếu đổi email)
@@ -81,10 +81,27 @@ const updateUser = async (req, res) => {
       }
     }
 
+    const updateData = {
+      fullName,
+      email,
+      phone,
+      address,
+      role,
+    };
+
+    if (password) {
+      if (password.length < 6) {
+        return res.status(400).json({ message: "Mật khẩu phải ít nhất 6 ký tự" });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
+
     // Update user
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { fullName, email, phone, address, role },
+      updateData,
       { new: true, runValidators: true }
     ).select("-password");
 
@@ -124,34 +141,4 @@ const deleteUser = async (req, res) => {
   }
 };
 
-// UPDATE password (Admin đặt lại mật khẩu cho user)
-const resetPassword = async (req, res) => {
-  try {
-    const { newPassword } = req.body;
-    const userId = req.params.id;
-
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ message: "Mật khẩu phải ít nhất 6 ký tự" });
-    }
-
-    // Mã hóa mật khẩu mới
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { password: hashedPassword },
-      { new: true }
-    ).select("-password");
-
-    if (!user) {
-      return res.status(404).json({ message: "Không tìm thấy người dùng" });
-    }
-
-    res.status(200).json({ message: "Đặt lại mật khẩu thành công!", user });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser, resetPassword };
+module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser };

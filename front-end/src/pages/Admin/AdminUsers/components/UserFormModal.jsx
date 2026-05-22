@@ -1,5 +1,5 @@
-import React from "react";
-import { Mail, Phone, ShieldCheck, UserRound } from "lucide-react";
+import React, { useState } from "react";
+import { Eye, EyeOff, Mail, Phone, ShieldCheck, UserRound, X } from "lucide-react";
 import CustomDropdown from "../../../../components/UI/CustomDropdown";
 
 const UserFormModal = ({
@@ -13,21 +13,33 @@ const UserFormModal = ({
   onClose,
   onSubmit,
 }) => {
+  const [showPassword, setShowPassword] = useState(false);
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
       <div className="w-full max-w-xl rounded-2xl bg-white shadow-2xl">
-        <div className="border-b border-gray-100 px-6 py-4">
+        <div className="relative border-b border-gray-100 px-6 py-4 pr-14">
           <h2 className="text-xl font-bold text-gray-900">
             {editingUser ? "Chỉnh sửa người dùng" : "Thêm người dùng mới"}
           </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Đóng form"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-4 p-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Họ tên</label>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Họ tên
+              </label>
               <div className="relative">
                 <UserRound
                   size={16}
@@ -46,7 +58,9 @@ const UserFormModal = ({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Email</label>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Email
+              </label>
               <div className="relative">
                 <Mail
                   size={16}
@@ -64,23 +78,43 @@ const UserFormModal = ({
               </div>
             </div>
 
-            {!editingUser ? (
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">Mật khẩu</label>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                {editingUser ? "Mật khẩu mới" : "Mật khẩu"}
+              </label>
+              <div className="relative">
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   name="password"
                   value={formData.password}
                   onChange={onChange}
-                  required
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
-                  placeholder="Tối thiểu 6 ký tự"
+                  autoComplete="new-password"
+                  required={!editingUser}
+                  className="hide-password-reveal w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-11 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
+                  placeholder={
+                    editingUser ? "Để trống nếu không đổi" : "Tối thiểu 6 ký tự"
+                  }
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
+                  aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                >
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
               </div>
-            ) : null}
+              {editingUser ? (
+                <p className="mt-1 text-xs text-gray-500">
+                  Chỉ nhập khi muốn thay đổi mật khẩu.
+                </p>
+              ) : null}
+            </div>
 
             <div>
-              <label className="mb-1 block text-sm font-semibold text-gray-700">Vai trò</label>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Vai trò
+              </label>
               <CustomDropdown
                 value={formData.role}
                 onChange={onRoleChange}
@@ -114,14 +148,16 @@ const UserFormModal = ({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-gray-700">Địa chỉ</label>
+            <label className="mb-1 block text-sm font-semibold text-gray-700">
+              Địa chỉ
+            </label>
             <textarea
               rows={2}
               name="address"
               value={formData.address}
               onChange={onChange}
               className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
-              placeholder="Ấp, xã, huyện, tỉnh..."
+              placeholder="Ấp, xã, tỉnh..."
             />
           </div>
 
@@ -143,7 +179,11 @@ const UserFormModal = ({
                   : "bg-emerald-600 shadow-sm hover:bg-emerald-700"
               }`}
             >
-              {submitting ? "Đang xử lý..." : editingUser ? "Cập nhật" : "Tạo người dùng"}
+              {submitting
+                ? "Đang xử lý..."
+                : editingUser
+                  ? "Cập nhật"
+                  : "Tạo người dùng"}
             </button>
           </div>
         </form>

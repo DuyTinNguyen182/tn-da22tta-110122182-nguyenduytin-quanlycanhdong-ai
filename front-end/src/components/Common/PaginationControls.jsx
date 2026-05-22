@@ -11,10 +11,25 @@ const buildPageItems = (currentPage, totalPages) => {
   }
 
   if (currentPage >= totalPages - 2) {
-    return [1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [
+      1,
+      "...",
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
   }
 
-  return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
+  return [
+    1,
+    "...",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "...",
+    totalPages,
+  ];
 };
 
 const PaginationControls = ({
@@ -38,7 +53,6 @@ const PaginationControls = ({
         className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-all hover:border-emerald-200 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
         <ChevronLeft size={16} />
-        Trước
       </button>
 
       <div className="flex flex-wrap items-center justify-center gap-2">
@@ -64,7 +78,7 @@ const PaginationControls = ({
             >
               {item}
             </button>
-          )
+          ),
         )}
       </div>
 
@@ -74,7 +88,6 @@ const PaginationControls = ({
         onClick={() => onPageChange(page + 1)}
         className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition-all hover:border-emerald-200 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Sau
         <ChevronRight size={16} />
       </button>
     </div>

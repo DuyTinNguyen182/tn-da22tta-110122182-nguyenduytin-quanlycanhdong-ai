@@ -4,7 +4,8 @@ import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
-import TaskDetailRow from "./components/TaskDetailRow";
+import TaskDetailTable from "./components/TaskDetailTable";
+import TaskDetailModal from "./components/TaskDetailModal";
 
 const AdminTaskDetails = () => {
   const { toast, confirm } = useFeedback();
@@ -13,11 +14,14 @@ const AdminTaskDetails = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [filterTaskId, setFilterTaskId] = useState("");
-  const [newTaskId, setNewTaskId] = useState("");
-  const [newTaskDetailName, setNewTaskDetailName] = useState("");
-  const [editingTaskDetailId, setEditingTaskDetailId] = useState("");
-  const [editingTaskId, setEditingTaskId] = useState("");
-  const [editingTaskDetailName, setEditingTaskDetailName] = useState("");
+  // modal & form state
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [formData, setFormData] = useState({ taskId: "", name: "" });
+
+  // pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     fetchBootstrap();
@@ -33,7 +37,10 @@ const AdminTaskDetails = () => {
       setTasks(taskRes.data || []);
       setTaskDetails(taskDetailRes.data || []);
     } catch (error) {
-      toast.error(error.response?.data?.message || "Không thể tải danh sách chi tiết công việc");
+      toast.error(
+        error.response?.data?.message ||
+          "Không thể tải danh sách chi tiết công việc",
+      );
     } finally {
       setLoading(false);
     }
@@ -52,7 +59,7 @@ const AdminTaskDetails = () => {
         label: task.name,
       })),
     ],
-    [tasks]
+    [tasks],
   );
 
   const filterTaskOptions = useMemo(
@@ -63,12 +70,31 @@ const AdminTaskDetails = () => {
         label: `${task.name} (${task.taskDetailCount || 0})`,
       })),
     ],
-    [tasks]
+    [tasks],
   );
 
-  const handleCreate = async () => {
-    const taskId = newTaskId.trim();
-    const name = newTaskDetailName.trim();
+  const openCreateModal = () => {
+    setEditingItem(null);
+    setFormData({ taskId: "", name: "" });
+    setShowModal(true);
+  };
+
+  const openEditModal = (item) => {
+    setEditingItem(item);
+    setFormData({ taskId: item.taskId || "", name: item.name || "" });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingItem(null);
+    setFormData({ taskId: "", name: "" });
+  };
+
+  const handleSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const taskId = String(formData.taskId || "").trim();
+    const name = String(formData.name || "").trim();
 
     if (!taskId) {
       toast.warning("Vui lòng chọn công việc");
@@ -81,53 +107,20 @@ const AdminTaskDetails = () => {
 
     setSubmitting(true);
     try {
-      await api.post("/task-details", { taskId, name });
-      setNewTaskDetailName("");
-      if (!filterTaskId) {
-        setFilterTaskId(taskId);
+      if (editingItem) {
+        await api.put(`/task-details/${editingItem._id}`, { taskId, name });
+        toast.success("Đã cập nhật chi tiết công việc.");
+      } else {
+        await api.post("/task-details", { taskId, name });
+        toast.success("Đã tạo chi tiết công việc.");
       }
+
+      closeModal();
       await fetchBootstrap();
-      toast.success("Đã tạo chi tiết công việc.");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Không thể tạo chi tiết công việc");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const startEdit = (taskDetail) => {
-    setEditingTaskDetailId(taskDetail._id);
-    setEditingTaskId(taskDetail.taskId || "");
-    setEditingTaskDetailName(taskDetail.name || "");
-  };
-
-  const cancelEdit = () => {
-    setEditingTaskDetailId("");
-    setEditingTaskId("");
-    setEditingTaskDetailName("");
-  };
-
-  const handleUpdate = async (id) => {
-    const taskId = editingTaskId.trim();
-    const name = editingTaskDetailName.trim();
-
-    if (!taskId) {
-      toast.warning("Vui lòng chọn công việc");
-      return;
-    }
-    if (!name) {
-      toast.warning("Tên chi tiết công việc không được để trống");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await api.put(`/task-details/${id}`, { taskId, name });
-      cancelEdit();
-      await fetchBootstrap();
-      toast.success("Đã cập nhật chi tiết công việc.");
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Không thể cập nhật chi tiết công việc");
+      toast.error(
+        error.response?.data?.message || "Không thể lưu chi tiết công việc",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -148,47 +141,65 @@ const AdminTaskDetails = () => {
       await fetchBootstrap();
       toast.success("Đã xóa chi tiết công việc.");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Không thể xóa chi tiết công việc");
+      toast.error(
+        error.response?.data?.message || "Không thể xóa chi tiết công việc",
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
+  // pagination derived values
+  const filtered = filteredTaskDetails;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Quản lý chi tiết công việc</h1>
+        <h1 className="text-2xl font-bold text-gray-800">
+          Quản lý chi tiết công việc
+        </h1>
       </div>
 
       <div className="mb-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 font-bold text-gray-800">Thêm chi tiết công việc mới</h2>
-          <div className="grid gap-3 md:grid-cols-[220px_1fr_auto]">
-            <CustomDropdown
-              value={newTaskId}
-              onChange={setNewTaskId}
-              options={createTaskOptions}
-              placeholder="Chọn công việc"
-              icon={Briefcase}
-            />
-            <input
-              value={newTaskDetailName}
-              onChange={(e) => setNewTaskDetailName(e.target.value)}
-              placeholder="Ví dụ: Phun thuốc lần 1"
-              className="rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
-            />
+          <div className="flex items-center justify-between">
+            <h2 className="mb-4 font-bold text-gray-800">
+              Thêm chi tiết công việc mới
+            </h2>
             <button
-              disabled={submitting}
-              onClick={handleCreate}
-              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+              type="button"
+              onClick={openCreateModal}
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700"
             >
               <Plus size={16} /> Tạo mới
             </button>
           </div>
+          <div className="grid gap-3 md:grid-cols-[220px_1fr]">
+            <CustomDropdown
+              value={filterTaskId}
+              onChange={setFilterTaskId}
+              options={filterTaskOptions}
+              placeholder="Tìm theo công việc"
+              icon={Briefcase}
+              variant="filter"
+            />
+            <p className="mt-3 text-sm text-gray-500">
+              Hiển thị {filtered.length} chi tiết công việc.
+            </p>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 font-bold text-gray-800">Lọc theo công việc</h2>
+          <h2 className="mb-4 font-bold text-gray-800">Bộ lọc</h2>
           <CustomDropdown
             value={filterTaskId}
             onChange={setFilterTaskId}
@@ -197,63 +208,34 @@ const AdminTaskDetails = () => {
             icon={Briefcase}
             variant="filter"
           />
-          <p className="mt-3 text-sm text-gray-500">
-            Hiển thị {filteredTaskDetails.length} chi tiết công việc.
-          </p>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h2 className="font-bold text-gray-800">Danh mục chi tiết công việc</h2>
-          <span className="text-sm text-gray-500">Tổng: {filteredTaskDetails.length}</span>
-        </div>
+      <TaskDetailTable
+        items={paginated}
+        loading={loading}
+        submitting={submitting}
+        onEdit={openEditModal}
+        onDelete={handleDelete}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={filtered.length}
+        onPageChange={(p) => setCurrentPage(p)}
+      />
 
-        {loading ? (
-          <LoadingScreen message="Đang tải dữ liệu chi tiết công việc..." />
-        ) : filteredTaskDetails.length === 0 ? (
-          <div className="flex h-44 items-center justify-center text-gray-500">
-            Chưa có chi tiết công việc nào
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
-                    Công việc
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
-                    Tên chi tiết
-                  </th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase text-gray-500">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredTaskDetails.map((taskDetail) => (
-                  <TaskDetailRow
-                    key={taskDetail._id}
-                    taskDetail={taskDetail}
-                    taskOptions={createTaskOptions}
-                    isEditing={editingTaskDetailId === taskDetail._id}
-                    editingTaskId={editingTaskId}
-                    editingTaskDetailName={editingTaskDetailName}
-                    submitting={submitting}
-                    onStartEdit={startEdit}
-                    onUpdate={handleUpdate}
-                    onCancelEdit={cancelEdit}
-                    onDelete={handleDelete}
-                    onEditingTaskIdChange={setEditingTaskId}
-                    onEditingTaskDetailNameChange={setEditingTaskDetailName}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <TaskDetailModal
+        open={showModal}
+        editingItem={editingItem}
+        formData={formData}
+        onChange={(e) => {
+          const { name, value } = e.target;
+          setFormData((prev) => ({ ...prev, [name]: value }));
+        }}
+        onClose={closeModal}
+        onSubmit={handleSubmit}
+        submitting={submitting}
+        taskOptions={createTaskOptions}
+      />
     </div>
   );
 };

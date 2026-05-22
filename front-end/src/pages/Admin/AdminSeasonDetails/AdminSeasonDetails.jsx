@@ -1,30 +1,19 @@
-import React, { useEffect, useState } from "react";
-import { Plus, Sprout } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
-import CustomDropdown from "../../../components/UI/CustomDropdown";
-import SeasonDetailRow from "./components/SeasonDetailRow";
+import SeasonDetailFormModal from "./components/SeasonDetailFormModal";
+import SeasonDetailTable from "./components/SeasonDetailTable";
 
 const CURRENT_YEAR = new Date().getFullYear();
 const MIN_YEAR = 2023;
 const MAX_YEAR = CURRENT_YEAR + 5;
+const DETAILS_PER_PAGE = 8;
 const YEAR_OPTIONS = Array.from(
   { length: MAX_YEAR - MIN_YEAR + 1 },
   (_, index) => String(MAX_YEAR - index),
 );
-
-const resolveDetailYear = (detail) => {
-  if (detail?.year) {
-    return String(detail.year);
-  }
-
-  if (detail?.startDate) {
-    return String(new Date(detail.startDate).getFullYear());
-  }
-
-  return String(CURRENT_YEAR);
-};
 
 const AdminSeasonDetails = () => {
   const { toast, confirm } = useFeedback();
@@ -32,20 +21,32 @@ const AdminSeasonDetails = () => {
   const [catalogSeasons, setCatalogSeasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-
-  const [selectedSeasonId, setSelectedSeasonId] = useState("");
-  const [year, setYear] = useState(String(CURRENT_YEAR));
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
-  const [editingId, setEditingId] = useState("");
-  const [editYear, setEditYear] = useState(String(CURRENT_YEAR));
-  const [editStartDate, setEditStartDate] = useState("");
-  const [editEndDate, setEditEndDate] = useState("");
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [editingDetail, setEditingDetail] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [formData, setFormData] = useState({
+    seasonId: "",
+    year: String(CURRENT_YEAR),
+    startDate: "",
+    endDate: "",
+  });
 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(seasonDetails.length / DETAILS_PER_PAGE));
+
+  const paginatedDetails = useMemo(() => {
+    const startIndex = (currentPage - 1) * DETAILS_PER_PAGE;
+    return seasonDetails.slice(startIndex, startIndex + DETAILS_PER_PAGE);
+  }, [currentPage, seasonDetails]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -57,10 +58,6 @@ const AdminSeasonDetails = () => {
 
       setSeasonDetails(detailsRes.data || []);
       setCatalogSeasons(catalogRes.data || []);
-
-      if (catalogRes.data?.length > 0) {
-        setSelectedSeasonId(catalogRes.data[0]._id);
-      }
     } catch (err) {
       console.error("Lỗi tải dữ liệu chi tiết mùa vụ:", err);
       toast.error(err.response?.data?.message || "Không thể tải dữ liệu");
@@ -69,89 +66,96 @@ const AdminSeasonDetails = () => {
     }
   };
 
-  const handleCreate = async () => {
-    if (!selectedSeasonId) {
+  const openCreateModal = () => {
+    setEditingDetail(null);
+    setFormData({
+      seasonId: catalogSeasons[0]?._id || "",
+      year: String(CURRENT_YEAR),
+      startDate: "",
+      endDate: "",
+    });
+    setShowFormModal(true);
+  };
+
+  const openEditModal = (detail) => {
+    const existingYear = detail?.year
+      ? String(detail.year)
+      : detail?.startDate
+        ? String(new Date(detail.startDate).getFullYear())
+        : String(CURRENT_YEAR);
+
+    setEditingDetail(detail);
+    setFormData({
+      seasonId: detail?.season?._id || "",
+      year: existingYear,
+      startDate: detail.startDate ? new Date(detail.startDate).toISOString().slice(0, 10) : "",
+      endDate: detail.endDate ? new Date(detail.endDate).toISOString().slice(0, 10) : "",
+    });
+    setShowFormModal(true);
+  };
+
+  const closeFormModal = () => {
+    setShowFormModal(false);
+    setEditingDetail(null);
+    setFormData({
+      seasonId: "",
+      year: String(CURRENT_YEAR),
+      startDate: "",
+      endDate: "",
+    });
+  };
+
+  const handleFormChange = (field, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleSubmitDetail = async (event) => {
+    event.preventDefault();
+
+    if (!editingDetail && !formData.seasonId) {
       toast.warning("Vui lòng chọn danh mục mùa vụ gốc");
       return;
     }
-    if (!year) {
+    if (!formData.year) {
       toast.warning("Vui lòng chọn năm");
       return;
     }
-    if (!startDate) {
+    if (!formData.startDate) {
       toast.warning("Vui lòng chọn ngày bắt đầu");
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await api.post("/season-details", {
-        seasonId: selectedSeasonId,
-        year: Number(year),
-        startDate,
-        endDate: endDate || null,
-      });
+      if (editingDetail) {
+        const res = await api.put(`/season-details/${editingDetail._id}`, {
+          year: Number(formData.year),
+          startDate: formData.startDate,
+          endDate: formData.endDate || null,
+        });
 
-      setSeasonDetails((prev) => [res.data, ...prev]);
-      setStartDate("");
-      setEndDate("");
-      toast.success("Đã tạo chi tiết mùa vụ mới.");
+        setSeasonDetails((prev) =>
+          prev.map((item) => (item._id === editingDetail._id ? res.data : item)),
+        );
+        toast.success("Đã cập nhật chi tiết mùa vụ.");
+      } else {
+        const res = await api.post("/season-details", {
+          seasonId: formData.seasonId,
+          year: Number(formData.year),
+          startDate: formData.startDate,
+          endDate: formData.endDate || null,
+        });
+
+        setSeasonDetails((prev) => [res.data, ...prev]);
+        toast.success("Đã tạo chi tiết mùa vụ mới.");
+      }
+
+      closeFormModal();
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Không thể tạo chi tiết mùa vụ",
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const startEdit = (detail) => {
-    setEditingId(detail._id);
-    setEditYear(resolveDetailYear(detail));
-    setEditStartDate(
-      detail.startDate
-        ? new Date(detail.startDate).toISOString().slice(0, 10)
-        : "",
-    );
-    setEditEndDate(
-      detail.endDate ? new Date(detail.endDate).toISOString().slice(0, 10) : "",
-    );
-  };
-
-  const cancelEdit = () => {
-    setEditingId("");
-    setEditYear(String(CURRENT_YEAR));
-    setEditStartDate("");
-    setEditEndDate("");
-  };
-
-  const handleSaveEdit = async (id) => {
-    if (!editYear) {
-      toast.warning("Năm không được để trống");
-      return;
-    }
-    if (!editStartDate) {
-      toast.warning("Ngày bắt đầu không được để trống");
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      const res = await api.put(`/season-details/${id}`, {
-        year: Number(editYear),
-        startDate: editStartDate,
-        endDate: editEndDate || null,
-      });
-
-      setSeasonDetails((prev) =>
-        prev.map((item) => (item._id === id ? res.data : item)),
-      );
-      cancelEdit();
-      toast.success("Đã cập nhật chi tiết mùa vụ.");
-    } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Không thể cập nhật thông tin",
-      );
+      toast.error(err.response?.data?.message || "Không thể lưu chi tiết mùa vụ");
     } finally {
       setSubmitting(false);
     }
@@ -194,14 +198,10 @@ const AdminSeasonDetails = () => {
     setSubmitting(true);
     try {
       await api.delete(`/season-details/${detail._id}`);
-      setSeasonDetails((prev) =>
-        prev.filter((item) => item._id !== detail._id),
-      );
+      setSeasonDetails((prev) => prev.filter((item) => item._id !== detail._id));
       toast.success("Đã xóa lịch trình mùa vụ.");
     } catch (err) {
-      toast.error(
-        err.response?.data?.message || "Không thể xóa lịch trình mùa vụ",
-      );
+      toast.error(err.response?.data?.message || "Không thể xóa lịch trình mùa vụ");
     } finally {
       setSubmitting(false);
     }
@@ -209,159 +209,51 @@ const AdminSeasonDetails = () => {
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">
-          Quản lý chi tiết mùa vụ
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Lên lịch và quản lý thời gian diễn ra của các vụ mưa
-        </p>
-      </div>
-
-      <div className="mb-6 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-3">
-          <h2 className="font-bold text-gray-800">Lên lịch mùa vụ mới</h2>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Quản lý chi tiết mùa vụ</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Lên lịch và quản lý thời gian diễn ra của các vụ mưa
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
-          <div className="flex flex-col gap-1 px-1">
-            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
-              Danh mục mùa vụ
-            </label>
-            <CustomDropdown
-              value={selectedSeasonId}
-              onChange={setSelectedSeasonId}
-              options={catalogSeasons.map((cat) => ({
-                value: cat._id,
-                label: cat.name,
-              }))}
-              placeholder="Chọn mùa vụ"
-              icon={Sprout}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1 px-1">
-            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
-              Năm
-            </label>
-            <select
-              value={year}
-              onChange={(e) => setYear(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
-            >
-              {YEAR_OPTIONS.map((optionYear) => (
-                <option key={optionYear} value={optionYear}>
-                  {optionYear}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1 px-1">
-            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
-              Ngày bắt đầu
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1 px-1">
-            <label className="text-xs font-medium uppercase tracking-wider text-gray-500">
-              Ngày kết thúc (Tùy chọn)
-            </label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
-            />
-          </div>
-
-          <div className="flex items-end px-1 pb-[1px]">
-            <button
-              disabled={submitting}
-              onClick={handleCreate}
-              className="flex h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
-            >
-              <Plus size={18} /> Thêm mới
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={openCreateModal}
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700"
+        >
+          <Plus size={16} />
+          Thêm lịch trình
+        </button>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-          <h2 className="font-bold text-gray-800">Danh sách lịch trình</h2>
-          <span className="text-sm font-medium text-gray-500">
-            Tổng: {seasonDetails.length}
-          </span>
-        </div>
+      {loading ? (
+        <LoadingScreen message="Đang tải dữ liệu..." />
+      ) : (
+        <SeasonDetailTable
+          seasonDetails={paginatedDetails}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalCount={seasonDetails.length}
+          submitting={submitting}
+          onPageChange={setCurrentPage}
+          onStartEdit={openEditModal}
+          onFinish={handleFinish}
+          onDelete={handleDelete}
+        />
+      )}
 
-        {loading ? (
-          <LoadingScreen message="Đang tải dữ liệu..." />
-        ) : seasonDetails.length === 0 ? (
-          <div className="flex h-44 items-center justify-center text-gray-500">
-            Chưa có lịch trình mùa vụ nào
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Mùa vụ
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Năm
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Ngày bắt đầu
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Ngày kết thúc
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Trạng thái
-                  </th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {seasonDetails.map((detail) => {
-                  const isEditing = editingId === detail._id;
-
-                  return (
-                    <SeasonDetailRow
-                      key={detail._id}
-                      detail={detail}
-                      isEditing={isEditing}
-                      editYear={editYear}
-                      editStartDate={editStartDate}
-                      editEndDate={editEndDate}
-                      submitting={submitting}
-                      yearOptions={YEAR_OPTIONS}
-                      onStartEdit={startEdit}
-                      onSaveEdit={handleSaveEdit}
-                      onCancelEdit={cancelEdit}
-                      onFinish={handleFinish}
-                      onDelete={handleDelete}
-                      onEditYearChange={setEditYear}
-                      onEditStartDateChange={setEditStartDate}
-                      onEditEndDateChange={setEditEndDate}
-                    />
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <SeasonDetailFormModal
+        open={showFormModal}
+        editingDetail={editingDetail}
+        catalogSeasons={catalogSeasons}
+        yearOptions={YEAR_OPTIONS}
+        formData={formData}
+        submitting={submitting}
+        onChange={handleFormChange}
+        onClose={closeFormModal}
+        onSubmit={handleSubmitDetail}
+      />
     </div>
   );
 };

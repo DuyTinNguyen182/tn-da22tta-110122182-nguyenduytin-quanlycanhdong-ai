@@ -20,6 +20,7 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-easy-crop": "^5.5.7",
+    "react-is": "^19.2.6",
     "react-markdown": "^10.1.0",
     "react-quill": "^2.0.0",
     "react-router-dom": "^7.12.0",

@@ -21,7 +21,4 @@ router.put("/:id", userController.updateUser);
 // DELETE user
 router.delete("/:id", userController.deleteUser);
 
-// RESET password cho user (chỉ admin)
-router.post("/:id/reset-password", userController.resetPassword);
-
 module.exports = router;
