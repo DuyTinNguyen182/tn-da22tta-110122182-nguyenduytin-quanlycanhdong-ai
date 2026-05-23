@@ -13,6 +13,7 @@ import {
   ListChecks,
   Map,
   ShieldCheck,
+  Sprout,
   Users,
 } from "lucide-react";
 
@@ -21,28 +22,25 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
 
   const navItems = [
     { name: "Tổng quan", icon: LayoutDashboard, path: "/admin/dashboard" },
-    { name: "Quản lý tiến độ", icon: BarChart3, path: "/admin/progress" },
-    { name: "Cánh đồng", icon: Map, path: "/admin/fields" },
     { name: "Người dùng", icon: Users, path: "/admin/users" },
+    { name: "Cánh đồng", icon: Map, path: "/admin/fields" },
     { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
     { name: "Lịch mùa vụ", icon: CalendarRange, path: "/admin/season-details" },
+    { name: "Thửa tham gia vụ", icon: Sprout, path: "/admin/season-plots" },
     { name: "Giai đoạn", icon: ListChecks, path: "/admin/stages" },
     { name: "Công việc", icon: Briefcase, path: "/admin/tasks" },
+    { name: "Quản lý tiến độ", icon: BarChart3, path: "/admin/progress" },
     {
       name: "Theo dõi dịch bệnh",
       icon: AlertTriangle,
       path: "/admin/disease-monitoring",
     },
     {
-      name: "Thông báo & cảnh báo",
-      icon: Bell,
-      path: "/admin/announcements",
-    },
-    {
-      name: "Khuyến nghị mùa vụ",
+      name: "Khuyến nghị",
       icon: BookText,
       path: "/admin/season-recommendations",
     },
+    { name: "Thông báo", icon: Bell, path: "/admin/announcements" },
   ];
 
   return (
@@ -51,7 +49,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
         collapsed ? "w-20" : "w-64"
       }`}
     >
-      <div className="flex h-16 flex-shrink-0 items-center border-b border-gray-800 px-6">
+      <div className="relative z-30 flex h-16 flex-shrink-0 items-center border-b border-gray-800 bg-gray-900 px-6">
         <Link to="/admin/dashboard" className="flex items-center gap-3">
           <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-lg">
             <ShieldCheck className="text-white" size={20} />
@@ -64,15 +62,13 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
         </Link>
       </div>
 
-      <nav className="flex-1 space-y-1 px-3 py-6">
-        <p
-          className={`mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-gray-500 transition-all duration-300 ${
-            collapsed ? "h-0 overflow-hidden opacity-0" : "h-auto opacity-100"
-          }`}
-        >
-          Quản lý hệ thống
-        </p>
-
+      <nav
+        className={`flex-1 flex flex-col min-h-0 py-2 px-3 ${
+          collapsed
+            ? "overflow-visible gap-1"
+            : "overflow-y-auto overflow-x-hidden gap-1 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-700"
+        }`}
+      >
         {navItems.map((item) => {
           const isActive =
             location.pathname === item.path ||
@@ -83,8 +79,10 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
             <Link
               key={item.path}
               to={item.path}
-              className={`group relative flex items-center rounded-xl px-3 py-3 transition-all ${
-                collapsed ? "justify-center" : ""
+              className={`group relative flex items-center transition-all ${
+                collapsed
+                  ? "justify-center rounded-xl p-2.5 mx-1"
+                  : "rounded-xl px-3 py-2.5"
               } ${
                 isActive
                   ? "bg-emerald-600 font-medium text-white shadow-md"
@@ -92,6 +90,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
               }`}
             >
               <item.icon size={20} className="stroke-[1.5] flex-shrink-0" />
+
               {!collapsed && (
                 <span className="ml-3 whitespace-nowrap text-sm">
                   {item.name}
@@ -99,7 +98,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
               )}
 
               {collapsed && (
-                <div className="pointer-events-none absolute left-full top-1/2 z-[100] ml-4 -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-800 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-xl transition-all duration-200 group-hover:opacity-100">
+                <div className="invisible absolute left-full top-1/2 z-[100] ml-4 -translate-y-1/2 whitespace-nowrap rounded-lg bg-gray-800 px-3 py-2 text-xs font-medium text-white opacity-0 shadow-xl transition-all duration-200 group-hover:visible group-hover:opacity-100">
                   {item.name}
                   <div className="absolute -left-1 top-1/2 h-0 w-0 -translate-y-1/2 border-y-[6px] border-y-transparent border-r-[6px] border-r-gray-800"></div>
                 </div>
@@ -109,14 +108,16 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
         })}
       </nav>
 
-      <div className="flex-shrink-0 border-t border-gray-800 p-4">
+      <div className="relative z-30 flex-shrink-0 border-t border-gray-800 bg-gray-900 p-3">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-gray-400 transition-colors hover:bg-gray-800 hover:text-white"
         >
           <ChevronLeft
             size={20}
-            className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`}
+            className={`transition-transform duration-300 ${
+              collapsed ? "rotate-180" : ""
+            }`}
           />
         </button>
       </div>

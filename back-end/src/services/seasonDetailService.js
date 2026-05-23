@@ -393,7 +393,8 @@ const getFarmerSeasonDetails = async (userId, fieldId) => {
       loggablePlots: loggableAssignments
         .map((item) => item.plot)
         .filter(Boolean),
-      totalPlotCount: assignments.length,
+      totalPlotCount: activeAssignments.length,
+      historicalPlotCount: assignments.length,
       activePlotCount: activeAssignments.length,
       loggablePlotCount: loggableAssignments.length,
     });

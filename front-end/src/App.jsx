@@ -27,6 +27,7 @@ import AdminUsers from "./pages/Admin/AdminUsers/AdminUsers";
 import AdminFields from "./pages/Admin/AdminFields/AdminFields";
 import AdminSeasons from "./pages/Admin/AdminSeasons/AdminSeasons";
 import AdminSeasonDetails from "./pages/Admin/AdminSeasonDetails/AdminSeasonDetails";
+import AdminSeasonPlots from "./pages/Admin/AdminSeasonPlots/AdminSeasonPlots";
 import AdminSeasonRecommendations from "./pages/Admin/AdminSeasonRecommendations/AdminSeasonRecommendations";
 import AdminAnnouncements from "./pages/Admin/AdminAnnouncements/AdminAnnouncements";
 import AdminStages from "./pages/Admin/AdminStages/AdminStages";
@@ -77,6 +78,10 @@ function App() {
                 <Route
                   path="/admin/season-details"
                   element={<AdminSeasonDetails />}
+                />
+                <Route
+                  path="/admin/season-plots"
+                  element={<AdminSeasonPlots />}
                 />
                 <Route
                   path="/admin/season-recommendations"
