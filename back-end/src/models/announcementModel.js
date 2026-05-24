@@ -24,7 +24,7 @@ const announcementSchema = new mongoose.Schema(
     },
     source: {
       type: String,
-      enum: ["manual", "plot-task-warning"],
+      enum: ["manual", "plot-task-warning", "plot-disease-warning"],
       default: "manual",
     },
     audience: {
@@ -39,6 +39,18 @@ const announcementSchema = new mongoose.Schema(
           ref: "User",
         },
       ],
+    },
+    targetConfig: {
+      mode: {
+        type: String,
+        enum: ["all_farmers", "selected_users", "field_users"],
+        default: "all_farmers",
+      },
+      fieldId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Field",
+        default: null,
+      },
     },
     deliveryChannels: [
       {

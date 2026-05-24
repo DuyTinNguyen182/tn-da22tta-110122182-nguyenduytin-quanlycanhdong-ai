@@ -36,6 +36,15 @@ exports.getAdminList = async (req, res) => {
   }
 };
 
+exports.getAdminOptions = async (req, res) => {
+  try {
+    const data = await announcementService.getAdminAnnouncementOptions();
+    res.json(data);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 exports.create = async (req, res) => {
   try {
     const created = await announcementService.createAnnouncement(req.body);
@@ -58,6 +67,18 @@ exports.remove = async (req, res) => {
   try {
     await announcementService.deleteAnnouncement(req.params.id);
     res.json({ message: "Đã xóa thông báo/cảnh báo" });
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+exports.removeMany = async (req, res) => {
+  try {
+    const data = await announcementService.deleteAnnouncements(req.body?.ids || []);
+    res.json({
+      message: `Đã xóa ${data.deletedCount} thông báo/cảnh báo`,
+      ...data,
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

@@ -47,6 +47,31 @@ const updateStatus = async (req, res) => {
   }
 };
 
+const getWarningPreview = async (req, res) => {
+  try {
+    const data = await diseaseLogService.getDiseaseLogWarningPreview(
+      req.params.id,
+      req.user
+    );
+    res.json(data);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+const sendWarning = async (req, res) => {
+  try {
+    const data = await diseaseLogService.sendDiseaseLogWarning(
+      req.params.id,
+      req.body,
+      req.user
+    );
+    res.status(201).json(data);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
 const remove = async (req, res) => {
   try {
     await diseaseLogService.deleteDiseaseLog(req.params.id, req.user);
@@ -61,5 +86,7 @@ module.exports = {
   create,
   update,
   updateStatus,
+  getWarningPreview,
+  sendWarning,
   remove,
 };

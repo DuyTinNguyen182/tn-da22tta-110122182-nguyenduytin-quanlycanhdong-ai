@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 from PIL import Image, UnidentifiedImageError
 
 APP_DIR = Path(__file__).resolve().parent
@@ -230,6 +231,7 @@ def _build_rejected_response(result):
 
 
 app = Flask(__name__)
+CORS(app)
 try:
     app.json.ensure_ascii = False
 except AttributeError:

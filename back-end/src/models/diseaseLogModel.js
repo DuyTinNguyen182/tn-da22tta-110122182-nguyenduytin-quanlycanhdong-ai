@@ -41,6 +41,8 @@ const diseaseLogSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    warningSent: { type: Boolean, default: false },
+    warningSentAt: { type: Date, default: null },
   },
   {
     collection: "disease_logs",
@@ -50,5 +52,6 @@ const diseaseLogSchema = new mongoose.Schema(
 
 diseaseLogSchema.index({ user: 1, status: 1, detectedAt: -1 });
 diseaseLogSchema.index({ seasonPlotAssignments: 1, detectedAt: -1 });
+diseaseLogSchema.index({ warningSent: 1, warningSentAt: -1 });
 
 module.exports = mongoose.model("DiseaseLog", diseaseLogSchema);

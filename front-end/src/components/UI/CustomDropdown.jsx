@@ -6,22 +6,8 @@ import {
   ListboxOptions,
   Transition,
 } from "@headlessui/react";
-import { ChevronDown, Check, X as XIcon } from "lucide-react";
+import { Check, ChevronDown, X as XIcon } from "lucide-react";
 
-/**
- * CustomDropdown — reusable select component built on HeadlessUI Listbox.
- * Uses portal rendering, so it's never clipped by parent overflow.
- *
- * @param {string|array}   value       - Currently selected value or array when multi
- * @param {function} onChange    - Callback when value changes
- * @param {Array}    options     - [{ value, label, dot?, badge? }]
- * @param {string}   placeholder - Placeholder text
- * @param {Component} icon      - Optional leading icon component
- * @param {"small"|"default"} size
- * @param {"default"|"active"|"filter"} variant
- * @param {string}   className  - Extra wrapper class
- * @param {boolean}  multi      - Enable multi-select mode
- */
 const CustomDropdown = ({
   value,
   onChange,
@@ -34,7 +20,6 @@ const CustomDropdown = ({
   multi = false,
   disabled = false,
 }) => {
-  // Normalize selected values
   const selectedValues = multi
     ? Array.isArray(value)
       ? value
@@ -45,7 +30,7 @@ const CustomDropdown = ({
 
   const selectedOption = multi
     ? null
-    : options.find((opt) => opt.value === value);
+    : options.find((option) => option.value === value);
 
   const displayLabel = multi
     ? selectedValues.length === 0
@@ -70,6 +55,11 @@ const CustomDropdown = ({
     filter: "ring-2 ring-emerald-200 border-emerald-300",
   };
 
+  const removeSelectedValue = (targetValue) => {
+    const nextValues = selectedValues.filter((item) => item !== targetValue);
+    onChange(nextValues);
+  };
+
   return (
     <Listbox
       value={value}
@@ -85,43 +75,57 @@ const CustomDropdown = ({
               open ? variantOpen[variant] : ""
             } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
           >
-            {Icon && (
+            {Icon ? (
               <Icon
                 size={size === "small" ? 13 : 15}
                 className="shrink-0 text-gray-400"
               />
-            )}
-            {/* Display tags when multi-select is enabled and items are selected */}
+            ) : null}
+
             {multi ? (
-              <div className="flex-1 flex flex-wrap items-center gap-2">
+              <div className="flex flex-1 flex-wrap items-center gap-2">
                 {selectedValues.length === 0 ? (
                   <span className="text-gray-400">{placeholder}</span>
                 ) : (
                   <div className="flex flex-wrap items-center gap-2">
-                    {selectedValues.map((val) => {
-                      const opt = options.find((o) => o.value === val) || {};
+                    {selectedValues.map((selectedValue) => {
+                      const selectedItem =
+                        options.find((option) => option.value === selectedValue) || {};
+
                       return (
                         <span
-                          key={val}
+                          key={selectedValue}
                           className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800"
                         >
                           <span className="max-w-[140px] truncate">
-                            {opt.label || val}
+                            {selectedItem.label || selectedValue}
                           </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const next = selectedValues.filter(
-                                (v) => v !== val,
-                              );
-                              onChange(next);
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              removeSelectedValue(selectedValue);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Enter" && event.key !== " ") {
+                                return;
+                              }
+
+                              event.preventDefault();
+                              event.stopPropagation();
+                              removeSelectedValue(selectedValue);
                             }}
                             className="flex items-center justify-center p-1 text-emerald-600 hover:text-emerald-800"
-                            aria-label={`Xóa ${opt.label || val}`}
+                            aria-label={`Xóa ${selectedItem.label || selectedValue}`}
                           >
                             <XIcon size={12} />
-                          </button>
+                          </span>
                         </span>
                       );
                     })}
@@ -141,6 +145,7 @@ const CustomDropdown = ({
                 {displayLabel}
               </span>
             )}
+
             <ChevronDown
               size={size === "small" ? 13 : 15}
               className={`shrink-0 text-gray-400 transition-transform duration-200 ${
@@ -159,10 +164,10 @@ const CustomDropdown = ({
               anchor="bottom start"
               className="z-[9999] mt-1.5 w-[var(--button-width)] min-w-[180px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50 focus:outline-none"
             >
-              {options.map((opt) => (
+              {options.map((option) => (
                 <ListboxOption
-                  key={opt.value}
-                  value={opt.value}
+                  key={option.value}
+                  value={option.value}
                   className={({ active, selected }) =>
                     `flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-colors ${
                       selected
@@ -175,31 +180,34 @@ const CustomDropdown = ({
                 >
                   {({ selected }) => (
                     <>
-                      {opt.dot && (
+                      {option.dot ? (
                         <span
-                          className={`h-2 w-2 shrink-0 rounded-full ${opt.dot}`}
+                          className={`h-2 w-2 shrink-0 rounded-full ${option.dot}`}
                         />
-                      )}
+                      ) : null}
+
                       <span
                         className={`flex-1 truncate text-sm ${
                           selected ? "font-semibold" : ""
                         }`}
                       >
-                        {opt.label}
+                        {option.label}
                       </span>
-                      {opt.badge && (
+
+                      {option.badge ? (
                         <span
-                          className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${opt.badge.className}`}
+                          className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${option.badge.className}`}
                         >
-                          {opt.badge.text}
+                          {option.badge.text}
                         </span>
-                      )}
-                      {selected && (
+                      ) : null}
+
+                      {selected ? (
                         <Check
                           size={14}
                           className="shrink-0 text-emerald-600"
                         />
-                      )}
+                      ) : null}
                     </>
                   )}
                 </ListboxOption>

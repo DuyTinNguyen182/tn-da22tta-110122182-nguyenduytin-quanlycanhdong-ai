@@ -22,7 +22,6 @@ const quillFormats = [
   "italic",
   "underline",
   "list",
-  "bullet",
 ];
 
 const isQuillEmpty = (value) => {

@@ -1,13 +1,25 @@
 const mongoose = require("mongoose");
 const Announcement = require("../models/announcementModel");
 const AnnouncementRead = require("../models/announcementReadModel");
+const Field = require("../models/fieldModel");
+const User = require("../models/userModel");
+const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
+const { sendMail } = require("./mailService");
+const {
+  buildAnnouncementEmailTemplate,
+} = require("../templates/announcementEmailTemplate");
 
 const DEFAULT_LIMIT = 5;
 const MAX_LIMIT = 20;
 const ANNOUNCEMENT_TYPES = new Set(["notification", "warning"]);
-const ANNOUNCEMENT_SOURCES = new Set(["manual", "plot-task-warning"]);
+const ANNOUNCEMENT_SOURCES = new Set([
+  "manual",
+  "plot-task-warning",
+  "plot-disease-warning",
+]);
 const ANNOUNCEMENT_AUDIENCE_SCOPES = new Set(["all", "users"]);
 const DELIVERY_CHANNELS = new Set(["web", "email"]);
+const TARGET_MODES = new Set(["all_farmers", "selected_users", "field_users"]);
 
 const parsePositiveInteger = (value, fallback) => {
   const parsed = Number.parseInt(value, 10);
@@ -76,7 +88,7 @@ const normalizeAudienceScope = (value) => {
     .toLowerCase();
 
   if (!ANNOUNCEMENT_AUDIENCE_SCOPES.has(normalized)) {
-    throw new Error("Phân loại người nhận không hợp lệ");
+    throw new Error("Phạm vi người nhận không hợp lệ");
   }
 
   return normalized;
@@ -87,15 +99,13 @@ const normalizeAudienceUserIds = (value) => {
     return [];
   }
 
-  const userIds = Array.from(
+  return Array.from(
     new Set(
       value
         .map((item) => String(item || "").trim())
-        .filter((item) => mongoose.Types.ObjectId.isValid(item))
-    )
+        .filter((item) => mongoose.Types.ObjectId.isValid(item)),
+    ),
   );
-
-  return userIds;
 };
 
 const normalizeAudience = (value = {}) => {
@@ -113,22 +123,34 @@ const normalizeAudience = (value = {}) => {
 };
 
 const normalizeDeliveryChannels = (value) => {
-  const channels = Array.isArray(value) && value.length > 0 ? value : ["web"];
+  const channels = Array.isArray(value) && value.length > 0 ? value : ["web", "email"];
   const normalized = Array.from(
     new Set(
       channels
         .map((item) => String(item || "").trim().toLowerCase())
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
 
   if (normalized.length === 0) {
-    return ["web"];
+    return ["web", "email"];
   }
 
   const hasInvalidChannel = normalized.some((item) => !DELIVERY_CHANNELS.has(item));
   if (hasInvalidChannel) {
     throw new Error("Kênh gửi thông báo không hợp lệ");
+  }
+
+  return normalized;
+};
+
+const normalizeTargetMode = (value, fallback = "all_farmers") => {
+  const normalized = String(value || fallback)
+    .trim()
+    .toLowerCase();
+
+  if (!TARGET_MODES.has(normalized)) {
+    throw new Error("Kiểu người nhận không hợp lệ");
   }
 
   return normalized;
@@ -160,19 +182,6 @@ const buildPagination = ({ page, limit, totalItems }) => {
     hasNextPage: page < totalPages,
   };
 };
-
-const normalizeAnnouncementOutput = (item) => ({
-  _id: String(item._id),
-  type: item.type,
-  title: item.title,
-  content: item.content,
-  isVisible: item.isVisible === true,
-  source: item.source || "manual",
-  audienceScope: item.audience?.scope || "all",
-  deliveryChannels: Array.isArray(item.deliveryChannels) ? item.deliveryChannels : ["web"],
-  createdAt: item.createdAt,
-  updatedAt: item.updatedAt,
-});
 
 const buildVisibleAudienceFilter = (currentUser) => ({
   $or: [
@@ -213,7 +222,233 @@ const buildQueryOptions = (query = {}, { adminView = false, currentUser = null }
   return { page, limit, filters };
 };
 
-const buildAnnouncementPayload = (payload = {}, current = null) => {
+const mapAnnouncementForAdmin = (item) => ({
+  _id: String(item._id),
+  type: item.type,
+  title: item.title,
+  content: item.content,
+  isVisible: item.isVisible === true,
+  source: item.source || "manual",
+  audienceScope: item.audience?.scope || "all",
+  audienceUserIds: Array.isArray(item.audience?.userIds)
+    ? item.audience.userIds.map((entry) => String(entry._id || entry))
+    : [],
+  deliveryChannels: Array.isArray(item.deliveryChannels) ? item.deliveryChannels : ["web", "email"],
+  targetMode: item.targetConfig?.mode || "all_farmers",
+  targetFieldId: item.targetConfig?.fieldId?._id
+    ? String(item.targetConfig.fieldId._id)
+    : item.targetConfig?.fieldId
+      ? String(item.targetConfig.fieldId)
+      : "",
+  targetFieldName: item.targetConfig?.fieldId?.name || "",
+  recipientCount: Array.isArray(item.audience?.userIds) ? item.audience.userIds.length : 0,
+  createdAt: item.createdAt,
+  updatedAt: item.updatedAt,
+});
+
+const mapAnnouncementForVisibleList = (item) => ({
+  _id: String(item._id),
+  type: item.type,
+  title: item.title,
+  content: item.content,
+  isVisible: item.isVisible === true,
+  source: item.source || "manual",
+  audienceScope: item.audience?.scope || "all",
+  deliveryChannels: Array.isArray(item.deliveryChannels) ? item.deliveryChannels : ["web", "email"],
+  createdAt: item.createdAt,
+  updatedAt: item.updatedAt,
+});
+
+const listFarmerUsers = async () =>
+  User.find({ role: "farmer" })
+    .sort({ fullName: 1, email: 1 })
+    .select("_id fullName email phone")
+    .lean();
+
+const buildFieldFarmerIndex = async () => {
+  const assignments = await SeasonPlotAssignment.find({ status: "active" })
+    .populate("field", "name")
+    .populate("user", "fullName email phone role")
+    .lean();
+
+  const fieldMap = new Map();
+
+  assignments.forEach((assignment) => {
+    const fieldId = assignment.field?._id ? String(assignment.field._id) : "";
+    const userId = assignment.user?._id ? String(assignment.user._id) : "";
+    const isFarmer = assignment.user?.role === "farmer";
+
+    if (!fieldId || !userId || !isFarmer) {
+      return;
+    }
+
+    if (!fieldMap.has(fieldId)) {
+      fieldMap.set(fieldId, {
+        fieldId,
+        fieldName: assignment.field?.name || "Cánh đồng",
+        userMap: new Map(),
+      });
+    }
+
+    const fieldEntry = fieldMap.get(fieldId);
+    if (!fieldEntry.userMap.has(userId)) {
+      fieldEntry.userMap.set(userId, {
+        _id: userId,
+        fullName: assignment.user?.fullName || "Nông dân",
+        email: assignment.user?.email || "",
+        phone: assignment.user?.phone || "",
+      });
+    }
+  });
+
+  return fieldMap;
+};
+
+const getAdminAnnouncementOptions = async () => {
+  const [fields, farmers, fieldFarmerIndex] = await Promise.all([
+    Field.find().sort({ name: 1 }).select("_id name").lean(),
+    listFarmerUsers(),
+    buildFieldFarmerIndex(),
+  ]);
+
+  const farmerFieldMap = new Map();
+  fieldFarmerIndex.forEach((entry) => {
+    entry.userMap.forEach((user) => {
+      if (!farmerFieldMap.has(user._id)) {
+        farmerFieldMap.set(user._id, []);
+      }
+
+      farmerFieldMap.get(user._id).push({
+        fieldId: entry.fieldId,
+        fieldName: entry.fieldName,
+      });
+    });
+  });
+
+  return {
+    fields: fields.map((field) => {
+      const fieldId = String(field._id);
+      const users = fieldFarmerIndex.get(fieldId)?.userMap || new Map();
+
+      return {
+        _id: fieldId,
+        name: field.name || "Cánh đồng",
+        farmerCount: users.size,
+      };
+    }),
+    farmers: farmers.map((farmer) => ({
+      _id: String(farmer._id),
+      fullName: farmer.fullName || "Nông dân",
+      email: farmer.email || "",
+      phone: farmer.phone || "",
+      fields: farmerFieldMap.get(String(farmer._id)) || [],
+    })),
+  };
+};
+
+const resolveAnnouncementRecipients = async (payload = {}, current = null) => {
+  const targetMode = normalizeTargetMode(
+    payload.targetConfig?.mode ?? current?.targetConfig?.mode ?? "all_farmers",
+  );
+  const fieldId =
+    payload.targetConfig?.fieldId ?? current?.targetConfig?.fieldId?._id ?? current?.targetConfig?.fieldId ?? "";
+
+  if (targetMode === "all_farmers") {
+    const farmers = await listFarmerUsers();
+    return {
+      targetMode,
+      fieldId: null,
+      fieldName: "",
+      recipients: farmers.map((item) => ({
+        _id: String(item._id),
+        fullName: item.fullName || "Nông dân",
+        email: item.email || "",
+        phone: item.phone || "",
+      })),
+    };
+  }
+
+  if (targetMode === "selected_users") {
+    const userIds = normalizeAudienceUserIds(
+      payload.audience?.userIds ?? current?.audience?.userIds ?? [],
+    );
+
+    if (userIds.length === 0) {
+      throw new Error("Vui lòng chọn ít nhất 1 nông dân");
+    }
+
+    const farmers = await User.find({
+      _id: { $in: userIds },
+      role: "farmer",
+    })
+      .select("_id fullName email phone")
+      .lean();
+
+    if (farmers.length === 0) {
+      throw new Error("Không tìm thấy nông dân phù hợp để gửi");
+    }
+
+    return {
+      targetMode,
+      fieldId: null,
+      fieldName: "",
+      recipients: farmers.map((item) => ({
+        _id: String(item._id),
+        fullName: item.fullName || "Nông dân",
+        email: item.email || "",
+        phone: item.phone || "",
+      })),
+    };
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(String(fieldId || ""))) {
+    throw new Error("Vui lòng chọn cánh đồng hợp lệ");
+  }
+
+  const assignments = await SeasonPlotAssignment.find({
+    field: fieldId,
+    status: "active",
+  })
+    .populate("field", "name")
+    .populate("user", "fullName email phone role")
+    .lean();
+
+  const recipientsMap = new Map();
+  let fieldName = "";
+
+  assignments.forEach((assignment) => {
+    if (assignment.user?.role !== "farmer" || !assignment.user?._id) {
+      return;
+    }
+
+    fieldName = assignment.field?.name || fieldName;
+    const userId = String(assignment.user._id);
+
+    if (!recipientsMap.has(userId)) {
+      recipientsMap.set(userId, {
+        _id: userId,
+        fullName: assignment.user?.fullName || "Nông dân",
+        email: assignment.user?.email || "",
+        phone: assignment.user?.phone || "",
+      });
+    }
+  });
+
+  const recipients = Array.from(recipientsMap.values());
+
+  if (recipients.length === 0) {
+    throw new Error("Cánh đồng này hiện chưa có nông dân để gửi");
+  }
+
+  return {
+    targetMode,
+    fieldId: String(fieldId),
+    fieldName,
+    recipients,
+  };
+};
+
+const buildAnnouncementPayload = (payload = {}, current = null, recipientResolution = null) => {
   const type = normalizeType(payload.type || current?.type || "notification") || "notification";
   const title = String(payload.title ?? current?.title ?? "").trim();
   const content = String(payload.content ?? current?.content ?? "").trim();
@@ -226,17 +461,56 @@ const buildAnnouncementPayload = (payload = {}, current = null) => {
     throw new Error("Nội dung thông báo/cảnh báo là bắt buộc");
   }
 
+  const recipients = recipientResolution?.recipients || [];
+  const userIds = recipients.map((item) => item._id);
+
   return {
     type,
     title,
     content,
     isVisible: payload.isVisible ?? current?.isVisible ?? false,
     source: normalizeSource(payload.source ?? current?.source ?? "manual"),
-    audience: normalizeAudience(payload.audience ?? current?.audience ?? { scope: "all" }),
+    audience: normalizeAudience({
+      scope: "users",
+      userIds,
+    }),
+    targetConfig: {
+      mode: recipientResolution?.targetMode || current?.targetConfig?.mode || "all_farmers",
+      fieldId: recipientResolution?.fieldId || current?.targetConfig?.fieldId || null,
+    },
     deliveryChannels: normalizeDeliveryChannels(
-      payload.deliveryChannels ?? current?.deliveryChannels ?? ["web"]
+      payload.deliveryChannels ?? current?.deliveryChannels ?? ["web", "email"],
     ),
   };
+};
+
+const sendAnnouncementEmails = async ({ recipients, title, content, type, deliveryChannels }) => {
+  if (!deliveryChannels.includes("email")) {
+    return;
+  }
+
+  const emailRecipients = recipients.filter((recipient) => recipient.email);
+  if (emailRecipients.length === 0) {
+    return;
+  }
+
+  await Promise.all(
+    emailRecipients.map((recipient) => {
+      const emailContent = buildAnnouncementEmailTemplate({
+        recipientName: recipient.fullName,
+        title,
+        content,
+        type,
+      });
+
+      return sendMail({
+        to: recipient.email,
+        subject: emailContent.subject,
+        text: emailContent.text,
+        html: emailContent.html,
+      });
+    }),
+  );
 };
 
 const listReadableAnnouncementIds = async (currentUser) => {
@@ -278,7 +552,7 @@ const listVisibleAnnouncements = async (query = {}, currentUser = null) => {
 
   return {
     items: items.map((item) => ({
-      ...normalizeAnnouncementOutput(item),
+      ...mapAnnouncementForVisibleList(item),
       isRead: readIdSet.has(String(item._id)),
     })),
     pagination: buildPagination({ page, limit, totalItems }),
@@ -292,6 +566,7 @@ const listAdminAnnouncements = async (query = {}) => {
   const [items, totalItems, totalCount, visibleCount, hiddenCount, warningCount, notificationCount] =
     await Promise.all([
       Announcement.find(filters)
+        .populate("targetConfig.fieldId", "name")
         .sort({ createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
@@ -305,7 +580,7 @@ const listAdminAnnouncements = async (query = {}) => {
     ]);
 
   return {
-    items: items.map(normalizeAnnouncementOutput),
+    items: items.map(mapAnnouncementForAdmin),
     pagination: buildPagination({ page, limit, totalItems }),
     summary: {
       totalCount,
@@ -318,15 +593,35 @@ const listAdminAnnouncements = async (query = {}) => {
 };
 
 const createAnnouncement = async (payload = {}) => {
-  const data = buildAnnouncementPayload(payload);
+  const recipientResolution = await resolveAnnouncementRecipients(payload);
+  const data = buildAnnouncementPayload(payload, null, recipientResolution);
   const created = await Announcement.create(data);
-  return normalizeAnnouncementOutput(created);
+
+  await sendAnnouncementEmails({
+    recipients: recipientResolution.recipients,
+    title: data.title,
+    content: data.content,
+    type: data.type,
+    deliveryChannels: data.deliveryChannels,
+  });
+
+  const populated = await Announcement.findById(created._id)
+    .populate("targetConfig.fieldId", "name")
+    .lean();
+
+  return mapAnnouncementForAdmin(populated);
 };
 
 const createSystemAnnouncement = async (payload = {}) => {
-  const data = buildAnnouncementPayload(payload);
+  const data = buildAnnouncementPayload(payload, null, {
+    targetMode: payload.targetConfig?.mode || "selected_users",
+    fieldId: payload.targetConfig?.fieldId || null,
+    recipients: Array.isArray(payload.audience?.userIds)
+      ? payload.audience.userIds.map((item) => ({ _id: String(item) }))
+      : [],
+  });
   const created = await Announcement.create(data);
-  return normalizeAnnouncementOutput(created);
+  return mapAnnouncementForAdmin(created.toObject());
 };
 
 const updateAnnouncement = async (id, payload = {}) => {
@@ -335,7 +630,8 @@ const updateAnnouncement = async (id, payload = {}) => {
     throw new Error("Không tìm thấy thông báo/cảnh báo");
   }
 
-  const data = buildAnnouncementPayload(payload, announcement);
+  const recipientResolution = await resolveAnnouncementRecipients(payload, announcement);
+  const data = buildAnnouncementPayload(payload, announcement, recipientResolution);
 
   announcement.type = data.type;
   announcement.title = data.title;
@@ -343,10 +639,15 @@ const updateAnnouncement = async (id, payload = {}) => {
   announcement.isVisible = data.isVisible;
   announcement.source = data.source;
   announcement.audience = data.audience;
+  announcement.targetConfig = data.targetConfig;
   announcement.deliveryChannels = data.deliveryChannels;
 
   await announcement.save();
-  return normalizeAnnouncementOutput(announcement);
+
+  const populated = await Announcement.findById(announcement._id)
+    .populate("targetConfig.fieldId", "name")
+    .lean();
+  return mapAnnouncementForAdmin(populated);
 };
 
 const deleteAnnouncement = async (id) => {
@@ -358,6 +659,27 @@ const deleteAnnouncement = async (id) => {
   await Announcement.deleteOne({ _id: id });
   await AnnouncementRead.deleteMany({ announcement: id });
   return { deletedId: id };
+};
+
+const deleteAnnouncements = async (ids = []) => {
+  const normalizedIds = Array.from(
+    new Set(
+      (Array.isArray(ids) ? ids : [])
+        .map((item) => String(item || "").trim())
+        .filter((item) => mongoose.Types.ObjectId.isValid(item)),
+    ),
+  );
+
+  if (normalizedIds.length === 0) {
+    throw new Error("Vui lòng chọn ít nhất 1 thông báo/cảnh báo để xóa");
+  }
+
+  await Announcement.deleteMany({ _id: { $in: normalizedIds } });
+  await AnnouncementRead.deleteMany({ announcement: { $in: normalizedIds } });
+
+  return {
+    deletedCount: normalizedIds.length,
+  };
 };
 
 const getUnreadAnnouncementSummary = async (currentUser) => {
@@ -411,7 +733,7 @@ const markVisibleAnnouncementsAsRead = async (currentUser) => {
           },
           upsert: true,
         },
-      }))
+      })),
     );
   }
 
@@ -424,10 +746,12 @@ const markVisibleAnnouncementsAsRead = async (currentUser) => {
 module.exports = {
   listVisibleAnnouncements,
   listAdminAnnouncements,
+  getAdminAnnouncementOptions,
   createAnnouncement,
   createSystemAnnouncement,
   updateAnnouncement,
   deleteAnnouncement,
+  deleteAnnouncements,
   getUnreadAnnouncementSummary,
   markVisibleAnnouncementsAsRead,
 };
