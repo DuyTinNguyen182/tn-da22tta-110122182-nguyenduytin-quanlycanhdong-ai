@@ -275,9 +275,13 @@ const AdminSeasonRecommendations = () => {
                   <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-4">
                     <div className="relative max-h-24 overflow-hidden">
                       <div className="ql-snow">
-                        <div 
-                          className="ql-editor prose max-w-none text-sm text-gray-700 p-0" 
-                          dangerouslySetInnerHTML={{ __html: draft.content || "<span class='text-gray-400'>Chưa có nội dung khuyến nghị...</span>" }} 
+                        <div
+                          className="ql-editor prose max-w-none text-sm text-gray-700 p-0"
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              draft.content ||
+                              "<span class='text-gray-400'>Chưa có nội dung khuyến nghị...</span>",
+                          }}
                         />
                       </div>
                       {draft.content && (
@@ -379,7 +383,14 @@ const AdminSeasonRecommendations = () => {
               style={{ maxHeight: "calc(96vh - 140px)", overflowY: "auto" }}
             >
               <div className="rounded-2xl border border-gray-200 bg-white">
-                <div style={{ minHeight: "400px", display: "flex", flexDirection: "column" }} className="[&_.ql-container]:flex-1 [&_.ql-editor]:min-h-[400px]">
+                <div
+                  style={{
+                    minHeight: "400px",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                  className="[&_.ql-container]:flex-1 [&_.ql-editor]:min-h-[400px]"
+                >
                   <SeasonRecommendationEditor
                     value={drafts[editingSeason.seasonId]?.content}
                     onChange={(value) =>
