@@ -18,7 +18,8 @@ const getRoleMeta = (role) => {
   };
 };
 
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString("vi-VN") : "--");
+const formatDate = (value) =>
+  value ? new Date(value).toLocaleDateString("vi-VN") : "--";
 
 const UserTable = ({
   users,
@@ -32,8 +33,8 @@ const UserTable = ({
   onDelete,
 }) => {
   return (
-    <div className="flex h-full flex-col">
-      <div className="overflow-auto">
+    <div className="flex flex-col">
+      <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="sticky top-0 bg-gray-50">
             <tr>
@@ -58,7 +59,9 @@ const UserTable = ({
           <tbody className="divide-y divide-gray-100">
             {users.map((user) => {
               const roleMeta = getRoleMeta(user.role);
-              const isCurrentUser = String(currentUser?._id || currentUser?.id || "") === String(user._id);
+              const isCurrentUser =
+                String(currentUser?._id || currentUser?.id || "") ===
+                String(user._id);
 
               return (
                 <tr key={user._id} className="hover:bg-gray-50/80">
@@ -68,8 +71,12 @@ const UserTable = ({
                         {(user.fullName || "U").charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="truncate font-semibold text-gray-900">{user.fullName}</p>
-                        <p className="mt-0.5 truncate text-xs text-gray-500">{user.email}</p>
+                        <p className="truncate font-semibold text-gray-900">
+                          {user.fullName}
+                        </p>
+                        <p className="mt-0.5 truncate text-xs text-gray-500">
+                          {user.email}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -89,7 +96,9 @@ const UserTable = ({
                     </span>
                   </td>
 
-                  <td className="px-5 py-3 align-top text-sm text-gray-600">{formatDate(user.createdAt)}</td>
+                  <td className="px-5 py-3 align-top text-sm text-gray-600">
+                    {formatDate(user.createdAt)}
+                  </td>
 
                   <td className="px-5 py-3 align-top">
                     <div className="flex items-center justify-center gap-1.5">
@@ -111,7 +120,11 @@ const UserTable = ({
                             ? "cursor-not-allowed text-gray-300"
                             : "text-red-600 hover:bg-red-50"
                         }`}
-                        title={isCurrentUser ? "Không thể xóa tài khoản đang đăng nhập" : "Xóa người dùng"}
+                        title={
+                          isCurrentUser
+                            ? "Không thể xóa tài khoản đang đăng nhập"
+                            : "Xóa người dùng"
+                        }
                       >
                         <Trash2 size={15} />
                       </button>
@@ -126,7 +139,8 @@ const UserTable = ({
 
       <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-sm text-gray-500">
-          Hiển thị {users.length} người dùng trong tổng số {totalUsers} người dùng theo bộ lọc hiện tại.
+          Hiển thị {users.length} người dùng trong tổng số {totalUsers} người
+          dùng theo bộ lọc hiện tại.
         </p>
 
         <PaginationControls

@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
-import { CalendarDays, Save, ShieldAlert, Sparkles } from "lucide-react";
+import {
+  CalendarDays,
+  Save,
+  ShieldAlert,
+  Sparkles,
+  Edit,
+  Eye,
+  X,
+} from "lucide-react";
 import Quill from "quill";
 import "quill/dist/quill.snow.css";
 import api from "../../../services/api";
@@ -16,13 +24,7 @@ const quillModules = {
   ],
 };
 
-const quillFormats = [
-  "header",
-  "bold",
-  "italic",
-  "underline",
-  "list",
-];
+const quillFormats = ["header", "bold", "italic", "underline", "list"];
 
 const isQuillEmpty = (value) => {
   const normalized = (value || "")
@@ -121,6 +123,8 @@ const AdminSeasonRecommendations = () => {
   const [initialDrafts, setInitialDrafts] = useState({});
   const [loading, setLoading] = useState(true);
   const [savingSeasonId, setSavingSeasonId] = useState("");
+  const [editingSeason, setEditingSeason] = useState(null);
+  const [viewingSeason, setViewingSeason] = useState(null);
 
   const fetchData = async () => {
     try {
@@ -237,22 +241,6 @@ const AdminSeasonRecommendations = () => {
                       </p>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => saveSeasonRecommendation(season)}
-                    disabled={!hasChanges || savingSeasonId === season.seasonId}
-                    className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white ${
-                      !hasChanges || savingSeasonId === season.seasonId
-                        ? "cursor-not-allowed bg-gray-300 opacity-60"
-                        : "bg-emerald-600 hover:bg-emerald-700"
-                    }`}
-                  >
-                    <Save size={15} />
-                    {savingSeasonId === season.seasonId
-                      ? "Đang lưu..."
-                      : "Lưu khuyến nghị"}
-                  </button>
                 </div>
 
                 <div className="mt-5 rounded-2xl bg-gray-50 p-4">
@@ -284,41 +272,181 @@ const AdminSeasonRecommendations = () => {
                     <Sparkles size={15} className="text-emerald-600" />
                     Nội dung khuyến nghị hiển thị cho nông dân
                   </div>
-                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
-                    <SeasonRecommendationEditor
-                      value={draft.content}
-                      onChange={(value) =>
-                        updateDraft(season.seasonId, "content", value)
-                      }
-                      placeholder="Nhập khuyến nghị tổng quát cho mùa vụ này..."
-                    />
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <label className="inline-flex cursor-pointer items-center gap-3">
-                      <CustomCheckbox
-                        checked={draft.isVisible}
-                        onChange={() =>
-                          updateDraft(
-                            season.seasonId,
-                            "isVisible",
-                            !draft.isVisible,
-                          )
-                        }
-                      />
-                      <span className="text-sm font-medium text-gray-700">
-                        Bật hiển thị khuyến nghị này cho nông dân
-                      </span>
-                    </label>
-
-                    <p className="text-xs text-gray-500">
-                      Nông dân chỉ nhìn thấy khuyến nghị khi mục này được bật.
-                    </p>
+                  <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white p-4">
+                    <div className="relative max-h-24 overflow-hidden">
+                      <div className="ql-snow">
+                        <div 
+                          className="ql-editor prose max-w-none text-sm text-gray-700 p-0" 
+                          dangerouslySetInnerHTML={{ __html: draft.content || "<span class='text-gray-400'>Chưa có nội dung khuyến nghị...</span>" }} 
+                        />
+                      </div>
+                      {draft.content && (
+                        <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+                      )}
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setViewingSeason(season)}
+                        className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100"
+                      >
+                        <Eye size={14} />
+                        Xem chi tiết
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSeason(season)}
+                        className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
+                      >
+                        <Edit size={14} />
+                        Chỉnh sửa
+                      </button>
+                    </div>
                   </div>
                 </div>
               </section>
             );
           })}
+        </div>
+      )}
+
+      {/* Draft Viewing Modal */}
+      {viewingSeason && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-3xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 p-5">
+              <div className="flex items-center gap-2">
+                <Eye size={18} className="text-blue-600" />
+                <h3 className="text-lg font-bold text-gray-900">
+                  Chi tiết khuyến nghị - {viewingSeason.seasonName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setViewingSeason(null)}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div
+              className="p-6"
+              style={{ maxHeight: "calc(90vh - 140px)", overflowY: "auto" }}
+            >
+              <div className="ql-snow">
+                <div
+                  className="ql-editor prose max-w-none text-gray-800 p-0"
+                  dangerouslySetInnerHTML={{
+                    __html:
+                      drafts[viewingSeason.seasonId]?.content ||
+                      "<span class='text-gray-400'>Chưa có nội dung khuyến nghị...</span>",
+                  }}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end border-t border-gray-100 p-5">
+              <button
+                type="button"
+                onClick={() => setViewingSeason(null)}
+                className="rounded-xl bg-gray-100 px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Editing Modal */}
+      {editingSeason && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex max-h-[96vh] w-full max-w-6xl flex-col rounded-3xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 p-5">
+              <div className="flex items-center gap-2">
+                <Sparkles size={18} className="text-emerald-600" />
+                <h3 className="text-lg font-bold text-gray-900">
+                  Chỉnh sửa khuyến nghị - {editingSeason.seasonName}
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingSeason(null)}
+                className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div
+              className="flex flex-col gap-4 p-6"
+              style={{ maxHeight: "calc(96vh - 140px)", overflowY: "auto" }}
+            >
+              <div className="rounded-2xl border border-gray-200 bg-white">
+                <div style={{ minHeight: "400px", display: "flex", flexDirection: "column" }} className="[&_.ql-container]:flex-1 [&_.ql-editor]:min-h-[400px]">
+                  <SeasonRecommendationEditor
+                    value={drafts[editingSeason.seasonId]?.content}
+                    onChange={(value) =>
+                      updateDraft(editingSeason.seasonId, "content", value)
+                    }
+                    placeholder="Nhập khuyến nghị tổng quát cho mùa vụ này..."
+                  />
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                <label className="inline-flex cursor-pointer items-center gap-3">
+                  <CustomCheckbox
+                    checked={drafts[editingSeason.seasonId]?.isVisible || false}
+                    onChange={() =>
+                      updateDraft(
+                        editingSeason.seasonId,
+                        "isVisible",
+                        !(drafts[editingSeason.seasonId]?.isVisible || false),
+                      )
+                    }
+                  />
+                  <span className="text-sm font-medium text-gray-700">
+                    Bật hiển thị khuyến nghị này cho nông dân
+                  </span>
+                </label>
+                <p className="text-xs text-gray-500">
+                  Nông dân chỉ nhìn thấy khuyến nghị khi mục này được bật.
+                </p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 border-t border-gray-100 p-5">
+              <button
+                type="button"
+                onClick={() => setEditingSeason(null)}
+                className="rounded-xl bg-gray-100 px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await saveSeasonRecommendation(editingSeason);
+                  setEditingSeason(null);
+                }}
+                disabled={
+                  savingSeasonId === editingSeason.seasonId ||
+                  !isDraftChanged(
+                    drafts[editingSeason.seasonId],
+                    initialDrafts[editingSeason.seasonId],
+                  )
+                }
+                className={`inline-flex items-center gap-2 rounded-xl px-5 py-2 text-sm font-semibold text-white ${
+                  !isDraftChanged(
+                    drafts[editingSeason.seasonId],
+                    initialDrafts[editingSeason.seasonId],
+                  ) || savingSeasonId === editingSeason.seasonId
+                    ? "cursor-not-allowed bg-gray-300 opacity-60"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+              >
+                <Save size={15} />
+                {savingSeasonId === editingSeason.seasonId
+                  ? "Đang lưu..."
+                  : "Lưu khuyến nghị"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Briefcase, Plus, X } from "lucide-react";
+import { Briefcase, Plus } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
-import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
-import TaskRow from "./components/TaskRow";
+import TaskTable from "./components/TaskTable";
+import TaskFormModal from "./components/TaskFormModal";
+
+const TASKS_PER_PAGE = 10;
 
 const TASK_CATEGORY_OPTIONS = [
   { value: "FERTILIZER", label: "Phân bón" },
@@ -98,6 +100,9 @@ const AdminTasks = () => {
   const [editingTaskStartDay, setEditingTaskStartDay] = useState(0);
   const [editingTaskEndDay, setEditingTaskEndDay] = useState(0);
 
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+
   useEffect(() => {
     fetchBootstrap();
   }, []);
@@ -126,6 +131,26 @@ const AdminTasks = () => {
       (item) => String(item.stage?._id || item.stage) === filterStageId,
     );
   }, [filterStageId, tasks]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredTasks.length / TASKS_PER_PAGE),
+  );
+
+  const paginatedTasks = useMemo(() => {
+    const startIndex = (currentPage - 1) * TASKS_PER_PAGE;
+    return filteredTasks.slice(startIndex, startIndex + TASKS_PER_PAGE);
+  }, [currentPage, filteredTasks]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStageId]);
 
   const stageOptions = useMemo(
     () => [
@@ -360,328 +385,75 @@ const AdminTasks = () => {
       </div>
 
       {/* MAIN DATA TABLE CONTAINER */}
-      <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4 bg-gray-50/50">
-          <h2 className="font-bold text-gray-800">Danh mục công việc</h2>
-          <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-            Số lượng: {filteredTasks.length}
-          </span>
-        </div>
-
-        {loading ? (
-          <LoadingScreen message="Đang tải dữ liệu công việc..." />
-        ) : filteredTasks.length === 0 ? (
-          <div className="flex h-44 items-center justify-center text-gray-500">
-            Chưa có công việc nào thuộc tiêu chí này
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-full table-auto">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
-                    Giai đoạn
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
-                    Tên công việc
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
-                    Thứ tự
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
-                    Danh mục
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
-                    Lặp lại
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
-                    Tiên quyết
-                  </th>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500 min-w-[210px]">
-                    Cấu hình Gợi ý nhắc việc
-                  </th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase text-gray-500">
-                    Thao tác
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredTasks.map((task) => (
-                  <TaskRow
-                    key={task._id}
-                    task={task}
-                    stageOptions={stageOptions}
-                    taskOptions={taskOptionsForPrerequisites}
-                    isEditing={editingTaskId === task._id}
-                    editingTaskStageId={editingTaskStageId}
-                    editingTaskName={editingTaskName}
-                    editingTaskOrder={editingTaskOrder}
-                    editingTaskCategory={editingTaskCategory}
-                    editingTaskIsRepeatable={editingTaskIsRepeatable}
-                    editingTaskPrerequisites={editingTaskPrerequisites}
-                    editingTaskRecType={editingTaskRecType}
-                    editingTaskStartDay={editingTaskStartDay}
-                    editingTaskEndDay={editingTaskEndDay}
-                    submitting={submitting}
-                    onStartEdit={startEdit}
-                    onUpdate={handleUpdate}
-                    onCancelEdit={cancelEdit}
-                    onDelete={handleDelete}
-                    onEditingTaskStageIdChange={setEditingTaskStageId}
-                    onEditingTaskNameChange={setEditingTaskName}
-                    onEditingTaskOrderChange={setEditingTaskOrder}
-                    onEditingTaskCategoryChange={setEditingTaskCategory}
-                    onEditingTaskIsRepeatableChange={setEditingTaskIsRepeatable}
-                    onEditingTaskPrerequisitesChange={
-                      setEditingTaskPrerequisites
-                    }
-                    onEditingTaskRecTypeChange={setEditingTaskRecType}
-                    onEditingTaskStartDayChange={setEditingTaskStartDay}
-                    onEditingTaskEndDayChange={setEditingTaskEndDay}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="rounded-2xl border border-gray-100 bg-white shadow-sm mt-5">
+        <TaskTable
+          tasks={paginatedTasks}
+          loading={loading}
+          stageOptions={stageOptions}
+          taskOptionsForPrerequisites={taskOptionsForPrerequisites}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalTasks={filteredTasks.length}
+          onPageChange={setCurrentPage}
+          onStartEdit={startEdit}
+          onDelete={handleDelete}
+        />
       </div>
 
-      {/* POPUP (MODAL) THÊM CÔNG VIỆC MỚI */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
-          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-gray-100 bg-white shadow-xl">
-            {/* Header Popup */}
-            <div className="flex items-center justify-between border-b border-gray-100 p-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-800">
-                  {modalMode === "edit"
-                    ? "Chỉnh sửa công việc"
-                    : "Tạo công việc tiêu chuẩn mới"}
-                </h2>
-                <p className="text-xs text-gray-500">
-                  {modalMode === "edit"
-                    ? "Cập nhật thông tin và cấu hình nhắc việc cho công việc đã chọn"
-                    : "Thiết lập công việc tiêu chuẩn và cấu hình trợ lý nhắc việc"}
-                </p>
-              </div>
-              <button
-                onClick={handleCloseModal}
-                className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Body Popup */}
-            <div className="flex-1 space-y-4 overflow-y-auto p-4">
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Thuộc giai đoạn vụ mùa
-                </label>
-                <CustomDropdown
-                  value={modalMode === "edit" ? editingTaskStageId : newStageId}
-                  onChange={
-                    modalMode === "edit" ? setEditingTaskStageId : setNewStageId
-                  }
-                  options={stageOptions}
-                  placeholder="Chọn giai đoạn sản xuất"
-                  icon={Briefcase}
-                  variant="active"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Tên hạng mục công việc
-                </label>
-                <input
-                  value={modalMode === "edit" ? editingTaskName : newTaskName}
-                  onChange={(e) =>
-                    modalMode === "edit"
-                      ? setEditingTaskName(e.target.value)
-                      : setNewTaskName(e.target.value)
-                  }
-                  placeholder="Ví dụ: Bón phân đợt 1, Xịt trừ rầy nâu..."
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Danh mục vật tư/loại đầu vào
-                </label>
-                <CustomDropdown
-                  value={
-                    modalMode === "edit" ? editingTaskCategory : newTaskCategory
-                  }
-                  onChange={
-                    modalMode === "edit"
-                      ? setEditingTaskCategory
-                      : setNewTaskCategory
-                  }
-                  options={categoryOptions}
-                  placeholder="Chọn nhóm danh mục"
-                  variant="active"
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-gray-700">
-                    Thứ tự hiển thị quy trình
-                  </label>
-                  <input
-                    type="number"
-                    value={
-                      modalMode === "edit" ? editingTaskOrder : newTaskOrder
-                    }
-                    onChange={(e) =>
-                      modalMode === "edit"
-                        ? setEditingTaskOrder(Number(e.target.value))
-                        : setNewTaskOrder(Number(e.target.value))
-                    }
-                    min="0"
-                    className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-semibold text-gray-700">
-                    Lặp lại công việc
-                  </label>
-                  <label className="flex h-[46px] cursor-pointer items-center gap-2 rounded-xl border border-gray-200 px-4 hover:bg-gray-50">
-                    <input
-                      type="checkbox"
-                      checked={
-                        modalMode === "edit"
-                          ? editingTaskIsRepeatable
-                          : newTaskIsRepeatable
-                      }
-                      onChange={(e) =>
-                        modalMode === "edit"
-                          ? setEditingTaskIsRepeatable(e.target.checked)
-                          : setNewTaskIsRepeatable(e.target.checked)
-                      }
-                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span className="text-sm text-gray-700">
-                      Cho phép lặp lại nhiều lần
-                    </span>
-                  </label>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-semibold text-gray-700">
-                  Công việc điều kiện tiên quyết
-                </label>
-                <CustomDropdown
-                  value={
-                    modalMode === "edit"
-                      ? editingTaskPrerequisites
-                      : newTaskPrerequisites
-                  }
-                  onChange={
-                    modalMode === "edit"
-                      ? setEditingTaskPrerequisites
-                      : setNewTaskPrerequisites
-                  }
-                  options={taskOptionsForPrerequisites}
-                  placeholder="Chọn các công việc bắt buộc làm trước"
-                  multi
-                  variant="active"
-                />
-              </div>
-
-              {/* KHU VỰC CẤU HÌNH TRỢ LÝ NHẮC VIỆC SIÊU TIN GỌN */}
-              <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-3">
-                <h3 className="text-sm font-bold text-blue-800">
-                  Thiết lập tự động nhắc việc
-                </h3>
-
-                <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-600">
-                    Loại mốc thời gian áp dụng
-                  </label>
-                  <CustomDropdown
-                    value={
-                      modalMode === "edit" ? editingTaskRecType : newTaskRecType
-                    }
-                    onChange={
-                      modalMode === "edit"
-                        ? setEditingTaskRecType
-                        : setNewTaskRecType
-                    }
-                    options={REC_TYPE_OPTIONS}
-                    placeholder="Chọn loại mốc"
-                    variant="active"
-                  />
-                </div>
-
-                {/* Chỉ hiển thị khung nhập ngày khi Admin chọn Chăm sóc sau sạ */}
-                {(modalMode === "edit"
-                  ? editingTaskRecType
-                  : newTaskRecType) === "AFTER" && (
-                  <div className="flex items-center gap-2 bg-white rounded-xl border border-gray-200 p-3 animate-slideDown">
-                    <span className="text-sm text-gray-600">
-                      Khung thời gian vàng: Từ ngày
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={
-                        modalMode === "edit"
-                          ? editingTaskStartDay
-                          : newTaskStartDay
-                      }
-                      onChange={(e) =>
-                        modalMode === "edit"
-                          ? setEditingTaskStartDay(Number(e.target.value))
-                          : setNewTaskStartDay(Number(e.target.value))
-                      }
-                      className="w-16 rounded-lg border border-gray-200 p-1.5 text-sm text-center font-semibold outline-none focus:border-blue-500"
-                    />
-                    <span className="text-sm text-gray-600">đến ngày</span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={
-                        modalMode === "edit" ? editingTaskEndDay : newTaskEndDay
-                      }
-                      onChange={(e) =>
-                        modalMode === "edit"
-                          ? setEditingTaskEndDay(Number(e.target.value))
-                          : setNewTaskEndDay(Number(e.target.value))
-                      }
-                      className="w-16 rounded-lg border border-gray-200 p-1.5 text-sm text-center font-semibold outline-none focus:border-blue-500"
-                    />
-                    <span className="text-sm text-gray-600">sau sạ</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer Popup */}
-            <div className="flex items-center justify-end gap-3 border-t border-gray-100 p-4 bg-gray-50 rounded-b-2xl">
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={handleCloseModal}
-                className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={handleSubmitTask}
-                className="rounded-xl bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {modalMode === "edit" ? "Lưu thay đổi" : "Xác nhận tạo"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* POPUP (MODAL) THÊM/SỬA CÔNG VIỆC */}
+      <TaskFormModal
+        open={isModalOpen}
+        modalMode={modalMode}
+        submitting={submitting}
+        stageOptions={stageOptions}
+        categoryOptions={categoryOptions}
+        taskOptionsForPrerequisites={taskOptionsForPrerequisites}
+        recTypeOptions={REC_TYPE_OPTIONS}
+        // Props for data (edit/create form)
+        stageId={modalMode === "edit" ? editingTaskStageId : newStageId}
+        setStageId={
+          modalMode === "edit" ? setEditingTaskStageId : setNewStageId
+        }
+        name={modalMode === "edit" ? editingTaskName : newTaskName}
+        setName={modalMode === "edit" ? setEditingTaskName : setNewTaskName}
+        order={modalMode === "edit" ? editingTaskOrder : newTaskOrder}
+        setOrder={modalMode === "edit" ? setEditingTaskOrder : setNewTaskOrder}
+        category={modalMode === "edit" ? editingTaskCategory : newTaskCategory}
+        setCategory={
+          modalMode === "edit" ? setEditingTaskCategory : setNewTaskCategory
+        }
+        isRepeatable={
+          modalMode === "edit" ? editingTaskIsRepeatable : newTaskIsRepeatable
+        }
+        setIsRepeatable={
+          modalMode === "edit"
+            ? setEditingTaskIsRepeatable
+            : setNewTaskIsRepeatable
+        }
+        prerequisites={
+          modalMode === "edit" ? editingTaskPrerequisites : newTaskPrerequisites
+        }
+        setPrerequisites={
+          modalMode === "edit"
+            ? setEditingTaskPrerequisites
+            : setNewTaskPrerequisites
+        }
+        recType={modalMode === "edit" ? editingTaskRecType : newTaskRecType}
+        setRecType={
+          modalMode === "edit" ? setEditingTaskRecType : setNewTaskRecType
+        }
+        startDay={modalMode === "edit" ? editingTaskStartDay : newTaskStartDay}
+        setStartDay={
+          modalMode === "edit" ? setEditingTaskStartDay : setNewTaskStartDay
+        }
+        endDay={modalMode === "edit" ? editingTaskEndDay : newTaskEndDay}
+        setEndDay={
+          modalMode === "edit" ? setEditingTaskEndDay : setNewTaskEndDay
+        }
+        // Handlers
+        onClose={handleCloseModal}
+        onSubmit={handleSubmitTask}
+      />
     </div>
   );
 };

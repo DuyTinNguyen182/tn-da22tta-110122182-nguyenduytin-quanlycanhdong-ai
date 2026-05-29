@@ -1,9 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  Plus,
-  Search,
-  ShieldCheck,
-} from "lucide-react";
+import { Plus, Search, ShieldCheck } from "lucide-react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import { useFeedback } from "../../../hooks/useFeedback";
@@ -54,7 +50,9 @@ const AdminUsers = () => {
       const res = await api.get("/users");
       setUsers(res.data.users || []);
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể tải danh sách người dùng.");
+      toast.error(
+        err.response?.data?.message || "Không thể tải danh sách người dùng.",
+      );
     } finally {
       setLoading(false);
     }
@@ -87,10 +85,13 @@ const AdminUsers = () => {
       adminCount: users.filter((item) => item.role === "admin").length,
       farmerCount: users.filter((item) => item.role !== "admin").length,
     }),
-    [users]
+    [users],
   );
 
-  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredUsers.length / USERS_PER_PAGE),
+  );
 
   const paginatedUsers = useMemo(() => {
     const startIndex = (currentPage - 1) * USERS_PER_PAGE;
@@ -137,7 +138,11 @@ const AdminUsers = () => {
   const handleCreateUser = async (event) => {
     event.preventDefault();
 
-    if (!formData.fullName.trim() || !formData.email.trim() || !formData.password.trim()) {
+    if (
+      !formData.fullName.trim() ||
+      !formData.email.trim() ||
+      !formData.password.trim()
+    ) {
       toast.warning("Vui lòng nhập đầy đủ họ tên, email và mật khẩu.");
       return;
     }
@@ -188,7 +193,9 @@ const AdminUsers = () => {
       closeUserModal();
       await fetchUsers();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể cập nhật người dùng.");
+      toast.error(
+        err.response?.data?.message || "Không thể cập nhật người dùng.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -219,7 +226,7 @@ const AdminUsers = () => {
   };
 
   return (
-    <div className="flex h-full flex-col bg-gray-50 p-6">
+    <div className="flex flex-col bg-gray-50 p-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Quản lý người dùng</h1>
         <button
@@ -235,15 +242,21 @@ const AdminUsers = () => {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="text-sm text-gray-500">Tổng người dùng</p>
-          <p className="mt-2 text-2xl font-bold text-gray-900">{summary.total}</p>
+          <p className="mt-2 text-2xl font-bold text-gray-900">
+            {summary.total}
+          </p>
         </div>
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="text-sm text-gray-500">Quản trị viên</p>
-          <p className="mt-2 text-2xl font-bold text-red-600">{summary.adminCount}</p>
+          <p className="mt-2 text-2xl font-bold text-red-600">
+            {summary.adminCount}
+          </p>
         </div>
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="text-sm text-gray-500">Nông dân</p>
-          <p className="mt-2 text-2xl font-bold text-blue-600">{summary.farmerCount}</p>
+          <p className="mt-2 text-2xl font-bold text-blue-600">
+            {summary.farmerCount}
+          </p>
         </div>
       </div>
 
@@ -280,7 +293,7 @@ const AdminUsers = () => {
         </div>
       </div>
 
-      <div className="mt-5 flex-1 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+      <div className="mt-5 rounded-2xl border border-gray-100 bg-white shadow-sm">
         {loading ? (
           <LoadingScreen message="Đang tải danh sách người dùng..." />
         ) : filteredUsers.length === 0 ? (
@@ -309,7 +322,9 @@ const AdminUsers = () => {
         submitting={submitting}
         roleOptions={roleOptions}
         onChange={handleFormChange}
-        onRoleChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
+        onRoleChange={(value) =>
+          setFormData((prev) => ({ ...prev, role: value }))
+        }
         onClose={closeUserModal}
         onSubmit={editingUser ? handleUpdateUser : handleCreateUser}
       />
