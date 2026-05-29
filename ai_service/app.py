@@ -6,8 +6,9 @@ from pathlib import Path
 import numpy as np
 import tensorflow as tf
 from flask import Flask, jsonify, request
-from flask_cors import CORS
+# from flask_cors import CORS
 from PIL import Image, UnidentifiedImageError
+from PIL import ImageOps
 
 APP_DIR = Path(__file__).resolve().parent
 DEFAULT_H5_MODEL_PATH = APP_DIR / "rice_disease_model.h5"
@@ -160,6 +161,7 @@ def prepare_image(image, target_size, input_range):
         image = image.convert("RGB")
 
     image = image.resize(target_size, RESAMPLE_BILINEAR)
+    # image = ImageOps.pad(image, target_size, method=RESAMPLE_BILINEAR, color=(0, 0, 0))
     image = tf.keras.preprocessing.image.img_to_array(image).astype("float32")
     if input_range == "0_1":
         image = image / 255.0
@@ -231,7 +233,7 @@ def _build_rejected_response(result):
 
 
 app = Flask(__name__)
-CORS(app)
+# CORS(app)
 try:
     app.json.ensure_ascii = False
 except AttributeError:
@@ -316,9 +318,9 @@ def predict():
     return jsonify(result)
 
 
-# if __name__ == "__main__":
-#     app.run(port=5000, debug=True)
-
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(port=5000, debug=True)
+
+# if __name__ == "__main__":
+#     port = int(os.environ.get("PORT", 5000))
+#     app.run(host="0.0.0.0", port=port)

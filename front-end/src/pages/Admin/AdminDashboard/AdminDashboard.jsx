@@ -12,6 +12,8 @@ import {
   Wallet,
   Activity,
   ShieldAlert,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import {
   Bar,
@@ -25,6 +27,8 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  LineChart,
+  Line,
 } from "recharts";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
@@ -39,12 +43,17 @@ const EMPTY_DASHBOARD = {
     totalArea: 0,
     totalCost: 0,
     totalActivePlots: 0,
+    trends: {
+      areaTrend: null,
+      costTrend: null,
+    },
   },
   charts: {
     costByCategory: [],
     costByStage: [],
-    cropProgress: [], // Thêm
-    topDiseases: [],
+    cropProgress: [],
+    cumulativeCosts: [],
+    topFarmers: [],
   },
   liveFeeds: {
     recentFarmingLogs: [],
@@ -92,11 +101,11 @@ const buildSeasonOptionLabel = (item) => {
   return year ? `${seasonName} ${year}` : seasonName;
 };
 
-const KpiCard = ({ title, value, icon, accentClass, iconClass }) => {
+const KpiCard = ({ title, value, icon, accentClass, iconClass, trend }) => {
   const IconComponent = icon;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm">
+    <div className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm flex flex-col justify-between h-full">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-xs font-medium text-gray-500">{title}</p>
@@ -106,6 +115,33 @@ const KpiCard = ({ title, value, icon, accentClass, iconClass }) => {
           <IconComponent className={`h-4 w-4 ${iconClass}`} />
         </div>
       </div>
+
+      {trend && (
+        <div className="mt-2 flex items-center gap-1 text-[11px]">
+          {trend.isIncrease ? (
+            <span
+              className={`flex items-center px-1.5 py-0.5 rounded font-medium ${
+                trend.isPositive
+                  ? "text-emerald-600 bg-emerald-50"
+                  : "text-red-600 bg-red-50"
+              }`}
+            >
+              <TrendingUp className="w-3 h-3 mr-0.5" /> +{trend.value}%
+            </span>
+          ) : (
+            <span
+              className={`flex items-center px-1.5 py-0.5 rounded font-medium ${
+                trend.isPositive
+                  ? "text-emerald-600 bg-emerald-50"
+                  : "text-red-600 bg-red-50"
+              }`}
+            >
+              <TrendingDown className="w-3 h-3 mr-0.5" /> -{trend.value}%
+            </span>
+          )}
+          <span className="text-gray-400">so với vụ trước</span>
+        </div>
+      )}
     </div>
   );
 };
@@ -149,13 +185,11 @@ const AdminDashboard = () => {
         const res = await api.get("/season-details/admin/all");
         setSeasonDetails(res.data || []);
       } catch (error) {
-        console.error("Lỗi tải danh sách mùa vụ:", error);
         toast.error(
           error.response?.data?.message || "Không thể tải danh sách mùa vụ",
         );
       }
     };
-
     fetchSeasonDetails();
   }, [toast]);
 
@@ -167,11 +201,8 @@ const AdminDashboard = () => {
 
     const fetchDashboard = async () => {
       try {
-        if (isFirstDashboardLoad.current) {
-          setLoading(true);
-        } else {
-          setRefreshing(true);
-        }
+        if (isFirstDashboardLoad.current) setLoading(true);
+        else setRefreshing(true);
 
         const res = await api.get("/admin/dashboard", {
           params: selectedSeasonId ? { seasonId: selectedSeasonId } : {},
@@ -185,7 +216,6 @@ const AdminDashboard = () => {
           setSelectedSeasonId(nextDashboard.seasonDetailId);
         }
       } catch (error) {
-        console.error("Lỗi tải dashboard admin:", error);
         toast.error(error.response?.data?.message || "Không thể tải dashboard");
       } finally {
         setLoading(false);
@@ -205,7 +235,6 @@ const AdminDashboard = () => {
       });
       setDashboard(res.data || EMPTY_DASHBOARD);
     } catch (error) {
-      console.error("Lỗi làm mới dashboard admin:", error);
       toast.error(error.response?.data?.message || "Không thể làm mới dữ liệu");
     } finally {
       setRefreshing(false);
@@ -243,10 +272,11 @@ const AdminDashboard = () => {
           />
           <KpiCard
             title="Tổng diện tích canh tác"
-            value={`${formatNumber(kpis.totalArea)} m2`}
+            value={`${formatNumber(kpis.totalArea)} m²`}
             icon={Map}
             accentClass="bg-sky-50"
             iconClass="text-sky-700"
+            trend={kpis.trends?.areaTrend}
           />
           <KpiCard
             title="Tổng vốn đầu tư"
@@ -254,6 +284,7 @@ const AdminDashboard = () => {
             icon={Wallet}
             accentClass="bg-amber-50"
             iconClass="text-amber-700"
+            trend={kpis.trends?.costTrend}
           />
 
           <div className="rounded-lg border border-gray-200 bg-white p-2.5 shadow-sm">
@@ -266,12 +297,12 @@ const AdminDashboard = () => {
                   <CustomDropdown
                     value={selectedSeasonId}
                     onChange={setSelectedSeasonId}
-                    placeholder="Mùa vụ đang hoạt động"
+                    placeholder="Mùa vụ hiện tại"
                     variant="filter"
                     size="small"
                     icon={Sprout}
                     options={[
-                      { value: "", label: "Mùa vụ đang hoạt động" },
+                      { value: "", label: "Mùa vụ hiện tại" },
                       ...seasonDetails.map((item) => ({
                         value: item._id,
                         label: buildSeasonOptionLabel(item),
@@ -386,134 +417,197 @@ const AdminDashboard = () => {
                         fontSize: "10px",
                       }}
                     />
+                    <Legend
+                      layout="vertical"
+                      verticalAlign="middle"
+                      align="right"
+                      wrapperStyle={{ fontSize: "10px" }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             )}
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
+
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-5">
+          {/* Biến động chi phí lũy kế theo thời gian (Line Chart) */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm xl:col-span-3">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="rounded-lg bg-blue-50 p-2">
+                <Activity className="h-4 w-4 text-blue-700" />
+              </div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                Chi phí đầu tư lũy kế theo thời gian
+              </h2>
+            </div>
+
+            {!charts.cumulativeCosts || charts.cumulativeCosts.length === 0 ? (
+              <EmptyBlock text="Chưa ghi nhận dữ liệu biến động chi phí phát sinh." />
+            ) : (
+              <div className="h-[200px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={charts.cumulativeCosts}
+                    margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f3f4f6"
+                    />
+                    <XAxis
+                      dataKey="_id"
+                      tick={{ fill: "#6b7280", fontSize: 10 }}
+                    />
+                    <YAxis
+                      tick={{ fill: "#6b7280", fontSize: 10 }}
+                      tickFormatter={formatNumber}
+                    />
+                    <Tooltip
+                      formatter={(value) => [
+                        formatCurrency(value),
+                        "Chi phí lũy kế",
+                      ]}
+                      contentStyle={{
+                        borderRadius: "8px",
+                        border: "1px solid #e5e7eb",
+                        fontSize: "10px",
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="cumulativeCost"
+                      stroke="#3b82f6"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Top 5 Nông dân chi phí/1000m2 cao nhất */}
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm xl:col-span-2">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="rounded-lg bg-orange-50 p-2">
+                <Layers className="h-4 w-4 text-orange-700" />
+              </div>
+              <h2 className="text-sm font-semibold text-gray-900">
+                Top nông dân có chi phí/1000m² cao nhất
+              </h2>
+            </div>
+
+            {!charts.topFarmers || charts.topFarmers.length === 0 ? (
+              <EmptyBlock text="Chưa có dữ liệu đầu tư của nông dân nào." />
+            ) : (
+              <div className="flex flex-col gap-2 overflow-y-auto max-h-[200px] pr-1">
+                {charts.topFarmers.map((farmer, idx) => {
+                  const maxCost = charts.topFarmers[0]?.costPer1000m2 || 1;
+                  const widthPercent = (farmer.costPer1000m2 / maxCost) * 100;
+
+                  return (
+                    <div
+                      key={idx}
+                      className="relative flex items-center justify-between p-2 rounded bg-gray-50 border border-gray-100 z-10 overflow-hidden"
+                    >
+                      <div
+                        className="absolute top-0 left-0 h-full bg-orange-100/40 -z-10 transition-all duration-500"
+                        style={{ width: `${widthPercent}%` }}
+                      ></div>
+
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-gray-800">
+                          {farmer.farmerName}
+                        </span>
+                        <span className="text-[10px] text-gray-500">
+                          Thửa: {farmer.plotName}
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold text-gray-900 text-right flex flex-col">
+                        {formatCurrency(farmer.costPer1000m2)}
+                        <span className="text-[9px] font-normal text-gray-500">
+                          / 1000m²
+                        </span>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-3">
+          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm overflow-hidden flex flex-col">
             <div className="mb-2 flex items-center gap-2">
               <div className="rounded-lg bg-sky-50 p-1.5">
                 <Activity className="h-4 w-4 text-sky-600" />
               </div>
               <h2 className="text-xs font-semibold text-gray-900">
-                Tiến độ canh tác
+                Tiến độ canh tác diện tích
               </h2>
             </div>
 
             {charts.cropProgress.length === 0 ? (
               <EmptyBlock text="Chưa có dữ liệu tiến độ." />
             ) : (
-              <div className="h-[180px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={charts.cropProgress}
-                    layout="vertical"
-                    margin={{ top: 2, right: 10, left: 15, bottom: 2 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      horizontal={false}
-                      stroke="#e5e7eb"
-                    />
-                    <XAxis
-                      type="number"
-                      tick={{ fill: "#6b7280", fontSize: 9 }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="stageName"
-                      tick={{ fill: "#374151", fontSize: 9 }}
-                      width={70}
-                    />
-                    <Tooltip
-                      formatter={(value) => [
-                        `${formatNumber(value)} m²`,
-                        "Diện tích",
-                      ]}
-                      contentStyle={{
-                        borderRadius: "12px",
-                        border: "1px solid #e5e7eb",
-                        fontSize: "11px",
-                      }}
-                    />
-                    <Bar
-                      dataKey="totalArea"
-                      name="Diện tích"
-                      radius={[0, 8, 8, 0]}
-                      fill="#0ea5e9"
-                      barSize={16}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="w-full flex-1 min-h-[150px] overflow-hidden">
+                {/* Tính toán chiều cao linh hoạt tránh bị rỗng khoảng không */}
+                <div
+                  style={{
+                    height: Math.max(100, charts.cropProgress.length * 40 + 40),
+                    minHeight: "100%",
+                  }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={charts.cropProgress}
+                      layout="vertical"
+                      margin={{ top: 5, right: 15, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        horizontal={false}
+                        stroke="#e5e7eb"
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{ fill: "#6b7280", fontSize: 9 }}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="stageName"
+                        tick={{ fill: "#374151", fontSize: 9 }}
+                        width={70}
+                      />
+                      <Tooltip
+                        formatter={(value) => [
+                          `${formatNumber(value)} m²`,
+                          "Diện tích",
+                        ]}
+                        contentStyle={{
+                          borderRadius: "12px",
+                          border: "1px solid #e5e7eb",
+                          fontSize: "11px",
+                        }}
+                      />
+                      <Bar
+                        dataKey="totalArea"
+                        name="Diện tích"
+                        radius={[0, 4, 4, 0]}
+                        fill="#0ea5e9"
+                        barSize={16}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="rounded-lg bg-red-50 p-1.5">
-                <ShieldAlert className="h-4 w-4 text-red-600" />
-              </div>
-              <h2 className="text-xs font-semibold text-gray-900">
-                Top 5 dịch bệnh
-              </h2>
-            </div>
-
-            {charts.topDiseases.length === 0 ? (
-              <EmptyBlock text="Chưa ghi nhận dịch bệnh nào." />
-            ) : (
-              <div className="h-[180px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={charts.topDiseases}
-                    margin={{ top: 2, right: 4, left: 0, bottom: 2 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="#e5e7eb"
-                    />
-                    <XAxis
-                      dataKey="diseaseName"
-                      tick={{ fill: "#6b7280", fontSize: 9 }}
-                    />
-                    <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} />
-                    <Tooltip
-                      formatter={(value, name) => [
-                        value,
-                        name === "unprocessedCount" ? "Chưa xử lý" : "Đã xử lý",
-                      ]}
-                      contentStyle={{
-                        borderRadius: "12px",
-                        border: "1px solid #e5e7eb",
-                        fontSize: "11px",
-                      }}
-                    />
-                    <Bar
-                      dataKey="unprocessedCount"
-                      stackId="a"
-                      fill="#ef4444"
-                      radius={[0, 0, 0, 0]}
-                      barSize={30}
-                    />
-                    <Bar
-                      dataKey="processedCount"
-                      stackId="a"
-                      fill="#10b981"
-                      radius={[8, 8, 0, 0]}
-                      barSize={30}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
           <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
             <div className="mb-2 flex items-center gap-2">
               <div className="rounded-lg bg-emerald-50 p-1.5">

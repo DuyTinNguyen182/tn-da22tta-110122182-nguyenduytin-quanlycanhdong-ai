@@ -27,11 +27,8 @@ const resolveSeasonDetail = async (querySeasonDetailId) => {
     .sort({ startDate: -1, createdAt: -1 })
     .lean();
 
-  if (!activeSeasonDetail) {
-    throw new Error("Không tìm thấy mùa vụ đang hoạt động");
-  }
-
-  return activeSeasonDetail;
+  // Không có thì null
+  return activeSeasonDetail || null;
 };
 
 const buildSeasonLabel = (seasonDetail) => {
@@ -39,8 +36,49 @@ const buildSeasonLabel = (seasonDetail) => {
   return seasonDetail?.year ? `${seasonName} ${seasonDetail.year}` : seasonName;
 };
 
+const getPreviousSeasonDetail = async (currentSeasonDetail) => {
+  if (!currentSeasonDetail) return null;
+  return await SeasonDetail.findOne({
+    startDate: { $lt: currentSeasonDetail.startDate },
+  })
+    .sort({ startDate: -1 })
+    .lean();
+};
+
 const getDashboardData = async (querySeasonDetailId = "") => {
   const seasonDetail = await resolveSeasonDetail(querySeasonDetailId);
+
+  // ĐÃ SỬA: Xử lý an toàn khi không có mùa vụ hoạt động
+  if (!seasonDetail) {
+    const totalFarmers = await User.countDocuments({ role: "farmer" });
+    return {
+      seasonDetailId: "",
+      currentSeasonName: "Chưa có mùa vụ hoạt động",
+      kpis: {
+        totalFarmers,
+        totalArea: 0,
+        totalCost: 0,
+        totalActivePlots: 0,
+        trends: {
+          areaTrend: null,
+          costTrend: null,
+        },
+      },
+      charts: {
+        costByCategory: [],
+        costByStage: [],
+        cropProgress: [],
+        cumulativeCosts: [],
+        topFarmers: [],
+      },
+      liveFeeds: {
+        recentFarmingLogs: [],
+        recentDiseaseLogs: [],
+      },
+    };
+  }
+
+  const prevSeasonDetail = await getPreviousSeasonDetail(seasonDetail);
 
   const assignments = await SeasonPlotAssignment.find({
     seasonDetail: seasonDetail._id,
@@ -60,6 +98,23 @@ const getDashboardData = async (querySeasonDetailId = "") => {
 
   const plotIds = Array.from(plotIdMap.values());
 
+  let prevAssignmentIds = [];
+  let prevPlotIds = [];
+  if (prevSeasonDetail) {
+    const prevAssignments = await SeasonPlotAssignment.find({
+      seasonDetail: prevSeasonDetail._id,
+      status: "active",
+    })
+      .select("_id plot")
+      .lean();
+    prevAssignmentIds = prevAssignments.map((item) => item._id);
+    const prevPlotIdMap = new Map();
+    prevAssignments.forEach((item) => {
+      if (item.plot) prevPlotIdMap.set(String(item.plot), item.plot);
+    });
+    prevPlotIds = Array.from(prevPlotIdMap.values());
+  }
+
   const [
     totalFarmers,
     totalAreaResult,
@@ -70,32 +125,27 @@ const getDashboardData = async (querySeasonDetailId = "") => {
     recentFarmingLogs,
     recentDiseaseLogs,
     cropProgress,
-    topDiseases,
+    rawDailyCosts,
+    topFarmers,
+    prevAreaResult,
+    prevCostResult,
   ] = await Promise.all([
     User.countDocuments({ role: "farmer" }),
     plotIds.length
       ? Plot.aggregate([
           { $match: { _id: { $in: plotIds } } },
-          {
-            $group: {
-              _id: null,
-              totalArea: { $sum: "$area" },
-            },
-          },
+          { $group: { _id: null, totalArea: { $sum: "$area" } } },
         ])
       : Promise.resolve([]),
     assignmentIds.length
       ? FarmingLog.aggregate([
           { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
-          {
-            $group: {
-              _id: null,
-              totalCost: { $sum: "$cost" },
-            },
-          },
+          { $group: { _id: null, totalCost: { $sum: "$cost" } } },
         ])
       : Promise.resolve([]),
     assignmentIds.length,
+
+    // Cost by Category
     assignmentIds.length
       ? FarmingLog.aggregate([
           { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
@@ -107,17 +157,10 @@ const getDashboardData = async (querySeasonDetailId = "") => {
               as: "task",
             },
           },
-          {
-            $unwind: {
-              path: "$task",
-              preserveNullAndEmptyArrays: true,
-            },
-          },
+          { $unwind: { path: "$task", preserveNullAndEmptyArrays: true } },
           {
             $group: {
-              _id: {
-                category: { $ifNull: ["$task.category", "OTHER"] },
-              },
+              _id: { category: { $ifNull: ["$task.category", "OTHER"] } },
               totalCost: { $sum: { $ifNull: ["$cost", 0] } },
             },
           },
@@ -158,6 +201,8 @@ const getDashboardData = async (querySeasonDetailId = "") => {
           { $sort: { totalCost: -1, categoryName: 1 } },
         ])
       : Promise.resolve([]),
+
+    // Cost by Stage
     assignmentIds.length
       ? FarmingLog.aggregate([
           { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
@@ -169,12 +214,7 @@ const getDashboardData = async (querySeasonDetailId = "") => {
               as: "task",
             },
           },
-          {
-            $unwind: {
-              path: "$task",
-              preserveNullAndEmptyArrays: true,
-            },
-          },
+          { $unwind: { path: "$task", preserveNullAndEmptyArrays: true } },
           {
             $lookup: {
               from: "stages",
@@ -183,12 +223,7 @@ const getDashboardData = async (querySeasonDetailId = "") => {
               as: "stage",
             },
           },
-          {
-            $unwind: {
-              path: "$stage",
-              preserveNullAndEmptyArrays: true,
-            },
-          },
+          { $unwind: { path: "$stage", preserveNullAndEmptyArrays: true } },
           {
             $group: {
               _id: {
@@ -211,16 +246,18 @@ const getDashboardData = async (querySeasonDetailId = "") => {
           { $sort: { stageOrder: 1, stageName: 1 } },
         ])
       : Promise.resolve([]),
+
+    // Recent Farming Logs
     assignmentIds.length
-      ? FarmingLog.find({
-          seasonPlotAssignments: { $in: assignmentIds },
-        })
+      ? FarmingLog.find({ seasonPlotAssignments: { $in: assignmentIds } })
           .populate("task", "name")
           .populate("user", "fullName")
           .sort({ createdAt: -1 })
           .limit(5)
           .lean()
       : Promise.resolve([]),
+
+    // Recent Disease Logs
     assignmentIds.length
       ? DiseaseLog.find({
           status: "unprocessed",
@@ -232,7 +269,7 @@ const getDashboardData = async (querySeasonDetailId = "") => {
           .lean()
       : Promise.resolve([]),
 
-    // [THÊM MỚI 1] Biểu đồ 1: Tiến độ mùa vụ theo diện tích (Crop Progress by Stage)
+    // Crop Progress
     assignmentIds.length
       ? SeasonPlotAssignment.aggregate([
           { $match: { _id: { $in: assignmentIds } } },
@@ -246,7 +283,6 @@ const getDashboardData = async (querySeasonDetailId = "") => {
           },
           { $unwind: "$plotData" },
           {
-            // Tìm farming log mới nhất của thửa ruộng này để biết đang ở giai đoạn nào
             $lookup: {
               from: "farming_logs",
               let: { assignmentId: "$_id" },
@@ -287,12 +323,11 @@ const getDashboardData = async (querySeasonDetailId = "") => {
           },
           { $unwind: { path: "$stageData", preserveNullAndEmptyArrays: true } },
           {
-            // Nhóm theo Giai đoạn (Stage) và tính tổng diện tích
             $group: {
               _id: {
                 stageId: "$stageData._id",
                 stageName: {
-                  $ifNull: ["$stageData.name", "Chưa bắt đầu / Khác"],
+                  $ifNull: ["$stageData.name", "Chưa bắt đầu"],
                 },
                 stageOrder: { $ifNull: ["$stageData.order", 0] },
               },
@@ -300,61 +335,156 @@ const getDashboardData = async (querySeasonDetailId = "") => {
             },
           },
           { $sort: { "_id.stageOrder": 1 } },
-          {
-            $project: {
-              _id: 0,
-              stageName: "$_id.stageName",
-              totalArea: 1,
-            },
-          },
+          { $project: { _id: 0, stageName: "$_id.stageName", totalArea: 1 } },
         ])
       : Promise.resolve([]),
 
-    // [THÊM MỚI 2] Biểu đồ 2: Top rủi ro dịch bệnh
+    // Biến động chi phí phát sinh (Lấy theo ngày định dạng YYYY-MM-DD để dễ sort)
     assignmentIds.length
-      ? DiseaseLog.aggregate([
+      ? FarmingLog.aggregate([
           { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
           {
             $group: {
-              _id: "$diseaseName",
-              totalCount: { $sum: 1 },
-              unprocessedCount: {
-                $sum: { $cond: [{ $eq: ["$status", "unprocessed"] }, 1, 0] },
+              _id: {
+                $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
               },
-              processedCount: {
-                $sum: { $cond: [{ $eq: ["$status", "processed"] }, 1, 0] },
-              },
+              dailyCost: { $sum: { $ifNull: ["$cost", 0] } },
             },
           },
-          { $sort: { totalCount: -1 } }, // Xếp theo bệnh xuất hiện nhiều nhất
-          { $limit: 5 },
+          { $sort: { _id: 1 } },
+        ])
+      : Promise.resolve([]),
+
+    // Top nông dân có chi phí/1000m2 cao nhất
+    assignmentIds.length
+      ? FarmingLog.aggregate([
+          { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
+          { $unwind: "$seasonPlotAssignments" },
+          { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
+          {
+            $group: {
+              _id: "$seasonPlotAssignments",
+              totalCost: { $sum: { $ifNull: ["$cost", 0] } },
+            },
+          },
+          {
+            $lookup: {
+              from: "season_plot_assignments",
+              localField: "_id",
+              foreignField: "_id",
+              as: "assignmentData",
+            },
+          },
+          { $unwind: "$assignmentData" },
+          {
+            $lookup: {
+              from: "plots",
+              localField: "assignmentData.plot",
+              foreignField: "_id",
+              as: "plotData",
+            },
+          },
+          { $unwind: "$plotData" },
+          {
+            $lookup: {
+              from: "users",
+              localField: "assignmentData.user",
+              foreignField: "_id",
+              as: "userData",
+            },
+          },
+          { $unwind: { path: "$userData", preserveNullAndEmptyArrays: true } },
           {
             $project: {
               _id: 0,
-              diseaseName: "$_id",
-              totalCount: 1,
-              unprocessedCount: 1,
-              processedCount: 1,
+              farmerName: { $ifNull: ["$userData.fullName", "Chưa xác định"] },
+              plotName: "$plotData.name",
+              area: "$plotData.area",
+              totalCost: 1,
+              // Tính costPer1000m2: (totalCost / area) * 1000
+              costPer1000m2: {
+                $cond: [
+                  { $gt: ["$plotData.area", 0] },
+                  {
+                    $multiply: [
+                      { $divide: ["$totalCost", "$plotData.area"] },
+                      1000,
+                    ],
+                  },
+                  0,
+                ],
+              },
             },
           },
+          { $sort: { costPer1000m2: -1 } },
+          { $limit: 5 },
+        ])
+      : Promise.resolve([]),
+
+    prevPlotIds.length
+      ? Plot.aggregate([
+          { $match: { _id: { $in: prevPlotIds } } },
+          { $group: { _id: null, totalArea: { $sum: "$area" } } },
+        ])
+      : Promise.resolve([]),
+
+    prevAssignmentIds.length
+      ? FarmingLog.aggregate([
+          { $match: { seasonPlotAssignments: { $in: prevAssignmentIds } } },
+          { $group: { _id: null, totalCost: { $sum: "$cost" } } },
         ])
       : Promise.resolve([]),
   ]);
+
+  // Tính toán Chi phí Lũy kế (Cumulative Cost) từ mảng daily cost
+  let cumulativeTotal = 0;
+  const cumulativeCosts = rawDailyCosts.map((log) => {
+    cumulativeTotal += log.dailyCost;
+    // Chuyển format YYYY-MM-DD sang DD/MM cho UI đẹp
+    const [y, m, d] = log._id.split("-");
+    return {
+      _id: `${d}/${m}`,
+      dailyCost: log.dailyCost,
+      cumulativeCost: cumulativeTotal,
+    };
+  });
+
+  const currentArea = totalAreaResult[0]?.totalArea || 0;
+  const currentCost = totalCostResult[0]?.totalCost || 0;
+  const prevArea = prevAreaResult[0]?.totalArea || 0;
+  const prevCost = prevCostResult[0]?.totalCost || 0;
+
+  const calculateTrend = (current, previous, higherIsPositive = true) => {
+    if (!previous) return null;
+    const diff = current - previous;
+    const percentage = Math.abs((diff / previous) * 100).toFixed(1);
+    const isIncrease = diff >= 0;
+    return {
+      value: parseFloat(percentage),
+      isIncrease,
+      isPositive: higherIsPositive ? isIncrease : !isIncrease,
+    };
+  };
 
   return {
     seasonDetailId: String(seasonDetail._id),
     currentSeasonName: buildSeasonLabel(seasonDetail),
     kpis: {
       totalFarmers,
-      totalArea: totalAreaResult[0]?.totalArea || 0,
-      totalCost: totalCostResult[0]?.totalCost || 0,
+      totalArea: currentArea,
+      totalCost: currentCost,
       totalActivePlots,
+      trends: {
+        areaTrend: calculateTrend(currentArea, prevArea, true),
+        costTrend: calculateTrend(currentCost, prevCost, false),
+      },
     },
     charts: {
       costByCategory,
       costByStage,
       cropProgress,
-      topDiseases,
+      cumulativeCosts,
+      topFarmers,
     },
     liveFeeds: {
       recentFarmingLogs,
