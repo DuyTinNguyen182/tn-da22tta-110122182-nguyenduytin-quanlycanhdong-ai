@@ -147,12 +147,12 @@ const DiseaseMonitoringTable = ({
 
                   <td className="px-4 py-4">
                     <div className="flex flex-col items-end gap-2">
-                      <span
+                      {/* <span
                         className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${warningMeta.className}`}
                       >
                         <BellRing size={13} />
                         {warningMeta.label}
-                      </span>
+                      </span> */}
 
                       <button
                         type="button"
