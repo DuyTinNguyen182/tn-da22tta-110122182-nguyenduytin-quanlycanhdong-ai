@@ -1,23 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertCircle,
   CalendarDays,
-  Check,
   CheckCircle2,
-  ClipboardList,
-  MapPinned,
-  Plus,
   RefreshCcw,
   Search,
-  Trash2,
-  UserRound,
+  XIcon,
 } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
-import PaginationControls from "../../../components/Common/PaginationControls";
-import CustomCheckbox from "../../../components/UI/CustomCheckbox";
+import CustomDropdown from "../../../components/UI/CustomDropdown";
+import AssignedPlotsTab from "./components/AssignedPlotsTab";
+import AvailablePlotsTab from "./components/AvailablePlotsTab";
 
 const PAGE_SIZE = 8;
 
@@ -120,6 +115,7 @@ const AdminSeasonPlots = () => {
   const [selectedPlotIds, setSelectedPlotIds] = useState([]);
   const [assignedPage, setAssignedPage] = useState(1);
   const [availablePage, setAvailablePage] = useState(1);
+  const [activeTab, setActiveTab] = useState("assigned");
 
   useEffect(() => {
     fetchData();
@@ -343,6 +339,14 @@ const AdminSeasonPlots = () => {
     }
   };
 
+  const handleResetFilters = () => {
+    setKeyword("");
+    setFieldFilter("");
+    setFarmerFilter("");
+    setAssignedPage(1);
+    setAvailablePage(1);
+  };
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -460,7 +464,7 @@ const AdminSeasonPlots = () => {
           </section>
 
           <section className="mt-6 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm">
-            <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr]">
+            <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_auto]">
               <label className="relative block">
                 <Search
                   size={16}
@@ -471,363 +475,97 @@ const AdminSeasonPlots = () => {
                   value={keyword}
                   onChange={(event) => setKeyword(event.target.value)}
                   placeholder="Tìm theo thửa ruộng, cánh đồng hoặc nông dân..."
-                  className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-11 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-11 py-2 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                 />
               </label>
 
-              <select
+              <CustomDropdown
                 value={fieldFilter}
-                onChange={(event) => setFieldFilter(event.target.value)}
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
-              >
-                <option value="">Tất cả cánh đồng</option>
-                {fieldOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                onChange={setFieldFilter}
+                options={[
+                  { value: "", label: "Tất cả cánh đồng" },
+                  ...fieldOptions,
+                ]}
+                placeholder="Tất cả cánh đồng"
+                variant="filter"
+              />
 
-              <select
+              <CustomDropdown
                 value={farmerFilter}
-                onChange={(event) => setFarmerFilter(event.target.value)}
-                className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 outline-none transition-all focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                onChange={setFarmerFilter}
+                options={[
+                  { value: "", label: "Tất cả nông dân" },
+                  ...farmerOptions,
+                ]}
+                placeholder="Tất cả nông dân"
+                variant="filter"
+              />
+
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="flex items-center justify-center rounded-xl border border-gray-200 bg-white p-2 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                title="Xóa bộ lọc"
               >
-                <option value="">Tất cả nông dân</option>
-                {farmerOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                <XIcon size={18} />
+              </button>
             </div>
           </section>
 
-          <section className="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
-              <div>
-                <h3 className="font-bold text-gray-800">
-                  Danh sách đang tham gia mùa vụ
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {filteredAssignedPlots.length} thửa phù hợp với bộ lọc hiện
-                  tại.
-                </p>
-              </div>
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                {summary.assignedCount || 0}/{summary.totalActivePlotCount || 0}{" "}
-                thửa đang hoạt động
-              </span>
+          <section className="mt-6">
+            <div className="flex border-b border-gray-200">
+              <button
+                className={`py-3 px-6 text-sm font-semibold transition-colors border-b-2 ${
+                  activeTab === "assigned"
+                    ? "border-emerald-600 text-emerald-700"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+                onClick={() => setActiveTab("assigned")}
+              >
+                Đang tham gia ({summary.assignedCount || 0})
+              </button>
+              <button
+                className={`py-3 px-6 text-sm font-semibold transition-colors border-b-2 ${
+                  activeTab === "available"
+                    ? "border-emerald-600 text-emerald-700"
+                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
+                onClick={() => setActiveTab("available")}
+              >
+                Có thể thêm ({summary.availableCount || 0})
+              </button>
             </div>
 
-            {filteredAssignedPlots.length === 0 ? (
-              <div className="px-6 py-14 text-center text-gray-500">
-                Không có thửa ruộng nào đang tham gia phù hợp với bộ lọc.
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[980px]">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Thửa ruộng
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Cánh đồng
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Nông dân
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Diện tích
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Dữ liệu liên quan
-                        </th>
-                        <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Thao tác
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {pagedAssignedPlots.map((item) => (
-                        <tr
-                          key={item.assignmentId}
-                          className="hover:bg-gray-50"
-                        >
-                          <td className="px-5 py-4">
-                            <div>
-                              <p className="font-semibold text-gray-800">
-                                {item.plot?.name || "Chưa xác định"}
-                              </p>
-                              {/* <p className="mt-1 text-xs text-gray-500">
-                                Mã tham gia: {item.assignmentId}
-                              </p> */}
-                            </div>
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex items-start gap-2">
-                              <MapPinned
-                                size={16}
-                                className="mt-0.5 text-emerald-600"
-                              />
-                              <div>
-                                <p className="font-medium text-gray-700">
-                                  {item.field?.name || "Chưa xác định"}
-                                </p>
-                                <p className="mt-1 text-xs text-gray-500">
-                                  {item.field?.address ||
-                                    "Chưa cập nhật địa bàn"}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex items-start gap-2">
-                              <UserRound
-                                size={16}
-                                className="mt-0.5 text-sky-600"
-                              />
-                              <div>
-                                <p className="font-medium text-gray-700">
-                                  {item.user?.fullName || "Chưa xác định"}
-                                </p>
-                                <p className="mt-1 text-xs text-gray-500">
-                                  {item.user?.phone || item.user?.email || "--"}
-                                </p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4 text-sm text-gray-700">
-                            {formatArea(item.plot?.area)}
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex flex-wrap gap-2">
-                              <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
-                                <ClipboardList size={12} />
-                                {item.diaryLogCount} nhật ký
-                              </span>
-                              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-3 py-1 text-xs font-semibold text-orange-700">
-                                <AlertCircle size={12} />
-                                {item.diseaseLogCount} bệnh hại
-                              </span>
-                              {item.hasLogs ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                                  Giữ lịch sử khi gỡ
-                                </span>
-                              ) : null}
-                            </div>
-                          </td>
-                          <td className="px-5 py-4">
-                            <div className="flex justify-end">
-                              <button
-                                type="button"
-                                disabled={submitting}
-                                onClick={() => handleRemovePlot(item)}
-                                className="inline-flex items-center gap-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                <Trash2 size={15} />
-                                Gỡ khỏi mùa vụ
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="mt-6">
+              {activeTab === "assigned" && (
+                <AssignedPlotsTab
+                  filteredPlots={filteredAssignedPlots}
+                  pagedPlots={pagedAssignedPlots}
+                  summary={summary}
+                  page={assignedPage}
+                  totalPages={assignedTotalPages}
+                  onPageChange={setAssignedPage}
+                  submitting={submitting}
+                  onRemovePlot={handleRemovePlot}
+                />
+              )}
 
-                <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                  <p className="text-sm text-gray-500">
-                    Hiển thị {pagedAssignedPlots.length} trong tổng số{" "}
-                    {filteredAssignedPlots.length} thửa đang tham gia.
-                  </p>
-                  <PaginationControls
-                    page={assignedPage}
-                    totalPages={assignedTotalPages}
-                    onPageChange={setAssignedPage}
-                    disabled={submitting}
-                  />
-                </div>
-              </>
-            )}
-          </section>
-
-          <section className="mt-6 overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-5 py-4">
-              <div>
-                <h3 className="font-bold text-gray-800">
-                  Danh sách có thể thêm vào mùa vụ
-                </h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Chỉ hiển thị các thửa đang canh tác nhưng chưa được đưa vào
-                  mùa vụ active.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={handleToggleSelectAllFiltered}
-                  disabled={filteredAvailablePlots.length === 0 || submitting}
-                  className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-emerald-200 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <span
-                    className={`flex h-4 w-4 items-center justify-center rounded border ${
-                      allFilteredAvailableSelected
-                        ? "border-emerald-500 bg-emerald-500 text-white"
-                        : "border-gray-300 bg-white"
-                    }`}
-                  >
-                    {allFilteredAvailableSelected ? (
-                      <Check size={12} strokeWidth={3} />
-                    ) : null}
-                  </span>
-                  Chọn tất cả theo bộ lọc
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleAssignSelectedPlots}
-                  disabled={selectedAvailablePlotIds.length === 0 || submitting}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <Plus size={16} />
-                  Thêm {selectedAvailablePlotIds.length} thửa đã chọn
-                </button>
-              </div>
+              {activeTab === "available" && (
+                <AvailablePlotsTab
+                  filteredPlots={filteredAvailablePlots}
+                  pagedPlots={pagedAvailablePlots}
+                  page={availablePage}
+                  totalPages={availableTotalPages}
+                  onPageChange={setAvailablePage}
+                  submitting={submitting}
+                  selectedIds={selectedAvailablePlotIds}
+                  onToggleSelection={handleTogglePlotSelection}
+                  onToggleSelectAllFiltered={handleToggleSelectAllFiltered}
+                  allFilteredSelected={allFilteredAvailableSelected}
+                  onAssignSelected={handleAssignSelectedPlots}
+                />
+              )}
             </div>
-
-            {filteredAvailablePlots.length === 0 ? (
-              <div className="px-6 py-14 text-center text-gray-500">
-                Không còn thửa ruộng khả dụng phù hợp với bộ lọc hiện tại.
-              </div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[980px]">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Chọn
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Thửa ruộng
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Cánh đồng
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Nông dân
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Diện tích
-                        </th>
-                        <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider text-gray-500">
-                          Ghi chú
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {pagedAvailablePlots.map((item) => {
-                        const plotId = String(item?.plot?._id || "");
-                        const checked =
-                          selectedAvailablePlotIds.includes(plotId);
-
-                        return (
-                          <tr key={plotId} className="hover:bg-gray-50">
-                            <td className="px-5 py-4">
-                              <CustomCheckbox
-                                checked={checked}
-                                disabled={submitting}
-                                onChange={() =>
-                                  handleTogglePlotSelection(plotId)
-                                }
-                              />
-                            </td>
-                            <td className="px-5 py-4">
-                              <div>
-                                <p className="font-semibold text-gray-800">
-                                  {item.plot?.name || "Chưa xác định"}
-                                </p>
-                                <p className="mt-1 text-xs text-gray-500">
-                                  Trạng thái: Đang canh tác
-                                </p>
-                              </div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex items-start gap-2">
-                                <MapPinned
-                                  size={16}
-                                  className="mt-0.5 text-emerald-600"
-                                />
-                                <div>
-                                  <p className="font-medium text-gray-700">
-                                    {item.field?.name || "Chưa xác định"}
-                                  </p>
-                                  <p className="mt-1 text-xs text-gray-500">
-                                    {item.field?.address ||
-                                      "Chưa cập nhật địa bàn"}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex items-start gap-2">
-                                <UserRound
-                                  size={16}
-                                  className="mt-0.5 text-sky-600"
-                                />
-                                <div>
-                                  <p className="font-medium text-gray-700">
-                                    {item.user?.fullName || "Chưa xác định"}
-                                  </p>
-                                  <p className="mt-1 text-xs text-gray-500">
-                                    {item.user?.phone ||
-                                      item.user?.email ||
-                                      "--"}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-5 py-4 text-sm text-gray-700">
-                              {formatArea(item.plot?.area)}
-                            </td>
-                            <td className="px-5 py-4">
-                              {item.hadPreviousAssignment ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                                  <RefreshCcw size={12} />
-                                  Có thể kích hoạt lại từ lịch sử cũ
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                  <Plus size={12} />
-                                  Sẵn sàng thêm mới
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
-                  <p className="text-sm text-gray-500">
-                    Hiển thị {pagedAvailablePlots.length} trong tổng số{" "}
-                    {filteredAvailablePlots.length} thửa có thể thêm.
-                  </p>
-                  <PaginationControls
-                    page={availablePage}
-                    totalPages={availableTotalPages}
-                    onPageChange={setAvailablePage}
-                    disabled={submitting}
-                  />
-                </div>
-              </>
-            )}
           </section>
         </>
       )}

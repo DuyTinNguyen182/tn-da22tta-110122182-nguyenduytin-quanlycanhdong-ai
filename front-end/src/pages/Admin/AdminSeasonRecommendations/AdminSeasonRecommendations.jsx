@@ -379,18 +379,11 @@ const AdminSeasonRecommendations = () => {
               </button>
             </div>
             <div
-              className="flex flex-col gap-4 p-6"
-              style={{ maxHeight: "calc(96vh - 140px)", overflowY: "auto" }}
+              className="flex flex-1 flex-col gap-4 p-6 min-h-0"
+              style={{ maxHeight: "calc(96vh - 142px)" }}
             >
-              <div className="rounded-2xl border border-gray-200 bg-white">
-                <div
-                  style={{
-                    minHeight: "400px",
-                    display: "flex",
-                    flexDirection: "column",
-                  }}
-                  className="[&_.ql-container]:flex-1 [&_.ql-editor]:min-h-[400px]"
-                >
+              <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white">
+                <div className="flex flex-1 flex-col overflow-hidden [&_.ql-toolbar]:shrink-0 [&_.ql-toolbar]:border-t-0 [&_.ql-toolbar]:border-x-0 [&_.ql-toolbar]:bg-gray-50 [&_.ql-container]:flex-1 [&_.ql-container]:overflow-y-auto [&_.ql-editor]:min-h-[250px]">
                   <SeasonRecommendationEditor
                     value={drafts[editingSeason.seasonId]?.content}
                     onChange={(value) =>
@@ -400,7 +393,7 @@ const AdminSeasonRecommendations = () => {
                   />
                 </div>
               </div>
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+              <div className="shrink-0 flex flex-wrap items-center justify-between gap-3">
                 <label className="inline-flex cursor-pointer items-center gap-3">
                   <CustomCheckbox
                     checked={drafts[editingSeason.seasonId]?.isVisible || false}
