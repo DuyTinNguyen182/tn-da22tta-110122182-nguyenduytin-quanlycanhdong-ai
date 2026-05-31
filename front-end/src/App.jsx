@@ -33,6 +33,7 @@ import AdminAnnouncements from "./pages/Admin/AdminAnnouncements/AdminAnnounceme
 import AdminStages from "./pages/Admin/AdminStages/AdminStages";
 import AdminTasks from "./pages/Admin/AdminTasks/AdminTasks";
 import AdminDiseaseMonitoring from "./pages/Admin/AdminDiseaseMonitoring/AdminDiseaseMonitoring";
+import AdminAllowedProducts from "./pages/Admin/AdminAllowedProducts/AdminAllowedProducts";
 
 function App() {
   return (
@@ -67,10 +68,7 @@ function App() {
                   path="/admin"
                   element={<Navigate to="/admin/dashboard" replace />}
                 />
-                <Route
-                  path="/admin/dashboard"
-                  element={<AdminDashboard />}
-                />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
                 <Route path="/admin/progress" element={<AdminProgress />} />
                 <Route path="/admin/fields" element={<AdminFields />} />
                 <Route path="/admin/users" element={<AdminUsers />} />
@@ -97,6 +95,10 @@ function App() {
                 />
                 <Route path="/admin/stages" element={<AdminStages />} />
                 <Route path="/admin/tasks" element={<AdminTasks />} />
+                <Route
+                  path="/admin/allowed-products"
+                  element={<AdminAllowedProducts />}
+                />
               </Route>
 
               <Route path="*" element={<Navigate to="/login" />} />

@@ -1,24 +1,20 @@
 const axios = require("axios");
 const FormData = require("form-data");
 const { randomUUID } = require("crypto");
-const OpenAI = require("openai");
 const { PYTHON_AI_SERVICE_URL } = require("../config/env");
 const aiChatService = require("../services/aiChatService");
 
-const openaiClient = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
-
-const systemPrompt =
-  "Bạn là trợ lý nông nghiệp Việt Nam. Trả lời rõ ràng, dễ áp dụng, ưu tiên an toàn cho cây lúa, môi trường và người dùng. Nếu thiếu dữ liệu thì nêu giả định.";
-
+// ==========================================
+// LUỒNG AI SCAN
+// ==========================================
 exports.diagnoseDisease = async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "Vui lòng tải lên hình ảnh lá lúa" });
+      return res
+        .status(400)
+        .json({ message: "Vui lòng tải lên hình ảnh lá lúa" });
     }
 
-    // Chuẩn bị form data để gửi sang Python Service
     const formData = new FormData();
     formData.append("file", req.file.buffer, {
       filename: req.file.originalname,
@@ -31,14 +27,11 @@ exports.diagnoseDisease = async (req, res) => {
       },
     });
 
-    // Trả kết quả về Frontend
-    // Sau này có thể lưu kết quả vào MongoDB (Model DiagnosisLog) tại đây
     res.json({
       success: true,
       data: response.data,
-      imageName: req.file.originalname
+      imageName: req.file.originalname,
     });
-
   } catch (error) {
     console.error("AI Service Error:", error.message);
     if (axios.isAxiosError(error) && error.response) {
@@ -68,53 +61,24 @@ exports.diagnoseDisease = async (req, res) => {
       }
     }
 
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Không thể kết nối tới dịch vụ AI. Vui lòng thử lại sau.",
-      details: error.message 
+      details: error.message,
     });
   }
 };
 
-const buildFallbackReply = (userMessage, diagnosisSnapshot) => {
-  const disease = diagnosisSnapshot?.disease;
-  const confidence =
-    typeof diagnosisSnapshot?.confidence === "number"
-      ? `${(diagnosisSnapshot.confidence * 100).toFixed(1)}%`
-      : null;
-
-  if (disease) {
-    return [
-      `Đã nhận câu hỏi về bệnh ${disease}${confidence ? ` (độ tin cậy ${confidence})` : ""}.`,
-      "Hệ thống AI đang bận hoặc gặp lỗi kết nối tới mô hình.",
-      "Bạn vui lòng thử lại sau ít phút hoặc đặt câu hỏi ngắn gọn hơn để hệ thống xử lý tốt hơn.",
-      `Nội dung bạn gửi: ${userMessage}`,
-    ].join("\n");
-  }
-
-  return [
-    "Đã nhận câu hỏi của bạn.",
-    "Hệ thống AI đang bận hoặc gặp lỗi kết nối tới mô hình.",
-    "Bạn vui lòng thử lại sau ít phút hoặc đặt câu hỏi ngắn gọn hơn để hệ thống xử lý tốt hơn.",
-  ].join("\n");
-};
-
-const buildLLMMessages = (chatHistory) => {
-  const llmMessages = [{ role: "system", content: systemPrompt }];
-  chatHistory.forEach((msg) => {
-    llmMessages.push({
-      role: msg.role,
-      content: msg.content,
-    });
-  });
-  return llmMessages;
-};
-
+// ==========================================
+// LUỒNG CHAT AI
+// ==========================================
 exports.chat = async (req, res) => {
   try {
     const { message, sessionId, diagnosisResult } = req.body;
 
     if (!message || !message.trim()) {
-      return res.status(400).json({ message: "Nội dung chat không được để trống" });
+      return res
+        .status(400)
+        .json({ message: "Nội dung chat không được để trống" });
     }
 
     const resolvedSessionId =
@@ -122,63 +86,20 @@ exports.chat = async (req, res) => {
         ? String(sessionId).trim()
         : randomUUID();
 
-    await aiChatService.saveMessage({
-      userId: req.user.id,
-      sessionId: resolvedSessionId,
-      role: "user",
-      content: message.trim(),
-      diagnosisSnapshot: diagnosisResult || undefined,
-    });
-
-    const recentMessages = await aiChatService.getSessionMessages(
+    // Controller gọi Service
+    const chatResult = await aiChatService.processChatRequest(
       req.user.id,
       resolvedSessionId,
-      aiChatService.MAX_SESSION_MESSAGES
-    );
-
-    if (!openaiClient) {
-      return res.status(500).json({
-        message: "Máy chủ chưa cấu hình OPENAI_API_KEY.",
-      });
-    }
-
-    let assistantReply;
-    try {
-      const completion = await openaiClient.chat.completions.create({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-        messages: buildLLMMessages(recentMessages),
-        temperature: 0.3,
-      });
-
-      assistantReply = completion.choices?.[0]?.message?.content?.trim();
-    } catch (openaiError) {
-      console.error("OpenAI request error:", openaiError.message);
-      assistantReply = buildFallbackReply(message.trim(), diagnosisResult);
-    }
-
-    if (!assistantReply) {
-      assistantReply = buildFallbackReply(message.trim(), diagnosisResult);
-    }
-
-    await aiChatService.saveMessage({
-      userId: req.user.id,
-      sessionId: resolvedSessionId,
-      role: "assistant",
-      content: assistantReply,
-    });
-
-    const messages = await aiChatService.getSessionMessages(
-      req.user.id,
-      resolvedSessionId,
-      aiChatService.MAX_SESSION_MESSAGES
+      message.trim(),
+      diagnosisResult,
     );
 
     res.json({
       success: true,
       data: {
         sessionId: resolvedSessionId,
-        reply: assistantReply,
-        messages,
+        reply: chatResult.reply,
+        messages: chatResult.messages,
       },
     });
   } catch (error) {
@@ -201,15 +122,12 @@ exports.getChatHistory = async (req, res) => {
     const messages = await aiChatService.getSessionMessages(
       req.user.id,
       sessionId,
-      aiChatService.MAX_SESSION_MESSAGES
+      aiChatService.MAX_SESSION_MESSAGES,
     );
 
     res.json({
       success: true,
-      data: {
-        sessionId,
-        messages,
-      },
+      data: { sessionId, messages },
     });
   } catch (error) {
     console.error("Get AI chat history error:", error.message);

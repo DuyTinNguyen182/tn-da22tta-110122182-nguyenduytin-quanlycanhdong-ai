@@ -21,6 +21,7 @@ const adminProgressRoutes = require("./src/routes/adminProgressRoute");
 const adminDashboardRoutes = require("./src/routes/adminDashboardRoute");
 const adminSeasonPlotAssignmentRoutes = require("./src/routes/adminSeasonPlotAssignmentRoute");
 const farmerDashboardRoutes = require("./src/routes/farmerDashboardRoute");
+const allowedProductRoutes = require("./src/routes/allowedProductRoutes");
 
 const app = express();
 
@@ -51,13 +52,10 @@ app.use("/api/disease-logs", diseaseLogRoutes);
 app.use("/api/stages", stageRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/ai", aiRoutes);
-
+app.use("/api/allowed-products", allowedProductRoutes);
 app.use("/api/admin/progress", adminProgressRoutes);
 app.use("/api/admin/dashboard", adminDashboardRoutes);
-app.use(
-  "/api/admin/season-plot-assignments",
-  adminSeasonPlotAssignmentRoutes,
-);
+app.use("/api/admin/season-plot-assignments", adminSeasonPlotAssignmentRoutes);
 app.use("/api/farmer-dashboard", farmerDashboardRoutes);
 
 // --- Start Server ---

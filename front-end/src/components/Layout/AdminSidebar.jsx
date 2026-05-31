@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Sprout,
   Users,
+  Package,
 } from "lucide-react";
 
 const AdminSidebar = ({ collapsed, setCollapsed }) => {
@@ -41,6 +42,7 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
       path: "/admin/season-recommendations",
     },
     { name: "Thông báo", icon: Bell, path: "/admin/announcements" },
+    { name: "Danh mục vật tư", icon: Package, path: "/admin/allowed-products" },
   ];
 
   return (
