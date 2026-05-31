@@ -12,7 +12,11 @@ const getAll = async (req, res) => {
 const create = async (req, res) => {
   try {
     const imageUrl = req.file?.path || "";
-    const log = await diseaseLogService.createDiseaseLog(req.body, req.user.id, imageUrl);
+    const log = await diseaseLogService.createDiseaseLog(
+      req.body,
+      req.user.id,
+      imageUrl,
+    );
     res.status(201).json(log);
   } catch (error) {
     console.error("Create Disease Log Error:", {
@@ -27,7 +31,13 @@ const create = async (req, res) => {
 
 const update = async (req, res) => {
   try {
-    const log = await diseaseLogService.updateDiseaseLog(req.params.id, req.body, req.user);
+    const imageUrl = req.file?.path || "";
+    const log = await diseaseLogService.updateDiseaseLog(
+      req.params.id,
+      req.body,
+      req.user,
+      imageUrl,
+    );
     res.json(log);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -39,7 +49,7 @@ const updateStatus = async (req, res) => {
     const log = await diseaseLogService.updateDiseaseLogStatus(
       req.params.id,
       req.body,
-      req.user
+      req.user,
     );
     res.json(log);
   } catch (error) {
@@ -51,7 +61,7 @@ const getWarningPreview = async (req, res) => {
   try {
     const data = await diseaseLogService.getDiseaseLogWarningPreview(
       req.params.id,
-      req.user
+      req.user,
     );
     res.json(data);
   } catch (error) {
@@ -64,7 +74,7 @@ const sendWarning = async (req, res) => {
     const data = await diseaseLogService.sendDiseaseLogWarning(
       req.params.id,
       req.body,
-      req.user
+      req.user,
     );
     res.status(201).json(data);
   } catch (error) {

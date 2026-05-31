@@ -731,7 +731,7 @@ const getDiseaseLogs = async (filters = {}, currentUser) => {
   return logs.map(mapDiseaseLogOutput);
 };
 
-const updateDiseaseLog = async (id, data, currentUser) => {
+const updateDiseaseLog = async (id, data, currentUser, imageUrl = "") => {
   const query = isAdminUser(currentUser)
     ? { _id: id }
     : { _id: id, user: currentUser.id };
@@ -769,9 +769,15 @@ const updateDiseaseLog = async (id, data, currentUser) => {
     return mapDiseaseLogOutput(populatedHistoricalLog);
   }
 
-  const payload = await buildDiseaseLogPayload(data, ownerUserId, existing, {
-    requireActiveSeason: true,
-  });
+  const payload = await buildDiseaseLogPayload(
+    data,
+    ownerUserId,
+    existing,
+    {
+      requireActiveSeason: true,
+    },
+    imageUrl,
+  );
 
   if (payload.status === "processed") {
     payload.processedBy = currentUser.id;

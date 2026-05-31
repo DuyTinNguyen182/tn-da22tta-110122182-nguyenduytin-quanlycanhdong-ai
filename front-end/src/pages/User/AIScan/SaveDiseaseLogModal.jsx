@@ -1,19 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
-import {
-  AlertCircle,
-  CalendarDays,
-  Loader2,
-  X,
-} from "lucide-react";
+import { AlertCircle, CalendarDays, Loader2, X } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
+
+const getLocalDatetime = (date = new Date()) => {
+  const d = new Date(date);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
 
 const formatPercent = (score) =>
   typeof score === "number" ? `${(score * 100).toFixed(1)}%` : "Không xác định";
 
 const getSeasonYear = (season) =>
-  season?.year || (season?.startDate ? new Date(season.startDate).getFullYear() : "");
+  season?.year ||
+  (season?.startDate ? new Date(season.startDate).getFullYear() : "");
 
 const formatSeasonLabel = (season) => {
   if (!season) return "";
@@ -29,8 +31,8 @@ const buildDiagnosisDescriptionText = (diagnosisResult) => {
     .map(
       (prediction, index) =>
         `${index + 1}. ${prediction.disease || prediction.class_name}: ${formatPercent(
-          prediction.confidence
-        )}`
+          prediction.confidence,
+        )}`,
     );
 
   return [
@@ -56,8 +58,8 @@ const buildLowConfidenceMessage = (diagnosisResult) => {
   ) {
     reasons.push(
       `độ tin cậy dưới ngưỡng ${formatPercent(
-        diagnosisResult.confidence_threshold
-      )}`
+        diagnosisResult.confidence_threshold,
+      )}`,
     );
   }
 
@@ -67,22 +69,25 @@ const buildLowConfidenceMessage = (diagnosisResult) => {
     diagnosisResult.confidence_gap < diagnosisResult.confidence_gap_threshold
   ) {
     reasons.push(
-      `top 1 và top 2 chỉ lệch ${formatPercent(diagnosisResult.confidence_gap)}`
+      `top 1 và top 2 chỉ lệch ${formatPercent(diagnosisResult.confidence_gap)}`,
     );
   }
 
   return reasons.length === 0
     ? "Kết quả AI chưa đủ chắc chắn. Bạn nên kiểm tra thêm bằng ảnh rõ hơn hoặc đối chiếu thực tế."
     : `Kết quả AI chưa đủ chắc chắn vì ${reasons.join(
-      " và "
-    )}. Bạn nên kiểm tra thêm bằng ảnh rõ hơn hoặc đối chiếu thực tế.`;
+        " và ",
+      )}. Bạn nên kiểm tra thêm bằng ảnh rõ hơn hoặc đối chiếu thực tế.`;
 };
 
 const sortSeasons = (items = []) =>
   [...items].sort((a, b) => {
     if (a.status === "active" && b.status !== "active") return -1;
     if (a.status !== "active" && b.status === "active") return 1;
-    return new Date(b.startDate || b.createdAt || 0) - new Date(a.startDate || a.createdAt || 0);
+    return (
+      new Date(b.startDate || b.createdAt || 0) -
+      new Date(a.startDate || a.createdAt || 0)
+    );
   });
 
 const SaveDiseaseLogModal = ({
@@ -101,9 +106,7 @@ const SaveDiseaseLogModal = ({
   const [selectedField, setSelectedField] = useState(null);
   const [selectedPlotIds, setSelectedPlotIds] = useState([]);
   const [selectAllPlots, setSelectAllPlots] = useState(true);
-  const [detectedDate, setDetectedDate] = useState(
-    new Date().toISOString().slice(0, 10)
-  );
+  const [detectedDate, setDetectedDate] = useState(getLocalDatetime());
   const [saveLoading, setSaveLoading] = useState(false);
   const [loadingModal, setLoadingModal] = useState(false);
 
@@ -114,7 +117,7 @@ const SaveDiseaseLogModal = ({
       try {
         const res = await api.get("/fields");
         const fieldList = (res.data || []).filter(
-          (f) => Number(f.myPlotCount || 0) > 0
+          (f) => Number(f.myPlotCount || 0) > 0,
         );
         setFields(fieldList);
         setSelectedField(fieldList[0] || null);
@@ -124,7 +127,7 @@ const SaveDiseaseLogModal = ({
     };
 
     fetchFields();
-    setDetectedDate(new Date().toISOString().slice(0, 10));
+    setDetectedDate(getLocalDatetime());
     setSelectAllPlots(true);
     setSelectedPlotIds([]);
   }, [open]);
@@ -142,13 +145,17 @@ const SaveDiseaseLogModal = ({
       try {
         setLoadingModal(true);
         const [seasonsRes, plotsRes] = await Promise.all([
-          api.get("/season-details/member", { params: { fieldId: selectedField._id } }),
+          api.get("/season-details/member", {
+            params: { fieldId: selectedField._id },
+          }),
           api.get("/plots", { params: { fieldId: selectedField._id } }),
         ]);
 
         const seasonList = sortSeasons(seasonsRes.data || []);
         const active = seasonList.find((s) => s.status === "active");
-        const farmerPlots = (plotsRes.data || []).filter((p) => p.status === "active");
+        const farmerPlots = (plotsRes.data || []).filter(
+          (p) => p.status === "active",
+        );
 
         setSeasons(seasonList);
         setSelectedSeason(active?._id || seasonList[0]?._id || "");
@@ -167,7 +174,7 @@ const SaveDiseaseLogModal = ({
 
   const currentSeason = useMemo(
     () => seasons.find((s) => s._id === selectedSeason) || null,
-    [seasons, selectedSeason]
+    [seasons, selectedSeason],
   );
 
   const loggablePlots = useMemo(
@@ -175,10 +182,12 @@ const SaveDiseaseLogModal = ({
       currentSeason?.loggablePlots?.length
         ? currentSeason.loggablePlots
         : plots,
-    [currentSeason, plots]
+    [currentSeason, plots],
   );
 
-  const canSave = Boolean(result && currentSeason && currentSeason.status === "active");
+  const canSave = Boolean(
+    result && currentSeason && currentSeason.status === "active",
+  );
 
   const togglePlotSelection = (plotId) => {
     if (selectAllPlots) {
@@ -188,7 +197,9 @@ const SaveDiseaseLogModal = ({
     }
 
     setSelectedPlotIds((prev) =>
-      prev.includes(plotId) ? prev.filter((id) => id !== plotId) : [...prev, plotId]
+      prev.includes(plotId)
+        ? prev.filter((id) => id !== plotId)
+        : [...prev, plotId],
     );
   };
 
@@ -261,7 +272,7 @@ const SaveDiseaseLogModal = ({
       console.error("Lỗi khi lưu nhật ký bệnh", saveError);
       toast.error(
         saveError?.response?.data?.message ||
-          "Không thể lưu nhật ký. Vui lòng thử lại."
+          "Không thể lưu nhật ký. Vui lòng thử lại.",
       );
     } finally {
       setSaveLoading(false);
@@ -287,7 +298,9 @@ const SaveDiseaseLogModal = ({
       <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_32px_90px_-40px_rgba(15,23,42,0.45)]">
         <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 text-white">
           <div>
-            <p className="text-sm font-semibold text-emerald-50/80">Ghi nhận ca phát hiện</p>
+            <p className="text-sm font-semibold text-emerald-50/80">
+              Ghi nhận ca phát hiện
+            </p>
             <h3 className="text-xl font-bold">Lưu nhật ký bệnh</h3>
           </div>
           <button
@@ -299,7 +312,7 @@ const SaveDiseaseLogModal = ({
           </button>
         </div>
 
-        <div className="overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6">
           {loadingModal ? (
             <div className="flex items-center justify-center gap-3 py-16 text-slate-400">
               <Loader2 size={24} className="animate-spin text-emerald-500" />
@@ -329,15 +342,20 @@ const SaveDiseaseLogModal = ({
                 </div>
               </div>
 
-              {!loadingModal && (!currentSeason || currentSeason.status !== "active") && (
-                <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <AlertCircle size={17} className="mt-0.5 shrink-0 text-amber-500" />
-                  <p className="text-sm text-amber-800">
-                    Cánh đồng này hiện <strong>không có mùa vụ đang canh tác</strong>.
-                    Bạn chỉ có thể lưu nhật ký khi đang trong một vụ mùa hoạt động.
-                  </p>
-                </div>
-              )}
+              {!loadingModal &&
+                (!currentSeason || currentSeason.status !== "active") && (
+                  <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <AlertCircle
+                      size={17}
+                      className="mt-0.5 shrink-0 text-amber-500"
+                    />
+                    <p className="text-sm text-amber-800">
+                      Cánh đồng này hiện{" "}
+                      <strong>không có mùa vụ đang canh tác</strong>. Bạn chỉ có
+                      thể lưu nhật ký khi đang trong một vụ mùa hoạt động.
+                    </p>
+                  </div>
+                )}
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
@@ -377,7 +395,7 @@ const SaveDiseaseLogModal = ({
 
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">
-                  Ngày phát hiện bệnh
+                  Ngày giờ phát hiện bệnh
                 </label>
                 <div className="relative">
                   <CalendarDays
@@ -385,7 +403,7 @@ const SaveDiseaseLogModal = ({
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
                   />
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={detectedDate}
                     onChange={(e) => setDetectedDate(e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 py-3 pl-10 pr-3 text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50"
@@ -417,16 +435,21 @@ const SaveDiseaseLogModal = ({
                 <div className="max-h-52 space-y-2 overflow-y-auto rounded-[22px] border border-slate-200 bg-slate-50 p-2">
                   {loggablePlots.length === 0 ? (
                     <p className="p-3 text-sm text-slate-400">
-                      {selectedField ? "Cánh đồng này chưa có thửa canh tác." : "Vui lòng chọn cánh đồng."}
+                      {selectedField
+                        ? "Cánh đồng này chưa có thửa canh tác."
+                        : "Vui lòng chọn cánh đồng."}
                     </p>
                   ) : (
                     loggablePlots.map((plot) => {
-                      const checked = selectAllPlots || selectedPlotIds.includes(plot._id);
+                      const checked =
+                        selectAllPlots || selectedPlotIds.includes(plot._id);
                       return (
                         <label
                           key={plot._id}
                           className={`flex cursor-pointer items-center gap-3 rounded-2xl border bg-white px-3 py-3 transition-all ${
-                            checked ? "border-emerald-300 shadow-sm shadow-emerald-50" : "border-slate-100 hover:border-slate-200"
+                            checked
+                              ? "border-emerald-300 shadow-sm shadow-emerald-50"
+                              : "border-slate-100 hover:border-slate-200"
                           }`}
                         >
                           <input
@@ -436,7 +459,9 @@ const SaveDiseaseLogModal = ({
                             onChange={() => togglePlotSelection(plot._id)}
                           />
                           <div className="min-w-0 flex-1">
-                            <p className={`truncate text-sm font-medium ${checked ? "text-emerald-700" : "text-slate-700"}`}>
+                            <p
+                              className={`truncate text-sm font-medium ${checked ? "text-emerald-700" : "text-slate-700"}`}
+                            >
                               {plot.name}
                             </p>
                             {plot.area ? (
@@ -454,7 +479,10 @@ const SaveDiseaseLogModal = ({
 
               {confidenceWarning && (
                 <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
-                  <AlertCircle size={17} className="mt-0.5 shrink-0 text-amber-500" />
+                  <AlertCircle
+                    size={17}
+                    className="mt-0.5 shrink-0 text-amber-500"
+                  />
                   <p className="text-sm text-amber-800">{confidenceWarning}</p>
                 </div>
               )}
@@ -462,7 +490,7 @@ const SaveDiseaseLogModal = ({
           )}
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+        <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onClose}
@@ -489,4 +517,3 @@ const SaveDiseaseLogModal = ({
 };
 
 export default SaveDiseaseLogModal;
-

@@ -130,7 +130,8 @@ const sortSeasons = (items = []) =>
   });
 
 const getSeasonYear = (season) =>
-  season?.year || (season?.startDate ? new Date(season.startDate).getFullYear() : "");
+  season?.year ||
+  (season?.startDate ? new Date(season.startDate).getFullYear() : "");
 
 const formatSeasonLabel = (season) => {
   if (!season) return "";
@@ -753,7 +754,7 @@ const AIScan = () => {
               </div>
             )}
 
-            {!rejectedDiagnosis && (
+            {/* {!rejectedDiagnosis && (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-[22px] border border-slate-100 bg-slate-50 px-4 py-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -787,7 +788,7 @@ const AIScan = () => {
                   </div>
                 </div>
               </div>
-            )}
+            )} */}
 
             {confidenceWarning && !rejectedDiagnosis && (
               <div className="mt-4 rounded-[22px] border border-amber-200 bg-amber-50 px-4 py-3">
@@ -813,11 +814,11 @@ const AIScan = () => {
                   <p className="text-sm font-semibold text-slate-900">
                     Top 3 dự đoán
                   </p>
-                  <span
+                  {/* <span
                     className={`rounded-full px-2.5 py-1 text-xs font-semibold ${confidenceMeta.chipClass}`}
                   >
                     {confidenceMeta.label}
-                  </span>
+                  </span> */}
                 </div>
 
                 <div className="mt-3 space-y-3">
@@ -939,4 +940,3 @@ const AIScan = () => {
 };
 
 export default AIScan;
-
