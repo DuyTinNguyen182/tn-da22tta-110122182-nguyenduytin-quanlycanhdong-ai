@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Loader2, ScanLine, Sprout } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
 const Login = () => {
@@ -14,6 +14,18 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!email.trim() || !password.trim()) {
+      setError("Vui lòng nhập đầy đủ email và mật khẩu.");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Vui lòng nhập email hợp lệ.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError("");
 
@@ -33,59 +45,63 @@ const Login = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#eef8f2_0%,#f8fafc_100%)] p-4">
-      <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-white/80 bg-white shadow-[0_28px_80px_-40px_rgba(15,23,42,0.45)]">
-        <div className="border-b border-emerald-100 bg-[linear-gradient(135deg,#ecfdf5_0%,#f8fafc_100%)] px-6 py-7 sm:px-8">
-          {/* <div className="flex items-center justify-between gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-600 shadow-lg shadow-emerald-200">
-              <Sprout className="text-white" size={26} />
-            </div>
-            <div className="rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-semibold text-emerald-700">
-              Mobile AI
-            </div>
-          </div> */}
+      <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-emerald-50 bg-white shadow-[0_28px_80px_-40px_rgba(15,23,42,0.45)]">
+        <div className="px-6 pt-10 sm:px-8 text-center flex flex-col items-center">
+          <div className="flex h-24 w-24 items-center justify-center overflow-hidden mb-3">
+            <img
+              src="/Logo_AgriSmart.png"
+              alt="AgriSmart Logo"
+              className="h-full w-full object-contain drop-shadow-sm"
+            />
+          </div>
 
-          <h2 className="mt-5 text-2xl font-bold text-slate-900">Chào mừng trở lại</h2>
-          {/* <p className="mt-2 text-sm leading-6 text-slate-500">
-            Đăng nhập để chụp lá lúa, quét bệnh và hỏi AI ngay trên điện thoại.
+          <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            AgriSmart
+          </h1>
+          <p className="mt-2 text-lg font-medium text-emerald-600">
+            Chào mừng trở lại!
           </p>
-
-          <div className="mt-4 flex items-center gap-2 rounded-2xl bg-white/80 px-4 py-3 text-sm text-slate-600 ring-1 ring-emerald-100">
-            <ScanLine size={16} className="shrink-0 text-emerald-600" />
-            <span>Đăng nhập xong sẽ vào thẳng màn hình AI dự đoán.</span>
-          </div> */}
         </div>
 
-        <div className="px-6 py-7 sm:px-8">
+        <div className="px-6 pb-10 pt-6 sm:px-8">
           {error && (
             <div className="mb-6 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5" noValidate>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">Email</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                Email
+              </label>
               <input
                 type="email"
-                required
                 autoComplete="email"
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 placeholder="nhanong@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  if (error) setError("");
+                }}
               />
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">Mật khẩu</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                Mật khẩu
+              </label>
               <input
                 type="password"
-                required
                 autoComplete="current-password"
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
                 placeholder="••••••••"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError("");
+                }}
               />
             </div>
 
@@ -94,15 +110,19 @@ const Login = () => {
               disabled={isSubmitting}
               className="flex w-full items-center justify-center rounded-2xl bg-emerald-600 px-4 py-3.5 font-bold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isSubmitting ? <Loader2 className="animate-spin" /> : "Đăng nhập ngay"}
+              {isSubmitting ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                "Đăng nhập ngay"
+              )}
             </button>
           </form>
 
           <p className="mt-7 text-center text-sm text-slate-500">
             Chưa có tài khoản?{" "}
-            <Link to="/register" className="font-semibold text-emerald-600 hover:underline">
-              Đăng ký miễn phí
-            </Link>
+            <span className="font-semibold text-emerald-600">
+              Vui lòng liên hệ với Ban quản lý HTX để được cấp tài khoản.
+            </span>
           </p>
         </div>
       </div>

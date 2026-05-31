@@ -23,7 +23,11 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { icon: ScanLine, label: "AI dự đoán", path: "/ai-scan" },
     { icon: FileText, label: "AI tư vấn", path: "/ask-ai" },
     { icon: Bell, label: "Thông báo & cảnh báo", path: "/announcements" },
-    { icon: BookText, label: "Khuyến nghị mùa vụ", path: "/season-recommendations" },
+    {
+      icon: BookText,
+      label: "Khuyến nghị mùa vụ",
+      path: "/season-recommendations",
+    },
   ];
 
   return (
@@ -33,14 +37,22 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       }`}
     >
       <div className="flex h-20 flex-shrink-0 items-center border-b border-gray-100 px-6">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600 shadow-lg shadow-emerald-200">
-          <Sprout className="text-white" size={24} />
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden">
+          <img
+            src="/Logo_AgriSmart.png"
+            alt="AgriSmart Logo"
+            className="h-full w-full object-contain"
+          />
         </div>
 
         {!collapsed && (
           <div className="ml-3 flex flex-col overflow-hidden">
-            <h3 className="whitespace-nowrap text-xl font-bold text-gray-800">AgriSmart</h3>
-            <p className="whitespace-nowrap text-xs text-gray-500">Nông nghiệp thông minh</p>
+            <h3 className="whitespace-nowrap text-xl font-bold text-gray-800">
+              AgriSmart
+            </h3>
+            <p className="whitespace-nowrap text-xs text-gray-500">
+              Nông nghiệp thông minh
+            </p>
           </div>
         )}
       </div>
@@ -78,7 +90,11 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
                     <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
                   ) : null}
                 </div>
-                {!collapsed && <span className="ml-3 whitespace-nowrap text-sm">{item.label}</span>}
+                {!collapsed && (
+                  <span className="ml-3 whitespace-nowrap text-sm">
+                    {item.label}
+                  </span>
+                )}
               </div>
 
               {!collapsed && isAnnouncementItem && hasUnread ? (
