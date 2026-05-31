@@ -66,6 +66,7 @@ const DiseaseMonitoringTable = ({
             <tr className="border-b border-gray-100 text-left text-xs font-bold uppercase tracking-wide text-gray-400">
               <th className="px-4 py-3">Cánh đồng</th>
               <th className="px-4 py-3">Bệnh</th>
+              <th className="px-4 py-3">Ảnh</th>
               <th className="px-4 py-3">Người ghi nhận</th>
               <th className="px-4 py-3">Thửa ảnh hưởng</th>
               <th className="px-4 py-3">Ngày ghi nhận</th>
@@ -95,6 +96,28 @@ const DiseaseMonitoringTable = ({
                     {/* <p className="mt-1 max-w-[260px] text-sm leading-6 text-gray-500">
                       {log.description || "Chưa có mô tả chi tiết."}
                     </p> */}
+                  </td>
+
+                  <td className="px-4 py-4">
+                    {log.imageUrl ? (
+                      <a
+                        href={log.imageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block h-12 w-12 overflow-hidden rounded-lg border border-gray-100 bg-gray-50 shadow-sm"
+                        title="Nhấn để xem ảnh phóng to"
+                      >
+                        <img
+                          src={log.imageUrl}
+                          alt="Ảnh bệnh"
+                          className="h-full w-full object-cover transition-transform duration-300 hover:scale-110"
+                        />
+                      </a>
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50">
+                        <span className="text-[10px] text-gray-400">Trống</span>
+                      </div>
+                    )}
                   </td>
 
                   <td className="px-4 py-4 text-sm text-gray-700">
