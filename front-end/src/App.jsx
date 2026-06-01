@@ -19,6 +19,7 @@ import SeasonRecommendations from "./pages/User/SeasonRecommendations/SeasonReco
 import AIScan from "./pages/User/AIScan/AIScan";
 import AIChat from "./pages/User/AIChat/AIChat";
 import Account from "./pages/User/Account/Account";
+import AllowedProducts from "./pages/User/AllowedProducts/AllowedProducts";
 import AdminDashboard from "./pages/Admin/AdminDashboard/AdminDashboard";
 import AdminProgress from "./pages/Admin/AdminProgress/AdminProgress";
 import AdminUsers from "./pages/Admin/AdminUsers/AdminUsers";
@@ -56,6 +57,7 @@ function App() {
                   element={<SeasonRecommendations />}
                 />
                 <Route path="/ai-scan" element={<AIScan />} />
+                <Route path="/allowed-products" element={<AllowedProducts />} />
                 <Route path="/ask-ai" element={<AIChat />} />
                 <Route path="/account" element={<Account />} />
               </Route>

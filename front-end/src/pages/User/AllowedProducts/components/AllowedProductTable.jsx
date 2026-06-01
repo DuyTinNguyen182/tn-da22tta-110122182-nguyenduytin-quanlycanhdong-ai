@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { Eye } from "lucide-react";
 import LoadingScreen from "../../../../components/Layout/LoadingScreen";
 import PaginationControls from "../../../../components/Common/PaginationControls";
 
@@ -21,8 +21,6 @@ const AllowedProductTable = ({
   totalItems,
   onPageChange,
   onView,
-  onStartEdit,
-  onDelete,
 }) => {
   return (
     <div className="flex flex-col">
@@ -49,14 +47,9 @@ const AllowedProductTable = ({
                 <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500">
                   Giai đoạn / Mốc áp dụng
                 </th>
-                <th className="px-5 py-3 text-left text-xs font-bold uppercase text-gray-500 whitespace-nowrap">
-                  Trạng thái
-                </th>
-                <th className="px-5 py-3 text-center text-xs font-bold uppercase text-gray-500 whitespace-nowrap">
-                  Hành động
-                </th>
               </tr>
             </thead>
+
             <tbody className="divide-y divide-gray-100">
               {products.map((item) => {
                 const categoryClass =
@@ -65,12 +58,17 @@ const AllowedProductTable = ({
                 const categoryLabel = CATEGORY_LABELS[item.category] || "Khác";
 
                 return (
-                  <tr key={item._id} className="transition hover:bg-gray-50/50">
+                  <tr
+                    key={item._id}
+                    className="transition hover:bg-gray-50/50 cursor-pointer"
+                    onClick={() => onView && onView(item)}
+                  >
                     <td className="px-5 py-4">
                       <span className="text-sm font-bold text-gray-800">
                         {item.product_name}
                       </span>
                     </td>
+
                     <td className="px-5 py-4">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${categoryClass}`}
@@ -78,6 +76,7 @@ const AllowedProductTable = ({
                         {categoryLabel}
                       </span>
                     </td>
+
                     <td className="px-5 py-4">
                       <div className="flex flex-wrap gap-1">
                         {item.target_issues?.map((issue, idx) => (
@@ -90,6 +89,7 @@ const AllowedProductTable = ({
                         ))}
                       </div>
                     </td>
+
                     <td className="px-5 py-4">
                       <span
                         className="text-xs font-medium text-gray-600 block max-w-[200px] truncate"
@@ -98,38 +98,8 @@ const AllowedProductTable = ({
                         {item.usage_periods?.join(", ") || "—"}
                       </span>
                     </td>
-                    <td className="px-5 py-4">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${item.is_active ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}
-                      >
-                        {item.is_active ? "Hiển thị" : "Ẩn"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="flex justify-center gap-1.5">
-                        <button
-                          onClick={() => onView(item)}
-                          className="rounded-lg bg-emerald-50 p-1.5 text-emerald-700 transition hover:bg-emerald-100"
-                          title="Xem chi tiết"
-                        >
-                          <Eye size={15} />
-                        </button>
-                        <button
-                          onClick={() => onStartEdit(item)}
-                          className="rounded-lg bg-blue-50 p-1.5 text-blue-700 transition hover:bg-blue-100"
-                          title="Chỉnh sửa"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          onClick={() => onDelete(item)}
-                          className="rounded-lg bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100"
-                          title="Xóa"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
+
+                    {/* status and action columns removed for farmer view; row is clickable to view details */}
                   </tr>
                 );
               })}

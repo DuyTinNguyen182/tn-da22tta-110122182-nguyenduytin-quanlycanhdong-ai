@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Package, Plus, Search } from "lucide-react";
+import { Package, Plus, Search, X } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
 import AllowedProductTable from "./components/AllowedProductTable";
 import AllowedProductFormModal from "./components/AllowedProductFormModal";
+import AllowedProductDetailModal from "./components/AllowedProductDetailModal";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -27,6 +28,7 @@ const AdminAllowedProducts = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState("create");
   const [editingId, setEditingId] = useState("");
+  const [viewingProduct, setViewingProduct] = useState(null);
 
   // States form
   const [productName, setProductName] = useState("");
@@ -64,10 +66,21 @@ const AdminAllowedProducts = () => {
         ? item.category.toUpperCase() === filterCategory
         : true;
 
-      // Điều kiện 2: Lọc theo từ khóa (Tìm theo tên sản phẩm)
-      const matchSearch = searchTerm
-        ? item.product_name?.toLowerCase().includes(searchTerm.toLowerCase())
-        : true;
+      // Điều kiện 2: Lọc theo từ khóa (Tìm theo tên sản phẩm, trị bệnh hoặc dùng cho)
+      if (!searchTerm) return matchCategory;
+
+      const lower = searchTerm.toLowerCase();
+      const nameMatch = item.product_name?.toLowerCase().includes(lower);
+      const targetIssuesText = (item.target_issues || [])
+        .join(", ")
+        .toLowerCase();
+      const usagePeriodsText = (item.usage_periods || [])
+        .join(", ")
+        .toLowerCase();
+      const matchSearch =
+        nameMatch ||
+        targetIssuesText.includes(lower) ||
+        usagePeriodsText.includes(lower);
 
       return matchCategory && matchSearch;
     });
@@ -125,9 +138,17 @@ const AdminAllowedProducts = () => {
     setIsModalOpen(true);
   };
 
+  const openViewDetail = (product) => {
+    setViewingProduct(product);
+  };
+
   const closeTaskModal = () => {
     setIsModalOpen(false);
     resetForm();
+  };
+
+  const closeDetailModal = () => {
+    setViewingProduct(null);
   };
 
   // Helper chuyển đổi chuỗi nhập từ UI thành mảng để lưu DB
@@ -197,32 +218,42 @@ const AdminAllowedProducts = () => {
     <div className="h-full overflow-y-auto bg-gray-50 p-6">
       <div className="mb-6 flex flex-col xl:flex-row xl:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">
+          <h1 className="text-2xl font-bold text-gray-800 mb-5">
             Danh mục Vật tư HTX
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          {/* <p className="text-sm text-gray-500 mt-1">
             Quản lý danh mục vật tư được phép sử dụng, cung cấp dữ liệu nền tảng
             cho Trợ lý AI tư vấn
-          </p>
+          </p> */}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <div className="flex flex-nowrap items-center gap-3 flex-1 min-w-0 justify-end overflow-x-auto pb-1">
           {/* Ô tìm kiếm theo tên */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-[16rem] sm:w-[18rem] lg:w-[22rem] shrink-0">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
               <Search size={18} className="text-gray-400" />
             </div>
             <input
               type="text"
-              placeholder="Tìm kiếm tên sản phẩm..."
+              placeholder="Tên sản phẩm, trị bệnh hoặc dùng cho..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 shadow-sm"
+              className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-700 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 shadow-sm"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 transition hover:text-gray-600"
+                aria-label="Xóa tìm kiếm"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
 
           {/* Lọc theo danh mục */}
-          <div className="w-full sm:w-56 rounded-xl bg-white border border-gray-200 p-1.5 shadow-sm">
+          <div className="relative w-[12rem] sm:w-[14rem] shrink-0 rounded-xl bg-white border border-gray-200 p-1.5 shadow-sm">
             <CustomDropdown
               value={filterCategory}
               onChange={setFilterCategory}
@@ -231,11 +262,21 @@ const AdminAllowedProducts = () => {
               icon={Package}
               variant="filter"
             />
+            {filterCategory && (
+              <button
+                type="button"
+                onClick={() => setFilterCategory("")}
+                className="absolute right-11 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Xóa bộ lọc danh mục"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
 
           <button
             onClick={openCreateModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-emerald-700 w-full sm:w-auto"
+            className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-emerald-700 w-auto"
           >
             <Plus size={18} /> Thêm sản phẩm
           </button>
@@ -250,10 +291,16 @@ const AdminAllowedProducts = () => {
           totalPages={totalPages}
           totalItems={filteredProducts.length}
           onPageChange={setCurrentPage}
+          onView={openViewDetail}
           onStartEdit={startEdit}
           onDelete={handleDelete}
         />
       </div>
+
+      <AllowedProductDetailModal
+        product={viewingProduct}
+        onClose={closeDetailModal}
+      />
 
       <AllowedProductFormModal
         open={isModalOpen}

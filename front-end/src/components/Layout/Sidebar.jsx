@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Bell,
   BookText,
+  Package,
   ChevronLeft,
   FileText,
   LayoutDashboard,
@@ -28,6 +29,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       label: "Khuyến nghị mùa vụ",
       path: "/season-recommendations",
     },
+    { icon: Package, label: "Danh mục vật tư", path: "/allowed-products" },
   ];
 
   return (
