@@ -1,10 +1,18 @@
 const authService = require("../services/authService");
 const jwtConfig = require("../config/jwt");
 
+// const getCookieOptions = () => ({
+//   httpOnly: true,
+//   secure: process.env.NODE_ENV === "production",
+//   sameSite: "lax",
+//   maxAge: 30 * 24 * 60 * 60 * 1000,
+//   path: "/",
+// });
+
 const getCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   maxAge: 30 * 24 * 60 * 60 * 1000,
   path: "/",
 });
@@ -43,7 +51,9 @@ const getMe = async (req, res) => {
       user,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message || "Không thể lấy thông tin người dùng" });
+    res
+      .status(500)
+      .json({ message: error.message || "Không thể lấy thông tin người dùng" });
   }
 };
 
@@ -56,7 +66,9 @@ const updateProfile = async (req, res) => {
       user,
     });
   } catch (error) {
-    res.status(400).json({ message: error.message || "Không thể cập nhật thông tin" });
+    res
+      .status(400)
+      .json({ message: error.message || "Không thể cập nhật thông tin" });
   }
 };
 
@@ -65,14 +77,18 @@ const updatePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
     if (!currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới" });
+      return res.status(400).json({
+        message: "Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới",
+      });
     }
 
     await authService.changePassword(req.user.id, currentPassword, newPassword);
 
     res.status(200).json({ message: "Đổi mật khẩu thành công" });
   } catch (error) {
-    res.status(400).json({ message: error.message || "Không thể đổi mật khẩu" });
+    res
+      .status(400)
+      .json({ message: error.message || "Không thể đổi mật khẩu" });
   }
 };
 
@@ -80,11 +96,18 @@ const logout = async (req, res) => {
   res.clearCookie(jwtConfig.COOKIE_NAME, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
     path: "/",
   });
 
   res.status(200).json({ message: "Đăng xuất thành công" });
 };
 
-module.exports = { register, login, getMe, logout, updateProfile, updatePassword };
+module.exports = {
+  register,
+  login,
+  getMe,
+  logout,
+  updateProfile,
+  updatePassword,
+};
