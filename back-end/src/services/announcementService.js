@@ -4,7 +4,7 @@ const AnnouncementRead = require("../models/announcementReadModel");
 const Field = require("../models/fieldModel");
 const User = require("../models/userModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
-const { sendMail } = require("./mailService");
+const { sendMailSafely } = require("./mailService");
 const {
   buildAnnouncementEmailTemplate,
 } = require("../templates/announcementEmailTemplate");
@@ -486,16 +486,16 @@ const buildAnnouncementPayload = (payload = {}, current = null, recipientResolut
 
 const sendAnnouncementEmails = async ({ recipients, title, content, type, deliveryChannels }) => {
   if (!deliveryChannels.includes("email")) {
-    return;
+    return [];
   }
 
   const emailRecipients = recipients.filter((recipient) => recipient.email);
   if (emailRecipients.length === 0) {
-    return;
+    return [];
   }
 
-  await Promise.all(
-    emailRecipients.map((recipient) => {
+  return Promise.all(
+    emailRecipients.map(async (recipient) => {
       const emailContent = buildAnnouncementEmailTemplate({
         recipientName: recipient.fullName,
         title,
@@ -503,12 +503,19 @@ const sendAnnouncementEmails = async ({ recipients, title, content, type, delive
         type,
       });
 
-      return sendMail({
+      const result = await sendMailSafely({
         to: recipient.email,
         subject: emailContent.subject,
         text: emailContent.text,
         html: emailContent.html,
       });
+
+      return {
+        userId: recipient._id,
+        email: recipient.email,
+        emailSent: result.success,
+        emailErrorMessage: result.errorMessage,
+      };
     }),
   );
 };

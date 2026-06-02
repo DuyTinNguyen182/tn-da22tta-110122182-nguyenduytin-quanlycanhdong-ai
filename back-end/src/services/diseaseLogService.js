@@ -2,7 +2,7 @@ const DiseaseLog = require("../models/diseaseLogModel");
 const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const announcementService = require("./announcementService");
-const { sendMail } = require("./mailService");
+const { sendMailSafely } = require("./mailService");
 const {
   buildDiseaseWarningEmailTemplate,
 } = require("../templates/diseaseWarningEmailTemplate");
@@ -883,8 +883,8 @@ const sendDiseaseLogWarning = async (id, payload = {}, currentUser) => {
     });
 
   const emailRecipients = recipients.filter((recipient) => recipient.email);
-  await Promise.all(
-    emailRecipients.map((recipient) => {
+  const emailResults = await Promise.all(
+    emailRecipients.map(async (recipient) => {
       const emailContent = buildDiseaseWarningEmailTemplate({
         farmerName: recipient.fullName,
         title,
@@ -893,12 +893,20 @@ const sendDiseaseLogWarning = async (id, payload = {}, currentUser) => {
         plotNames: recipient.plotNames || [],
       });
 
-      return sendMail({
+      const result = await sendMailSafely({
         to: recipient.email,
         subject: emailContent.subject,
         text: emailContent.text,
         html: emailContent.html,
       });
+
+      return {
+        userId: recipient.userId,
+        fullName: recipient.fullName,
+        email: recipient.email,
+        emailSent: result.success,
+        emailErrorMessage: result.errorMessage,
+      };
     }),
   );
 
@@ -920,6 +928,12 @@ const sendDiseaseLogWarning = async (id, payload = {}, currentUser) => {
     log: mapDiseaseLogOutput(updated),
     recipients,
     recipientMode,
+    emailSummary: {
+      attemptedCount: emailResults.length,
+      sentCount: emailResults.filter((item) => item.emailSent).length,
+      failedCount: emailResults.filter((item) => !item.emailSent).length,
+    },
+    emailResults,
   };
 };
 

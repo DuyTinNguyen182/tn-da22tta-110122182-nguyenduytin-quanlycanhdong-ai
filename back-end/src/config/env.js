@@ -33,6 +33,16 @@ const SMTP_PASS = process.env.SMTP_PASS?.trim() || "";
 const SMTP_FROM_NAME =
   process.env.SMTP_FROM_NAME?.trim() || "Hệ thống quản lý cánh đồng lúa";
 const SMTP_FROM_EMAIL = process.env.SMTP_FROM_EMAIL?.trim() || SMTP_USER;
+const SMTP_CONNECTION_TIMEOUT =
+  Number(process.env.SMTP_CONNECTION_TIMEOUT) || 10000;
+const RESEND_API_KEY = process.env.RESEND_API_KEY?.trim() || "";
+const RESEND_API_URL =
+  process.env.RESEND_API_URL?.trim() || "https://api.resend.com/emails";
+const RESEND_FROM_NAME =
+  process.env.RESEND_FROM_NAME?.trim() || SMTP_FROM_NAME;
+const RESEND_FROM_EMAIL =
+  process.env.RESEND_FROM_EMAIL?.trim() || SMTP_FROM_EMAIL;
+const RESEND_TIMEOUT = Number(process.env.RESEND_TIMEOUT) || 10000;
 
 module.exports = {
   MONGO_URI,
@@ -50,4 +60,10 @@ module.exports = {
   SMTP_PASS,
   SMTP_FROM_NAME,
   SMTP_FROM_EMAIL,
+  SMTP_CONNECTION_TIMEOUT,
+  RESEND_API_KEY,
+  RESEND_API_URL,
+  RESEND_FROM_NAME,
+  RESEND_FROM_EMAIL,
+  RESEND_TIMEOUT,
 };

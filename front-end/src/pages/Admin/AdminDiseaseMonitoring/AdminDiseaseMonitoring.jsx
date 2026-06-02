@@ -240,11 +240,19 @@ const AdminDiseaseMonitoring = () => {
           title: warningForm.title.trim(),
           content: warningForm.content.trim(),
         },
+        { timeout: 30000 },
       );
 
       updateLogInState(res.data?.log);
+      const emailSummary = res.data?.emailSummary;
+      const failedEmailCount = emailSummary?.failedCount || 0;
+      const sentEmailCount = emailSummary?.sentCount || 0;
+      const recipientCount = res.data?.recipients?.length || 0;
+
       toast.success(
-        `Đã gửi cảnh báo đến ${res.data?.recipients?.length || 0} nông dân.`,
+        failedEmailCount > 0
+          ? `Đã gửi cảnh báo web đến ${recipientCount} nông dân. Email gửi được ${sentEmailCount}, lỗi ${failedEmailCount}.`
+          : `Đã gửi cảnh báo đến ${recipientCount} nông dân.`,
       );
       closeWarningModal();
     } catch (error) {
