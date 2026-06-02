@@ -27,8 +27,8 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
 } from "recharts";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
@@ -52,7 +52,7 @@ const EMPTY_DASHBOARD = {
     costByCategory: [],
     costByStage: [],
     cropProgress: [],
-    cumulativeCosts: [],
+    diseaseTrends: [],
     topFarmers: [],
   },
   liveFeeds: {
@@ -169,6 +169,61 @@ const EmptyBlock = ({ text }) => (
   </div>
 );
 
+// Component Tooltip Custom hiển thị chi tiết khi hover vào biểu đồ dịch bệnh
+const CustomDiseaseTooltip = ({ active, payload, label }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+
+    return (
+      <div className="rounded-lg border border-red-100 bg-white p-3 shadow-md min-w-[350px] max-w-[450px]">
+        <p className="text-xs font-bold text-gray-900 mb-2 border-b border-gray-100 pb-1.5">
+          Ngày {label} ({data.diseaseCount} báo cáo)
+        </p>
+
+        <div className="flex flex-col">
+          {data.details && data.details.length > 0 ? (
+            data.details.map((item, index) => (
+              <div
+                key={index}
+                className="flex items-center justify-between gap-3 text-[11px] py-1.5 border-b border-gray-50 last:border-0"
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="font-semibold text-red-600 whitespace-nowrap">
+                    {item.diseaseName}
+                  </span>
+                  <span className="text-gray-500 truncate">
+                    {/* Nối mảng plotNames lại thành chuỗi, cách nhau bằng dấu phẩy */}
+                    •{" "}
+                    {item.plotNames?.length
+                      ? item.plotNames.join(", ")
+                      : "Chưa xác định"}{" "}
+                    ({item.farmerName})
+                  </span>
+                </div>
+
+                <span
+                  className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-semibold border ${
+                    item.status === "processed"
+                      ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                      : "bg-amber-50 text-amber-600 border-amber-200"
+                  }`}
+                >
+                  {item.status === "processed" ? "Đã xử lý" : "Chưa xử lý"}
+                </span>
+              </div>
+            ))
+          ) : (
+            <p className="text-[11px] text-gray-500 italic py-1">
+              Không có ca bệnh nào.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 const AdminDashboard = () => {
   const { toast } = useFeedback();
   const [dashboard, setDashboard] = useState(EMPTY_DASHBOARD);
@@ -212,8 +267,13 @@ const AdminDashboard = () => {
         setDashboard(nextDashboard);
 
         if (!selectedSeasonId && nextDashboard?.seasonDetailId) {
-          skipNextDashboardFetch.current = true;
-          setSelectedSeasonId(nextDashboard.seasonDetailId);
+          setSelectedSeasonId((prevId) => {
+            if (prevId !== nextDashboard.seasonDetailId) {
+              skipNextDashboardFetch.current = true;
+              return nextDashboard.seasonDetailId;
+            }
+            return prevId; // Bỏ qua, không bật cờ nếu ID đã trùng khớp
+          });
         }
       } catch (error) {
         toast.error(error.response?.data?.message || "Không thể tải dashboard");
@@ -431,25 +491,25 @@ const AdminDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 gap-2 xl:grid-cols-5">
-          {/* Biến động chi phí lũy kế theo thời gian (Line Chart) */}
+          {/* Thay thế biểu đồ Chi phí lũy kế thành Biểu đồ cảnh báo dịch bệnh */}
           <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm xl:col-span-3">
             <div className="mb-3 flex items-center gap-2">
-              <div className="rounded-lg bg-blue-50 p-2">
-                <Activity className="h-4 w-4 text-blue-700" />
+              <div className="rounded-lg bg-red-50 p-2">
+                <ShieldAlert className="h-4 w-4 text-red-600" />
               </div>
               <h2 className="text-sm font-semibold text-gray-900">
-                Chi phí đầu tư lũy kế theo thời gian
+                Tần suất phát hiện dịch bệnh theo ngày
               </h2>
             </div>
 
-            {!charts.cumulativeCosts || charts.cumulativeCosts.length === 0 ? (
-              <EmptyBlock text="Chưa ghi nhận dữ liệu biến động chi phí phát sinh." />
+            {!charts.diseaseTrends || charts.diseaseTrends.length === 0 ? (
+              <EmptyBlock text="Chưa ghi nhận dữ liệu thống kê dịch bệnh cho mùa vụ này." />
             ) : (
               <div className="h-[200px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={charts.cumulativeCosts}
-                    margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                  <AreaChart
+                    data={charts.diseaseTrends}
+                    margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
                   >
                     <CartesianGrid
                       strokeDasharray="3 3"
@@ -459,31 +519,24 @@ const AdminDashboard = () => {
                     <XAxis
                       dataKey="_id"
                       tick={{ fill: "#6b7280", fontSize: 10 }}
+                      interval="preserveStartEnd"
+                      minTickGap={15}
                     />
                     <YAxis
                       tick={{ fill: "#6b7280", fontSize: 10 }}
-                      tickFormatter={formatNumber}
+                      allowDecimals={false}
                     />
-                    <Tooltip
-                      formatter={(value) => [
-                        formatCurrency(value),
-                        "Chi phí lũy kế",
-                      ]}
-                      contentStyle={{
-                        borderRadius: "8px",
-                        border: "1px solid #e5e7eb",
-                        fontSize: "10px",
-                      }}
-                    />
-                    <Line
+
+                    <Tooltip content={<CustomDiseaseTooltip />} />
+
+                    <Area
                       type="monotone"
-                      dataKey="cumulativeCost"
-                      stroke="#3b82f6"
+                      dataKey="diseaseCount"
+                      stroke="#ef4444"
+                      fill="#fee2e2"
                       strokeWidth={2}
-                      dot={{ r: 3 }}
-                      activeDot={{ r: 5 }}
                     />
-                  </LineChart>
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             )}
@@ -496,7 +549,7 @@ const AdminDashboard = () => {
                 <Layers className="h-4 w-4 text-orange-700" />
               </div>
               <h2 className="text-sm font-semibold text-gray-900">
-                Top nông dân có chi phí/1000m² cao nhất
+                Top thửa ruộng có chi phí/1000m² cao nhất
               </h2>
             </div>
 
@@ -520,10 +573,10 @@ const AdminDashboard = () => {
 
                       <div className="flex flex-col">
                         <span className="text-xs font-semibold text-gray-800">
-                          {farmer.farmerName}
+                          {farmer.plotName}
                         </span>
                         <span className="text-[10px] text-gray-500">
-                          Thửa: {farmer.plotName}
+                          {farmer.farmerName}
                         </span>
                       </div>
                       <span className="text-xs font-bold text-gray-900 text-right flex flex-col">

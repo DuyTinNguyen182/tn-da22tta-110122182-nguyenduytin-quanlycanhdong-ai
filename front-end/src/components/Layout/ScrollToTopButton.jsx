@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ChevronUp } from "lucide-react";
 
 const SCROLL_THRESHOLD = 8;
@@ -11,7 +12,11 @@ const getScrollableElements = () => {
     const style = window.getComputedStyle(element);
     const hasScrollableOverflow = /(auto|scroll)/.test(style.overflowY);
 
-    return hasScrollableOverflow && element.scrollHeight > element.clientHeight + 1 && element.scrollTop > 0;
+    return (
+      hasScrollableOverflow &&
+      element.scrollHeight > element.clientHeight + 1 &&
+      element.scrollTop > 0
+    );
   });
 };
 
@@ -23,13 +28,23 @@ const isScrolledAwayFromTop = () => {
   return getScrollableElements().length > 0;
 };
 
+// Example: ["/farmer", "/farmer/plots", "/admin/dashboard"]
+export const allowedPaths = ["/farmer", "/farmer/plots", "/farmer/dashboard"];
+
+const isAllowedPath = (pathname) => {
+  if (!allowedPaths || allowedPaths.length === 0) return true; // show everywhere if empty
+  return allowedPaths.some((p) => pathname.startsWith(p));
+};
+
 const ScrollToTopButton = () => {
+  const location = useLocation();
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     const updateVisibility = () => {
       const isDesktop = window.matchMedia("(min-width: 768px)").matches;
-      setIsVisible(isDesktop && isScrolledAwayFromTop());
+      const allowed = isAllowedPath(location.pathname);
+      setIsVisible(isDesktop && isScrolledAwayFromTop() && allowed);
     };
 
     updateVisibility();
@@ -43,10 +58,12 @@ const ScrollToTopButton = () => {
       window.removeEventListener("resize", updateVisibility);
       document.removeEventListener("scroll", updateVisibility, true);
     };
-  }, []);
+  }, [location.pathname]);
 
   const handleScrollToTop = () => {
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     const behavior = prefersReducedMotion ? "auto" : "smooth";
 
     window.scrollTo({ top: 0, behavior });

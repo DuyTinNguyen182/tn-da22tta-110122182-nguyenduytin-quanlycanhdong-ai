@@ -38,7 +38,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
         collapsed ? "w-20" : "w-64"
       }`}
     >
-      <div className="flex h-20 flex-shrink-0 items-center border-b border-gray-100 px-6">
+      <div className="flex h-20 flex-shrink-0 items-center border-b border-gray-100 px-4">
         <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden">
           <img
             src="/Logo_AgriSmart.png"

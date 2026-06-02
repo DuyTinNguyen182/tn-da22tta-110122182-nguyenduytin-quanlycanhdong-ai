@@ -48,7 +48,6 @@ const getPreviousSeasonDetail = async (currentSeasonDetail) => {
 const getDashboardData = async (querySeasonDetailId = "") => {
   const seasonDetail = await resolveSeasonDetail(querySeasonDetailId);
 
-  // ĐÃ SỬA: Xử lý an toàn khi không có mùa vụ hoạt động
   if (!seasonDetail) {
     const totalFarmers = await User.countDocuments({ role: "farmer" });
     return {
@@ -68,7 +67,7 @@ const getDashboardData = async (querySeasonDetailId = "") => {
         costByCategory: [],
         costByStage: [],
         cropProgress: [],
-        cumulativeCosts: [],
+        diseaseTrends: [],
         topFarmers: [],
       },
       liveFeeds: {
@@ -125,7 +124,7 @@ const getDashboardData = async (querySeasonDetailId = "") => {
     recentFarmingLogs,
     recentDiseaseLogs,
     cropProgress,
-    rawDailyCosts,
+    rawDailyDiseases,
     topFarmers,
     prevAreaResult,
     prevCostResult,
@@ -339,23 +338,60 @@ const getDashboardData = async (querySeasonDetailId = "") => {
         ])
       : Promise.resolve([]),
 
-    // Biến động chi phí phát sinh (Lấy theo ngày định dạng YYYY-MM-DD để dễ sort)
+    // Tần suất phát hiện dịch bệnh theo ngày (Lấy chi tiết - Gộp chung log)
     assignmentIds.length
-      ? FarmingLog.aggregate([
+      ? DiseaseLog.aggregate([
           { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
+          {
+            $lookup: {
+              from: "season_plot_assignments",
+              localField: "seasonPlotAssignments",
+              foreignField: "_id",
+              as: "assignments",
+            },
+          },
+          {
+            $lookup: {
+              from: "plots",
+              localField: "assignments.plot",
+              foreignField: "_id",
+              as: "plots", // Trả về mảng chứa toàn bộ data các thửa đất của log này
+            },
+          },
+          {
+            $lookup: {
+              from: "users",
+              localField: "user",
+              foreignField: "_id",
+              as: "userData",
+            },
+          },
+          { $unwind: { path: "$userData", preserveNullAndEmptyArrays: true } },
           {
             $group: {
               _id: {
-                $dateToString: { format: "%Y-%m-%d", date: "$createdAt" },
+                $dateToString: { format: "%Y-%m-%d", date: "$detectedAt" },
               },
-              dailyCost: { $sum: { $ifNull: ["$cost", 0] } },
+              diseaseCount: { $sum: 1 },
+              details: {
+                $push: {
+                  diseaseName: {
+                    $ifNull: ["$diseaseName", "Bệnh chưa xác định"],
+                  },
+                  farmerName: {
+                    $ifNull: ["$userData.fullName", "Chưa xác định"],
+                  },
+                  plotNames: "$plots.name",
+                  status: { $ifNull: ["$status", "unprocessed"] },
+                },
+              },
             },
           },
           { $sort: { _id: 1 } },
         ])
       : Promise.resolve([]),
 
-    // Top nông dân có chi phí/1000m2 cao nhất
+    // Top thửa ruộng có chi phí/1000m2 cao nhất
     assignmentIds.length
       ? FarmingLog.aggregate([
           { $match: { seasonPlotAssignments: { $in: assignmentIds } } },
@@ -401,7 +437,6 @@ const getDashboardData = async (querySeasonDetailId = "") => {
               plotName: "$plotData.name",
               area: "$plotData.area",
               totalCost: 1,
-              // Tính costPer1000m2: (totalCost / area) * 1000
               costPer1000m2: {
                 $cond: [
                   { $gt: ["$plotData.area", 0] },
@@ -436,18 +471,61 @@ const getDashboardData = async (querySeasonDetailId = "") => {
       : Promise.resolve([]),
   ]);
 
-  // Tính toán Chi phí Lũy kế (Cumulative Cost) từ mảng daily cost
-  let cumulativeTotal = 0;
-  const cumulativeCosts = rawDailyCosts.map((log) => {
-    cumulativeTotal += log.dailyCost;
-    // Chuyển format YYYY-MM-DD sang DD/MM cho UI đẹp
-    const [y, m, d] = log._id.split("-");
-    return {
-      _id: `${d}/${m}`,
-      dailyCost: log.dailyCost,
-      cumulativeCost: cumulativeTotal,
-    };
-  });
+  // Lập bản đồ dữ liệu
+  const diseaseMap = new Map(rawDailyDiseases.map((item) => [item._id, item]));
+  const diseaseTrends = [];
+
+  let start = new Date(seasonDetail.startDate);
+
+  // --- LOGIC CẮT BỎ KHOẢNG TRỐNG FLATLINE ĐẦU MÙA VỤ ---
+  if (rawDailyDiseases.length > 0) {
+    // Lấy ngày có ca bệnh đầu tiên (do rawDailyDiseases đã được $sort tăng dần)
+    const firstDiseaseDate = new Date(rawDailyDiseases[0]._id);
+
+    // Lùi lại 3 ngày để làm "khoảng đệm" (padding)
+    firstDiseaseDate.setDate(firstDiseaseDate.getDate() - 3);
+
+    // Nếu ngày bắt đầu có dịch (đã lùi 3 ngày) lớn hơn ngày bắt đầu mùa vụ,
+    // thì dời mốc vẽ biểu đồ về ngày này để cắt bỏ đoạn flatline 0 vô nghĩa.
+    if (firstDiseaseDate > start) {
+      start = firstDiseaseDate;
+    }
+  }
+  // ---------------------------------------------------------
+
+  let end = new Date(); // Mặc định mốc kết thúc là ngày hôm nay
+
+  // Cắt mốc tương lai
+  if (seasonDetail.endDate) {
+    const parsedEndDate = new Date(seasonDetail.endDate);
+    if (parsedEndDate < end) {
+      end = parsedEndDate;
+    }
+  }
+
+  // Vòng lặp điền bù ngày trống
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const dateKey = `${yyyy}-${mm}-${dd}`;
+    const uiLabel = `${dd}/${mm}`;
+
+    if (diseaseMap.has(dateKey)) {
+      const dayData = diseaseMap.get(dateKey);
+      diseaseTrends.push({
+        _id: uiLabel,
+        diseaseCount: dayData.diseaseCount,
+        details: dayData.details,
+      });
+    } else {
+      diseaseTrends.push({
+        _id: uiLabel,
+        diseaseCount: 0,
+        details: [],
+      });
+    }
+  }
 
   const currentArea = totalAreaResult[0]?.totalArea || 0;
   const currentCost = totalCostResult[0]?.totalCost || 0;
@@ -483,7 +561,7 @@ const getDashboardData = async (querySeasonDetailId = "") => {
       costByCategory,
       costByStage,
       cropProgress,
-      cumulativeCosts,
+      diseaseTrends,
       topFarmers,
     },
     liveFeeds: {
