@@ -22,6 +22,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  Legend, // ĐÃ THÊM: Import Legend từ recharts
 } from "recharts";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
@@ -92,7 +93,6 @@ const buildSeasonOptionLabel = (item) => {
   return year ? `${seasonName} ${year}` : seasonName;
 };
 
-// Đã thêm subtext cực nhỏ gọn để nhét vừa dòng So sánh chi phí
 const KpiCard = ({
   title,
   value,
@@ -172,7 +172,7 @@ const FarmerDashboard = () => {
   useEffect(() => {
     const fetchSeasonDetails = async () => {
       try {
-        const res = await api.get("/season-details/all"); // Route tương ứng của Farmer
+        const res = await api.get("/season-details/all");
         setSeasonDetails(res.data || []);
       } catch (error) {
         toast.error(
@@ -202,8 +202,13 @@ const FarmerDashboard = () => {
         setDashboard(nextDashboard);
 
         if (!selectedSeasonId && nextDashboard?.seasonDetailId) {
-          skipNextDashboardFetch.current = true;
-          setSelectedSeasonId(nextDashboard.seasonDetailId);
+          setSelectedSeasonId((prevId) => {
+            if (prevId !== nextDashboard.seasonDetailId) {
+              skipNextDashboardFetch.current = true;
+              return nextDashboard.seasonDetailId;
+            }
+            return prevId;
+          });
         }
       } catch (error) {
         toast.error(error.response?.data?.message || "Không thể tải dashboard");
@@ -242,7 +247,6 @@ const FarmerDashboard = () => {
     );
   }
 
-  // Set màu sắc cho text so sánh
   let compColor = "text-gray-500";
   if (kpis.comparison.type === "good") compColor = "text-emerald-600";
   if (kpis.comparison.type === "bad") compColor = "text-red-600";
@@ -250,7 +254,7 @@ const FarmerDashboard = () => {
   return (
     <div className="h-full overflow-y-auto bg-gray-100 px-2 py-2 sm:px-4 lg:px-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-2">
-        {/* ROW 1: KPIs & Bộ Lọc (Grid 5 cột y hệt Admin) */}
+        {/* ROW 1: KPIs & Bộ Lọc */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <KpiCard
             title="Số thửa đang canh tác"
@@ -293,12 +297,12 @@ const FarmerDashboard = () => {
                   <CustomDropdown
                     value={selectedSeasonId}
                     onChange={setSelectedSeasonId}
-                    placeholder="Mùa vụ đang hoạt động"
+                    placeholder="Mùa vụ hiện tại"
                     variant="filter"
                     size="small"
                     icon={Sprout}
                     options={[
-                      { value: "", label: "Mùa vụ đang hoạt động" },
+                      { value: "", label: "Mùa vụ hiện tại" },
                       ...seasonDetails.map((item) => ({
                         value: item._id,
                         label: buildSeasonOptionLabel(item),
@@ -414,6 +418,12 @@ const FarmerDashboard = () => {
                         fontSize: "10px",
                       }}
                     />
+                    <Legend
+                      layout="vertical"
+                      verticalAlign="middle"
+                      align="right"
+                      wrapperStyle={{ fontSize: "10px" }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -421,10 +431,9 @@ const FarmerDashboard = () => {
           </div>
         </div>
 
-        {/* ROW 3: Tiến độ canh tác & Cảnh báo sâu bệnh */}
+        {/* ROW 3: Tiến độ canh tác*/}
         <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-          {/* Tiến độ (Biểu đồ ngang) */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
+          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm flex flex-col h-full">
             <div className="mb-2 flex items-center gap-2">
               <div className="rounded-lg bg-sky-50 p-1.5">
                 <Activity className="h-4 w-4 text-sky-600" />
@@ -437,118 +446,63 @@ const FarmerDashboard = () => {
             {charts.cropProgress.length === 0 ? (
               <EmptyBlock text="Chưa bắt đầu làm đất." />
             ) : (
-              <div className="h-[180px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={charts.cropProgress}
-                    layout="vertical"
-                    margin={{ top: 2, right: 10, left: 15, bottom: 2 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      horizontal={false}
-                      stroke="#e5e7eb"
-                    />
-                    <XAxis
-                      type="number"
-                      tick={{ fill: "#6b7280", fontSize: 9 }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="stageName"
-                      tick={{ fill: "#374151", fontSize: 9 }}
-                      width={70}
-                    />
-                    <Tooltip
-                      formatter={(value) => [
-                        `${formatNumber(value)} m²`,
-                        "Diện tích",
-                      ]}
-                      contentStyle={{
-                        borderRadius: "12px",
-                        border: "1px solid #e5e7eb",
-                        fontSize: "11px",
-                      }}
-                    />
-                    <Bar
-                      dataKey="totalArea"
-                      name="Diện tích"
-                      radius={[0, 8, 8, 0]}
-                      fill="#0ea5e9"
-                      barSize={16}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div className="w-full flex-1 min-h-[150px] overflow-hidden">
+                {/* Tính toán chiều cao linh hoạt tránh bị rỗng khoảng không */}
+                <div
+                  style={{
+                    height: Math.max(100, charts.cropProgress.length * 40 + 40),
+                    minHeight: "100%",
+                  }}
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={charts.cropProgress}
+                      layout="vertical"
+                      margin={{ top: 5, right: 15, left: 0, bottom: 5 }}
+                    >
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        horizontal={false}
+                        stroke="#e5e7eb"
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{ fill: "#6b7280", fontSize: 9 }}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="stageName"
+                        tick={{ fill: "#374151", fontSize: 9 }}
+                        width={70}
+                      />
+                      <Tooltip
+                        formatter={(value) => [
+                          `${formatNumber(value)} m²`,
+                          "Diện tích",
+                        ]}
+                        contentStyle={{
+                          borderRadius: "12px",
+                          border: "1px solid #e5e7eb",
+                          fontSize: "11px",
+                        }}
+                      />
+                      <Bar
+                        dataKey="totalArea"
+                        name="Diện tích"
+                        radius={[0, 4, 4, 0]}
+                        fill="#0ea5e9"
+                        barSize={16}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Cảnh báo dịch bệnh (Thay cho biểu đồ Top bệnh của Admin) */}
-          {/* <div className="rounded-2xl border border-red-200 bg-red-50 p-2.5 shadow-sm">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="rounded-lg bg-red-100 p-1.5">
-                <ShieldAlert className="h-4 w-4 text-red-600" />
-              </div>
-              <h2 className="text-xs font-semibold text-red-900">
-                Cảnh báo chưa xử lý (Của bạn)
-              </h2>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              {alerts.unprocessedDiseases.length === 0 ? (
-                <EmptyBlock text="Tuyệt vời! Ruộng của bạn không có cảnh báo nào." />
-              ) : (
-                alerts.unprocessedDiseases
-                  .slice(0, 3)
-                  .map((item) => (
-                    <FeedItem
-                      key={item._id}
-                      icon={Bug}
-                      iconClass="text-red-600"
-                      bgClass="bg-white"
-                      borderClass="border-red-100"
-                      title={item.diseaseName || "Bệnh chưa xác định"}
-                      subtitle={`Tại ruộng: ${item.seasonPlotAssignments?.[0]?.plot?.name || "Đang xử lý"}`}
-                      meta={`Phát hiện: ${formatDateOnly(item.detectedAt)}`}
-                    />
-                  ))
-              )}
-            </div>
-          </div> */}
+          {/* Cảnh báo dịch bệnh / Trợ lý sinh học */}
           <AssistantCard />
-          {/* <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="rounded-lg bg-emerald-50 p-1.5">
-                <Sprout className="h-4 w-4 text-emerald-700" />
-              </div>
-              <h2 className="text-xs font-semibold text-gray-900">
-                Hoạt động vừa ghi
-              </h2>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              {liveFeeds.recentFarmingLogs.length === 0 ? (
-                <EmptyBlock text="Chưa có nhật ký nào." />
-              ) : (
-                liveFeeds.recentFarmingLogs
-                  .slice(0, 3)
-                  .map((item) => (
-                    <FeedItem
-                      key={item._id}
-                      icon={Sprout}
-                      iconClass="text-emerald-700"
-                      title={item.task?.name || "Công việc"}
-                      subtitle={formatDateOnly(item.createdAt)}
-                      meta={`Chi phí: ${formatCurrency(item.cost)}`}
-                    />
-                  ))
-              )}
-            </div>
-          </div> */}
         </div>
-
-        {/* ROW 4: Nhật ký hoạt động */}
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-2"></div>
       </div>
     </div>
   );

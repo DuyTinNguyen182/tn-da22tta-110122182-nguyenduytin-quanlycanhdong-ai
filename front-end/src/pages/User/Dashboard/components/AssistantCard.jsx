@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { CheckCircle2, ChevronRight, Sparkles, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, Sparkles, X, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../../services/api";
 
 const SmartAssistantCard = () => {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hasActiveSeason, setHasActiveSeason] = useState(true); // Thêm state quản lý mùa vụ
 
   // State điều khiển Popup Xem tất cả
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,7 +17,19 @@ const SmartAssistantCard = () => {
       try {
         const res = await api.get("/farmer-dashboard/recommendations");
 
-        const rawData = res.data || [];
+        let rawData = [];
+        let active = true;
+
+        // Xử lý đọc data tương thích với API mới
+        if (res.data && !Array.isArray(res.data)) {
+          rawData = res.data.data || [];
+          active = res.data.hasActiveSeason ?? true;
+        } else {
+          rawData = res.data || [];
+        }
+
+        setHasActiveSeason(active);
+
         const grouped = rawData.reduce((acc, curr) => {
           if (!acc[curr.taskId]) {
             acc[curr.taskId] = {
@@ -57,6 +70,25 @@ const SmartAssistantCard = () => {
     );
   }
 
+  // ĐÃ SỬA: Thông báo riêng khi KHÔNG CÓ mùa vụ
+  if (!hasActiveSeason) {
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 shadow-sm">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="rounded-xl bg-white p-1.5 shadow-sm border border-gray-100 text-gray-500">
+            <Info className="h-4 w-4" />
+          </div>
+          <h2 className="text-sm font-bold text-gray-700">Trợ lý sinh học</h2>
+        </div>
+        <p className="text-xs text-gray-500 ml-9 leading-relaxed">
+          Chưa có mùa vụ nào đang hoạt động. Hãy chờ Hợp tác xã cấu hình mùa vụ
+          mới nhé.
+        </p>
+      </div>
+    );
+  }
+
+  // Thông báo khi CÓ mùa vụ nhưng ruộng đang ổn (không có việc cần làm)
   if (recommendations.length === 0) {
     return (
       <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-3 shadow-sm">
@@ -122,7 +154,6 @@ const SmartAssistantCard = () => {
                   • {rec.message}
                 </p>
               </div>
-              {/* Đã gỡ bỏ nút "Ghi ngay" ở từng dòng */}
             </div>
           ))}
         </div>
@@ -137,7 +168,7 @@ const SmartAssistantCard = () => {
               Xem tất cả ({recommendations.length})
             </button>
           ) : (
-            <div></div> // Giữ layout flex-between không bị lệch nếu không có nút xem tất cả
+            <div></div>
           )}
 
           <button
@@ -153,7 +184,6 @@ const SmartAssistantCard = () => {
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
           <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white shadow-xl flex flex-col max-h-[85vh]">
-            {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-100 p-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-amber-500" />
@@ -169,7 +199,6 @@ const SmartAssistantCard = () => {
               </button>
             </div>
 
-            {/* Modal Body (Cuộn được) */}
             <div className="overflow-y-auto p-4 space-y-2.5 flex-1 bg-gray-50/50">
               {recommendations.map((rec, index) => (
                 <div
@@ -199,12 +228,11 @@ const SmartAssistantCard = () => {
               ))}
             </div>
 
-            {/* Modal Footer */}
             <div className="p-4 border-t border-gray-100 bg-white rounded-b-2xl">
               <button
                 onClick={() => {
                   setIsModalOpen(false);
-                  navigate("/farmer/diary/create"); // Chuyển sang form ghi nhật ký chung
+                  navigate("/farmer/diary/create");
                 }}
                 className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
               >

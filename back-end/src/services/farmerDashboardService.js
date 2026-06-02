@@ -47,13 +47,16 @@ const resolveSeasonDetail = async (querySeasonDetailId) => {
     .sort({ startDate: -1, createdAt: -1 })
     .lean();
 
-  if (activeSeasonDetail) {
-    return activeSeasonDetail;
-  }
+  return activeSeasonDetail || null;
+};
 
-  return await SeasonDetail.findOne({})
-    .populate("season", "name")
-    .sort({ startDate: -1, createdAt: -1 })
+// ĐÃ THÊM: Hàm lấy thông tin vụ trước
+const getPreviousSeasonDetail = async (currentSeasonDetail) => {
+  if (!currentSeasonDetail) return null;
+  return await SeasonDetail.findOne({
+    startDate: { $lt: currentSeasonDetail.startDate },
+  })
+    .sort({ startDate: -1 })
     .lean();
 };
 
@@ -67,23 +70,18 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
     return EMPTY_DASHBOARD;
   }
 
-  const userObjectId = toObjectId(userId);
   const seasonDetail = await resolveSeasonDetail(querySeasonDetailId);
+
   if (!seasonDetail) {
-    return EMPTY_DASHBOARD;
+    return {
+      ...EMPTY_DASHBOARD,
+      currentSeasonName: "Chưa có mùa vụ hoạt động",
+    };
   }
 
-  // 1. Lấy TẤT CẢ assignment của Mùa vụ này (để tính trung bình HTX)
-  const allAssignments = await SeasonPlotAssignment.find({
-    seasonDetail: seasonDetail._id,
-    status: "active",
-  })
-    .select("_id plot")
-    .lean();
-  const allAssignmentIds = allAssignments.map((a) => a._id);
-  const allPlotIds = [...new Set(allAssignments.map((a) => String(a.plot)))];
+  const userObjectId = toObjectId(userId);
 
-  // 2. Lấy assignment CỦA RIÊNG NÔNG DÂN NÀY
+  // 1. Lấy assignment CỦA RIÊNG NÔNG DÂN NÀY (Vụ hiện tại)
   const userAssignments = await SeasonPlotAssignment.find({
     seasonDetail: seasonDetail._id,
     user: userId,
@@ -94,32 +92,43 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
   const userAssignmentIds = userAssignments.map((a) => a._id);
   const userPlotIds = [...new Set(userAssignments.map((a) => String(a.plot)))];
 
+  // 2. Lấy dữ liệu VỤ TRƯỚC của Nông dân này
+  const prevSeasonDetail = await getPreviousSeasonDetail(seasonDetail);
+  let prevUserAssignmentIds = [];
+  let prevUserPlotIds = [];
+
+  if (prevSeasonDetail) {
+    const prevAssignments = await SeasonPlotAssignment.find({
+      seasonDetail: prevSeasonDetail._id,
+      user: userId,
+      status: "active",
+    })
+      .select("_id plot")
+      .lean();
+    prevUserAssignmentIds = prevAssignments.map((a) => a._id);
+    prevUserPlotIds = [...new Set(prevAssignments.map((a) => String(a.plot)))];
+  }
+
   // 3. Thực hiện các câu query song song
   const [
     userAreaResult,
     userCostResult,
-    allAreaResult,
-    allCostResult,
+    prevAreaResult, // Thay thế allAreaResult
+    prevCostResult, // Thay thế allCostResult
     costByCategory,
     costByStage,
     cropProgress,
     unprocessedDiseases,
     recentFarmingLogs,
   ] = await Promise.all([
-    // Diện tích của nông dân
+    // Diện tích vụ hiện tại
     userPlotIds.length
       ? Plot.aggregate([
-          {
-            $match: {
-              _id: {
-                $in: userPlotIds.map((id) => toObjectId(id)),
-              },
-            },
-          },
+          { $match: { _id: { $in: userPlotIds.map((id) => toObjectId(id)) } } },
           { $group: { _id: null, totalArea: { $sum: "$area" } } },
         ])
       : Promise.resolve([{ totalArea: 0 }]),
-    // Chi phí của nông dân
+    // Chi phí vụ hiện tại
     userAssignmentIds.length
       ? FarmingLog.aggregate([
           {
@@ -131,23 +140,27 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
           { $group: { _id: null, totalCost: { $sum: "$cost" } } },
         ])
       : Promise.resolve([{ totalCost: 0 }]),
-    // Diện tích của CẢ HTX
-    allPlotIds.length
+
+    // Diện tích vụ trước (Của riêng nông dân này)
+    prevUserPlotIds.length
       ? Plot.aggregate([
           {
             $match: {
-              _id: {
-                $in: allPlotIds.map((id) => toObjectId(id)),
-              },
+              _id: { $in: prevUserPlotIds.map((id) => toObjectId(id)) },
             },
           },
           { $group: { _id: null, totalArea: { $sum: "$area" } } },
         ])
       : Promise.resolve([{ totalArea: 0 }]),
-    // Chi phí của CẢ HTX
-    allAssignmentIds.length
+    // Chi phí vụ trước (Của riêng nông dân này)
+    prevUserAssignmentIds.length
       ? FarmingLog.aggregate([
-          { $match: { seasonPlotAssignments: { $in: allAssignmentIds } } },
+          {
+            $match: {
+              seasonPlotAssignments: { $in: prevUserAssignmentIds },
+              user: userObjectId,
+            },
+          },
           { $group: { _id: null, totalCost: { $sum: "$cost" } } },
         ])
       : Promise.resolve([{ totalCost: 0 }]),
@@ -214,7 +227,7 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
         ])
       : Promise.resolve([]),
 
-    // Biểu đồ: Chi phí theo giai đoạn (Của riêng user)
+    // Biểu đồ: Chi phí theo giai đoạn
     userAssignmentIds.length
       ? FarmingLog.aggregate([
           {
@@ -263,7 +276,7 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
         ])
       : Promise.resolve([]),
 
-    // Tiến độ canh tác (Của riêng user)
+    // Tiến độ canh tác
     userAssignmentIds.length
       ? SeasonPlotAssignment.aggregate([
           { $match: { _id: { $in: userAssignmentIds }, user: userObjectId } },
@@ -330,7 +343,7 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
         ])
       : Promise.resolve([]),
 
-    // Cảnh báo bệnh (Của riêng user, chưa xử lý)
+    // Cảnh báo bệnh chưa xử lý
     userAssignmentIds.length
       ? DiseaseLog.find({
           seasonPlotAssignments: { $in: userAssignmentIds },
@@ -342,7 +355,7 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
           .lean()
       : Promise.resolve([]),
 
-    // Log gần nhất (Của riêng user)
+    // Log gần nhất
     userAssignmentIds.length
       ? FarmingLog.find({
           seasonPlotAssignments: { $in: userAssignmentIds },
@@ -355,33 +368,36 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
       : Promise.resolve([]),
   ]);
 
-  // Xử lý số liệu so sánh KPI
+  // Xử lý số liệu so sánh KPI với vụ trước
   const userTotalArea = userAreaResult[0]?.totalArea || 0;
   const userTotalCost = userCostResult[0]?.totalCost || 0;
   const userCostPer1000 =
     userTotalArea > 0 ? (userTotalCost / userTotalArea) * 1000 : 0;
 
-  const allTotalArea = allAreaResult[0]?.totalArea || 0;
-  const allTotalCost = allCostResult[0]?.totalCost || 0;
-  const allCostPer1000 =
-    allTotalArea > 0 ? (allTotalCost / allTotalArea) * 1000 : 0;
+  const prevTotalArea = prevAreaResult[0]?.totalArea || 0;
+  const prevTotalCost = prevCostResult[0]?.totalCost || 0;
+  const prevCostPer1000 =
+    prevTotalArea > 0 ? (prevTotalCost / prevTotalArea) * 1000 : 0;
 
-  let comparisonText = "Chưa có dữ liệu so sánh";
+  let comparisonText = "Chưa có dữ liệu vụ trước";
   let comparisonType = "neutral";
 
-  if (userCostPer1000 > 0 && allCostPer1000 > 0) {
+  if (prevCostPer1000 > 0) {
     const diffPercent =
-      ((userCostPer1000 - allCostPer1000) / allCostPer1000) * 100;
+      ((userCostPer1000 - prevCostPer1000) / prevCostPer1000) * 100;
+
     if (diffPercent < -5) {
-      comparisonText = `Tiết kiệm hơn ${Math.abs(diffPercent).toFixed(1)}% so với TB Hợp tác xã`;
-      comparisonType = "good"; // Xanh lá
+      comparisonText = `Tiết kiệm hơn ${Math.abs(diffPercent).toFixed(1)}% so với vụ trước`;
+      comparisonType = "good"; // Xanh lá (tốt vì tiết kiệm chi phí)
     } else if (diffPercent > 5) {
-      comparisonText = `Cao hơn ${diffPercent.toFixed(1)}% so với TB Hợp tác xã`;
-      comparisonType = "bad"; // Đỏ
+      comparisonText = `Cao hơn ${diffPercent.toFixed(1)}% so với vụ trước`;
+      comparisonType = "bad"; // Đỏ (cảnh báo lố ngân sách)
     } else {
-      comparisonText = `Tương đương mức trung bình của Hợp tác xã`;
+      comparisonText = `Đang bám sát mức chi tiêu của vụ trước`;
       comparisonType = "neutral"; // Xám
     }
+  } else if (userCostPer1000 > 0) {
+    comparisonText = "Vụ đầu tiên ghi nhận chi phí trên hệ thống";
   }
 
   return {
@@ -399,19 +415,18 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
     liveFeeds: { recentFarmingLogs },
   };
 };
+
 const getDailyRecommendations = async (farmerId) => {
   try {
     const now = new Date();
 
-    // 1. Tìm mùa vụ đang diễn ra
     const activeSeasonDetail = await SeasonDetail.findOne({
       startDate: { $lte: now },
       $or: [{ endDate: null }, { endDate: { $gte: now } }],
     }).lean();
 
-    if (!activeSeasonDetail) return [];
+    if (!activeSeasonDetail) return { hasActiveSeason: false, data: [] };
 
-    // 2. Lấy phân công canh tác của Nông dân này
     const assignments = await SeasonPlotAssignment.find({
       seasonDetail: activeSeasonDetail._id,
       user: farmerId,
@@ -420,9 +435,8 @@ const getDailyRecommendations = async (farmerId) => {
       .populate("plot", "name")
       .lean();
 
-    if (!assignments.length) return [];
+    if (!assignments.length) return { hasActiveSeason: true, data: [] };
 
-    // 3. Lấy dữ liệu cấu hình Task từ DB
     const sowingTask = await Task.findOne({
       "recommendation.isSowingTask": true,
     }).lean();
@@ -433,23 +447,17 @@ const getDailyRecommendations = async (farmerId) => {
 
     let recommendations = [];
 
-    // ---------------------------------------------------------
-    // [LÕI NÂNG CẤP]: HÀM KIỂM TRA ĐIỀU KIỆN TIÊN QUYẾT
-    // ---------------------------------------------------------
     const checkPrerequisites = (task, completedTaskIdsSet) => {
-      if (!task.prerequisites || task.prerequisites.length === 0) return true; // Không yêu cầu gì -> Pass
-      // Kiểm tra xem MỌI công việc tiên quyết đều đã được nông dân làm (nằm trong set)
+      if (!task.prerequisites || task.prerequisites.length === 0) return true;
       return task.prerequisites.every((prereqId) =>
         completedTaskIdsSet.has(String(prereqId)),
       );
     };
 
-    // 4. CHẠY THUẬT TOÁN GỢI Ý CHO TỪNG THỬA RUỘNG
     for (const assignment of assignments) {
       const plotName = assignment.plot?.name || "Thửa chưa rõ";
       const plotId = assignment.plot?._id;
 
-      // [QUAN TRỌNG]: Lấy TẤT CẢ nhật ký đã ghi của thửa này để làm đối chứng
       const completedLogs = await FarmingLog.find({
         seasonPlotAssignments: assignment._id,
       })
@@ -459,7 +467,6 @@ const getDailyRecommendations = async (farmerId) => {
         completedLogs.map((log) => String(log.task)),
       );
 
-      // Tìm nhật ký gieo sạ
       let sowingLog = null;
       if (sowingTask && completedTaskIds.has(String(sowingTask._id))) {
         sowingLog = completedLogs.find(
@@ -468,7 +475,6 @@ const getDailyRecommendations = async (farmerId) => {
       }
 
       if (sowingLog) {
-        // --- GIAI ĐOẠN 2: ĐÃ GIEO SẠ (Đếm tuổi lúa) ---
         const logDate = new Date(sowingLog.date || sowingLog.createdAt);
         const daysSinceSowing = Math.floor(
           (now - logDate) / (1000 * 60 * 60 * 24),
@@ -485,9 +491,7 @@ const getDailyRecommendations = async (farmerId) => {
           const isDone = completedTaskIds.has(String(task._id));
 
           if (!isDone) {
-            // Kể cả chăm sóc sau sạ cũng áp dụng luật tuần tự
             const isReady = checkPrerequisites(task, completedTaskIds);
-
             if (isReady) {
               recommendations.push({
                 plotId,
@@ -505,7 +509,6 @@ const getDailyRecommendations = async (farmerId) => {
           }
         }
       } else {
-        // --- GIAI ĐOẠN 1: CHƯA GIEO SẠ (Checklist Chuẩn bị có tuần tự) ---
         if (now >= new Date(activeSeasonDetail.startDate)) {
           let pendingPrepCount = 0;
 
@@ -514,9 +517,7 @@ const getDailyRecommendations = async (farmerId) => {
 
             if (!isDone) {
               pendingPrepCount++;
-              // CHỈ GỢI Ý CÔNG VIỆC NÀY NẾU NÔNG DÂN ĐÃ LÀM XONG VIỆC TRƯỚC ĐÓ
               const isReady = checkPrerequisites(task, completedTaskIds);
-
               if (isReady) {
                 recommendations.push({
                   plotId,
@@ -532,12 +533,10 @@ const getDailyRecommendations = async (farmerId) => {
           }
 
           if (sowingTask && !completedTaskIds.has(String(sowingTask._id))) {
-            // SẠ LÚA LÀ BƯỚC CUỐI CÙNG: Chỉ hiện Sạ lúa khi đã xử lý giống và làm đất xong!
             const isSowingReady = checkPrerequisites(
               sowingTask,
               completedTaskIds,
             );
-
             if (isSowingReady) {
               recommendations.push({
                 plotId,
@@ -557,7 +556,7 @@ const getDailyRecommendations = async (farmerId) => {
       }
     }
 
-    return recommendations;
+    return { hasActiveSeason: true, data: recommendations };
   } catch (error) {
     throw new Error(`Lỗi khi tạo gợi ý: ${error.message}`);
   }
