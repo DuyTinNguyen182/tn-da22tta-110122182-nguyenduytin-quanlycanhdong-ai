@@ -19,12 +19,21 @@ const findSelectedOption = (options, value) => {
   return null;
 };
 
-const TaskFilterDropdown = ({ value, onChange, options = [], className = "" }) => {
+const TaskFilterDropdown = ({
+  value,
+  onChange,
+  options = [],
+  className = "",
+}) => {
   const wrapperRef = useRef(null);
+  const closeTimerRef = useRef(null);
   const [open, setOpen] = useState(false);
   const [hoveredParent, setHoveredParent] = useState(null);
 
-  const selectedOption = useMemo(() => findSelectedOption(options, value), [options, value]);
+  const selectedOption = useMemo(
+    () => findSelectedOption(options, value),
+    [options, value],
+  );
   const displayLabel = selectedOption?.label || "Tất cả việc";
 
   useEffect(() => {
@@ -45,7 +54,31 @@ const TaskFilterDropdown = ({ value, onChange, options = [], className = "" }) =
     }
   }, [open]);
 
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const cancelCloseTimer = () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    cancelCloseTimer();
+    closeTimerRef.current = window.setTimeout(() => {
+      setHoveredParent(null);
+      closeTimerRef.current = null;
+    }, 120);
+  };
+
   const handleSelect = (nextValue) => {
+    cancelCloseTimer();
     onChange(nextValue);
     setOpen(false);
     setHoveredParent(null);
@@ -63,7 +96,9 @@ const TaskFilterDropdown = ({ value, onChange, options = [], className = "" }) =
         }`}
       >
         <Filter size={13} className="shrink-0 text-gray-400" />
-        <span className="flex-1 truncate text-left text-gray-700">{displayLabel}</span>
+        <span className="flex-1 truncate text-left text-gray-700">
+          {displayLabel}
+        </span>
         <ChevronDown
           size={13}
           className={`shrink-0 text-gray-400 transition-transform duration-200 ${
@@ -75,7 +110,8 @@ const TaskFilterDropdown = ({ value, onChange, options = [], className = "" }) =
       {open && (
         <div className="absolute left-0 top-full z-[100] mt-1.5 w-[220px] rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50">
           {options.map((option) => {
-            const hasChildren = Array.isArray(option.children) && option.children.length > 0;
+            const hasChildren =
+              Array.isArray(option.children) && option.children.length > 0;
             const isSelected = option.value === value;
             const showChildren = hasChildren && hoveredParent === option.value;
 
@@ -83,10 +119,11 @@ const TaskFilterDropdown = ({ value, onChange, options = [], className = "" }) =
               <div
                 key={option.value}
                 className="relative"
-                onMouseEnter={() => setHoveredParent(option.value)}
-                onMouseLeave={() => {
-                  setHoveredParent((current) => (current === option.value ? null : current));
+                onMouseEnter={() => {
+                  cancelCloseTimer();
+                  setHoveredParent(option.value);
                 }}
+                onMouseLeave={scheduleClose}
               >
                 <button
                   type="button"
@@ -97,15 +134,31 @@ const TaskFilterDropdown = ({ value, onChange, options = [], className = "" }) =
                       : "text-gray-700 hover:bg-gray-50"
                   }`}
                 >
-                  <span className={`flex-1 truncate text-sm ${isSelected ? "font-semibold" : ""}`}>
+                  <span
+                    className={`flex-1 truncate text-sm ${isSelected ? "font-semibold" : ""}`}
+                  >
                     {option.label}
                   </span>
-                  {hasChildren && <ChevronRight size={14} className="shrink-0 text-gray-400" />}
-                  {isSelected && <Check size={14} className="shrink-0 text-emerald-600" />}
+                  {hasChildren && (
+                    <ChevronRight
+                      size={14}
+                      className="shrink-0 text-gray-400"
+                    />
+                  )}
+                  {isSelected && (
+                    <Check size={14} className="shrink-0 text-emerald-600" />
+                  )}
                 </button>
 
                 {showChildren && (
-                  <div className="absolute left-full top-0 ml-1 w-[240px] rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50">
+                  <div
+                    className="absolute left-full top-0 ml-1 w-[240px] rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50"
+                    onMouseEnter={() => {
+                      cancelCloseTimer();
+                      setHoveredParent(option.value);
+                    }}
+                    onMouseLeave={scheduleClose}
+                  >
                     {option.children.map((child) => {
                       const isChildSelected = child.value === value;
 
@@ -128,7 +181,10 @@ const TaskFilterDropdown = ({ value, onChange, options = [], className = "" }) =
                             {child.label}
                           </span>
                           {isChildSelected && (
-                            <Check size={14} className="shrink-0 text-emerald-600" />
+                            <Check
+                              size={14}
+                              className="shrink-0 text-emerald-600"
+                            />
                           )}
                         </button>
                       );

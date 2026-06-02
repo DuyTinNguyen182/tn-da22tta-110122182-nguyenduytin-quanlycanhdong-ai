@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Trash2,
   X,
+  RefreshCw,
 } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
@@ -91,6 +92,8 @@ const DiseaseLogs = () => {
   const [formSeasons, setFormSeasons] = useState([]);
   const [formPlots, setFormPlots] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(5);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -164,7 +167,7 @@ const DiseaseLogs = () => {
     return res.data || [];
   };
 
-  const loadDiseaseLogs = async (nextFilters) => {
+  const loadDiseaseLogs = async (nextFilters, limit) => {
     try {
       setLoading(true);
       const params = {};
@@ -172,8 +175,14 @@ const DiseaseLogs = () => {
       if (nextFilters.seasonId) params.seasonId = nextFilters.seasonId;
       if (nextFilters.status) params.status = nextFilters.status;
 
+      const effectiveLimit = typeof limit === "number" ? limit : visibleCount;
+      if (effectiveLimit) params.limit = effectiveLimit;
+
       const res = await api.get("/disease-logs", { params });
-      setLogs(res.data || []);
+      const data = res.data || [];
+      setLogs(data);
+      // if returned less than requested, no more available
+      setHasMore(Array.isArray(data) ? data.length >= effectiveLimit : false);
     } catch (error) {
       console.error("Lỗi tải nhật ký bệnh", error);
     } finally {
@@ -186,10 +195,19 @@ const DiseaseLogs = () => {
       try {
         await loadFields();
 
-        const defaultFilters = { fieldId: "", seasonId: "", status: "" };
+        const seasons = await loadSeasonsByField("");
+        setFilterSeasons(seasons);
+
+        const activeSeasonId =
+          seasons.find((s) => s.status === "active")?._id || "";
+        const defaultFilters = {
+          fieldId: "",
+          seasonId: activeSeasonId,
+          status: "",
+        };
         setFilters(defaultFilters);
-        setFilterSeasons(await loadSeasonsByField(""));
-        await loadDiseaseLogs(defaultFilters);
+        setVisibleCount(5);
+        await loadDiseaseLogs(defaultFilters, 5);
       } catch (error) {
         console.error("Lỗi khởi tạo trang nhật ký bệnh", error);
         setLoading(false);
@@ -197,6 +215,13 @@ const DiseaseLogs = () => {
     };
     bootstrap();
   }, []);
+
+  const handleLoadMore = async () => {
+    if (loading) return;
+    const next = visibleCount + 5;
+    setVisibleCount(next);
+    await loadDiseaseLogs(filters, next);
+  };
 
   useEffect(() => {
     const syncFormSeasonData = async () => {
@@ -419,7 +444,7 @@ const DiseaseLogs = () => {
       toast.success(
         editingLog ? "Đã cập nhật nhật ký bệnh." : "Đã lưu nhật ký bệnh.",
       );
-      await loadDiseaseLogs(filters);
+      await loadDiseaseLogs(filters, visibleCount);
     } catch (error) {
       toast.error(
         error.response?.data?.message || "Không thể lưu nhật ký bệnh.",
@@ -442,7 +467,7 @@ const DiseaseLogs = () => {
     try {
       await api.delete(`/disease-logs/${id}`);
       toast.success("Đã xóa nhật ký bệnh.");
-      await loadDiseaseLogs(filters);
+      await loadDiseaseLogs(filters, visibleCount);
     } catch (error) {
       toast.error(
         error.response?.data?.message || "Không thể xóa nhật ký bệnh.",
@@ -466,12 +491,20 @@ const DiseaseLogs = () => {
   };
 
   const handleResetFilters = async () => {
-    const defaultFilters = { fieldId: "", seasonId: "", status: "" };
     setKeyword("");
+    const seasons = await loadSeasonsByField("");
+    setFilterSeasons(seasons);
+    const activeSeasonId =
+      seasons.find((s) => s.status === "active")?._id || "";
+    const defaultFilters = {
+      fieldId: "",
+      seasonId: activeSeasonId,
+      status: "",
+    };
     setFilters(defaultFilters);
-    setFilterSeasons(await loadSeasonsByField(""));
     setShowFiltersMobile(false);
-    await loadDiseaseLogs(defaultFilters);
+    setVisibleCount(5);
+    await loadDiseaseLogs(defaultFilters, 5);
   };
 
   // â”€â”€ Render â”€â”€
@@ -494,6 +527,8 @@ const DiseaseLogs = () => {
           <Plus size={16} /> Thêm nhật ký
         </button>
       </div>
+
+      {/* (Pager moved below list) */}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-2.5 md:gap-3">
@@ -558,14 +593,18 @@ const DiseaseLogs = () => {
           <CustomDropdown
             value={filters.fieldId}
             onChange={async (val) => {
+              const seasons = await loadSeasonsByField(val);
+              setFilterSeasons(seasons);
+              const activeSeasonId =
+                seasons.find((s) => s.status === "active")?._id || "";
               const next = {
                 fieldId: val,
-                seasonId: "",
+                seasonId: activeSeasonId,
                 status: filters.status,
               };
               setFilters(next);
-              setFilterSeasons(await loadSeasonsByField(val));
-              await loadDiseaseLogs(next);
+              setVisibleCount(5);
+              await loadDiseaseLogs(next, 5);
             }}
             options={fieldOptions}
             placeholder="Tất cả cánh đồng"
@@ -577,7 +616,8 @@ const DiseaseLogs = () => {
             onChange={async (val) => {
               const next = { ...filters, seasonId: val };
               setFilters(next);
-              await loadDiseaseLogs(next);
+              setVisibleCount(5);
+              await loadDiseaseLogs(next, 5);
             }}
             options={filterSeasonOptions}
             placeholder="Tất cả mùa vụ"
@@ -589,7 +629,8 @@ const DiseaseLogs = () => {
             onChange={async (val) => {
               const next = { ...filters, status: val };
               setFilters(next);
-              await loadDiseaseLogs(next);
+              setVisibleCount(5);
+              await loadDiseaseLogs(next, 5);
             }}
             options={filterStatusOptions}
             placeholder="Trạng thái"
@@ -602,7 +643,7 @@ const DiseaseLogs = () => {
             onClick={handleResetFilters}
             className="inline-flex min-w-[40px] items-center justify-center rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-semibold text-gray-600 transition-all hover:border-gray-300 hover:bg-gray-50"
           >
-            <X size={15} />
+            <RefreshCw size={15} />
           </button>
         </div>
       </div>
@@ -736,14 +777,13 @@ const DiseaseLogs = () => {
                       href={log.imageUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group/img relative flex-shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-50"
+                      className="group/img relative overflow-hidden rounded-xl border border-gray-200 bg-gray-50 sm:flex-shrink-0 sm:ml-4 mt-2 sm:mt-0"
                       title="Xem ảnh quét AI"
                     >
                       <img
                         src={log.imageUrl}
                         alt={log.diseaseName}
-                        className="h-full w-24 object-cover transition-transform group-hover/img:scale-105"
-                        style={{ minHeight: "108px", maxHeight: "124px" }}
+                        className="w-full sm:w-24 h-48 sm:h-full object-cover transition-transform group-hover/img:scale-105"
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
                         }}
@@ -760,6 +800,28 @@ const DiseaseLogs = () => {
               </article>
             );
           })
+        )}
+      </div>
+
+      {/* Load more / pager (moved below list) */}
+      <div className="mt-4 flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+        <p className="text-sm text-gray-500">
+          Đang hiển thị {filteredLogs.length} mục.
+        </p>
+
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={handleLoadMore}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+          >
+            {loading ? "Đang tải..." : "Xem thêm"}
+          </button>
+        ) : (
+          <p className="text-sm font-medium text-emerald-700">
+            Đã tải hết danh sách theo bộ lọc hiện tại.
+          </p>
         )}
       </div>
 
