@@ -29,9 +29,5 @@
     "Bọ hispa hại lá",
     "Lá lúa khỏe",
     "Bệnh vàng lùn (tungro)"
-  ],
-  "confidence_threshold": 0.8,
-  "confidence_gap_threshold": 0.12,
-  "test_accuracy": 0.9673495292663574,
-  "training_minutes": 81.92
+  ]
 }

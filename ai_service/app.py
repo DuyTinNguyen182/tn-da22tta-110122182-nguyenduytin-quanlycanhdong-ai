@@ -226,8 +226,8 @@ def _build_rejected_response(result):
     return {
         "status": "rejected",
         "error_code": "UNSUPPORTED_IMAGE",
-        "message": "Ảnh tải lên không đủ điều kiện để chẩn đoán bệnh lá lúa.",
-        "guidance": "Vui lòng sử dụng ảnh cận cảnh lá lúa rõ nét, đủ ánh sáng, không bị mờ.",
+        "message": "Ảnh tải lên không đủ điều kiện để dự đoán bệnh lúa.",
+        "guidance": "Vui lòng sử dụng ảnh cận cảnh rõ nét, đủ ánh sáng, hạn chế nền trời hoặc nền đất.",
         "prediction": result,
     }
 
@@ -313,7 +313,8 @@ def predict():
     print("=========================")
 
     if REJECT_LOW_CONFIDENCE and result["is_low_confidence"]:
-        return jsonify(_build_rejected_response(result)), 422
+        # Trả về 200 (OK) nhưng bên trong JSON vẫn chứa thông báo bị từ chối
+        return jsonify(_build_rejected_response(result)), 200
 
     return jsonify(result)
 
