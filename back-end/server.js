@@ -25,16 +25,34 @@ const allowedProductRoutes = require("./src/routes/allowedProductRoutes");
 
 const app = express();
 
+// // --- Middlewares ---
+// app.use(express.json());
+// app.use(cookieParser());
+// app.use(
+//   cors({
+//     origin: FRONTEND_URL,
+//     credentials: true,
+//   }),
+// );
 // --- Middlewares ---
 app.use(express.json());
 app.use(cookieParser());
+
+// Định nghĩa danh sách các domain được phép truy cập API
+const allowedOrigins = ["http://localhost:5173", FRONTEND_URL];
+
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Bị chặn bởi cơ chế bảo mật CORS"));
+      }
+    },
     credentials: true,
   }),
 );
-
 // --- Database Connection ---
 connectDB();
 
