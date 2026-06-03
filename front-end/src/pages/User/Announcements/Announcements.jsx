@@ -1,5 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { BellRing, ChevronDown, ShieldAlert, TriangleAlert } from "lucide-react";
+import {
+  BellRing,
+  ChevronDown,
+  ShieldAlert,
+  TriangleAlert,
+} from "lucide-react";
 import api from "../../../services/api";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import { useAnnouncements } from "../../../context/AnnouncementContext";
@@ -56,7 +61,13 @@ const Announcements = () => {
   });
 
   const fetchAnnouncements = useCallback(
-    async ({ page = 1, append = false, type = filterType, silent = false, limit = 5 } = {}) => {
+    async ({
+      page = 1,
+      append = false,
+      type = filterType,
+      silent = false,
+      limit = 5,
+    } = {}) => {
       try {
         if (silent) {
           // Keep current UI while refreshing in the background.
@@ -104,7 +115,7 @@ const Announcements = () => {
         }
       }
     },
-    [filterType]
+    [filterType],
   );
 
   useEffect(() => {
@@ -135,7 +146,10 @@ const Announcements = () => {
       refreshUnreadSummary();
     };
 
-    const intervalId = window.setInterval(refreshPageData, ANNOUNCEMENT_POLL_INTERVAL_MS);
+    const intervalId = window.setInterval(
+      refreshPageData,
+      ANNOUNCEMENT_POLL_INTERVAL_MS,
+    );
 
     const handleWindowFocus = () => {
       refreshPageData();
@@ -171,12 +185,14 @@ const Announcements = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-gray-50 p-4 lg:p-6">
+    <div className="app-page-shell overflow-y-auto bg-gray-50 p-4 lg:p-6">
       <div className="mx-auto max-w-5xl space-y-5">
         <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Thông báo và cảnh báo</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Thông báo và cảnh báo
+              </h2>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -205,7 +221,9 @@ const Announcements = () => {
             <div className="rounded-2xl bg-gray-100 p-4 text-gray-400">
               <ShieldAlert size={28} />
             </div>
-            <p className="mt-4 text-lg font-semibold text-gray-700">Chưa có thông báo nào đang hiển thị</p>
+            <p className="mt-4 text-lg font-semibold text-gray-700">
+              Chưa có thông báo nào đang hiển thị
+            </p>
             <p className="mt-1 text-sm text-gray-500">
               Admin sẽ cập nhật thêm khi có thông tin mới cho nông dân.
             </p>
@@ -214,7 +232,8 @@ const Announcements = () => {
           <>
             <div className="space-y-4">
               {items.map((item) => {
-                const typeStyle = TYPE_STYLES[item.type] || TYPE_STYLES.notification;
+                const typeStyle =
+                  TYPE_STYLES[item.type] || TYPE_STYLES.notification;
                 const Icon = typeStyle.icon;
 
                 return (
@@ -224,7 +243,9 @@ const Announcements = () => {
                   >
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
-                        <div className={`rounded-2xl p-3 ${typeStyle.iconClassName}`}>
+                        <div
+                          className={`rounded-2xl p-3 ${typeStyle.iconClassName}`}
+                        >
                           <Icon size={20} />
                         </div>
 
@@ -246,7 +267,9 @@ const Announcements = () => {
                             </span>
                           </div>
 
-                          <h3 className="mt-2 text-xl font-bold text-gray-900">{item.title}</h3>
+                          <h3 className="mt-2 text-xl font-bold text-gray-900">
+                            {item.title}
+                          </h3>
                         </div>
                       </div>
                     </div>

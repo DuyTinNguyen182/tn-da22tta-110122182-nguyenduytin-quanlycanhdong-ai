@@ -44,6 +44,15 @@ const isRejectedDiagnosis = (scanResult) =>
 const getScanResponsePayload = (responseData) => {
   if (!responseData) return null;
 
+  if (
+    responseData.rejected === true ||
+    responseData.status === "rejected" ||
+    responseData.errorCode === "UNSUPPORTED_IMAGE" ||
+    responseData.error_code === "UNSUPPORTED_IMAGE"
+  ) {
+    return responseData;
+  }
+
   if (responseData.data?.status === "rejected") {
     return responseData.data;
   }
@@ -73,8 +82,7 @@ const normalizeRejectedDiagnosis = (responseData) => {
     rejected: true,
     error_code: payload.error_code || payload.errorCode || "UNSUPPORTED_IMAGE",
     message:
-      payload.message ||
-      "Ảnh tải lên không đủ điều kiện để dự đoán bệnh lúa.",
+      payload.message || "Ảnh tải lên không đủ điều kiện để dự đoán bệnh lúa.",
     guidance:
       payload.guidance ||
       "Vui lòng dùng ảnh cận cảnh lá lúa rõ nét, đủ ánh sáng.",
@@ -781,7 +789,9 @@ const AIScan = () => {
                 <h3 className="mt-1 break-words text-xl font-bold text-slate-900">
                   Có lỗi trong lúc dự đoán
                 </h3>
-                <p className="mt-2 break-words text-sm leading-6 text-rose-700">{error}</p>
+                <p className="mt-2 break-words text-sm leading-6 text-rose-700">
+                  {error}
+                </p>
               </div>
             </div>
           </div>
@@ -918,7 +928,9 @@ const AIScan = () => {
                       <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
                         {index + 1}
                       </span>
-                        <p className="min-w-0 break-words text-sm text-slate-700">{tip}</p>
+                      <p className="min-w-0 break-words text-sm text-slate-700">
+                        {tip}
+                      </p>
                     </div>
                   ))}
                 </div>

@@ -575,7 +575,7 @@ const DiseaseLogs = () => {
         </button>
 
         <div
-          className={`${showFiltersMobile || hasActiveFilters ? "mt-3 grid" : "hidden"} grid-cols-1 items-center gap-2.5 md:mt-0 md:grid xl:grid-cols-[1.2fr_1fr_1fr_auto_auto]`}
+          className={`${showFiltersMobile ? "mt-3 grid" : "hidden"} grid-cols-1 items-center gap-2.5 md:mt-0 md:grid xl:grid-cols-[1.2fr_1fr_1fr_auto_auto]`}
         >
           <div className="relative">
             <Search

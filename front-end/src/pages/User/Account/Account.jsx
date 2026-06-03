@@ -250,31 +250,31 @@ const Account = () => {
   `;
 
   return (
-    <div className="bg-gray-50 px-4 py-6 pb-28 sm:px-6 sm:py-8 lg:px-8 min-h-screen">
-      <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-6 lg:gap-8 items-start">
+    <div className="app-page-shell overflow-y-auto bg-gray-50 px-4 py-3 pb-28 sm:px-6 sm:py-8 lg:px-8">
+      <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-2 lg:gap-8 items-start">
         {/* Cột trái: Tiêu đề + Sidebar Menu */}
         <div className="w-full md:w-72 flex flex-col shrink-0 md:sticky md:top-8">
           {/* Header nằm trong cột trái để đồng mức với Form */}
           <div className="flex items-center gap-4 mb-6">
-            <button
+            {/* <button
               onClick={() => navigate(-1)}
               className="p-2.5 bg-white shadow-sm border border-gray-100 hover:bg-gray-50 rounded-xl transition-colors shrink-0"
               title="Quay lại"
             >
               <ArrowLeft size={20} className="text-gray-600" />
-            </button>
+            </button> */}
             <div>
               <h1 className="text-2xl font-bold text-gray-900 leading-tight">
                 Quản lý tài khoản
               </h1>
-              <p className="text-sm text-gray-500 mt-1">
+              {/* <p className="text-sm text-gray-500 mt-1">
                 Cập nhật thông tin & bảo mật
-              </p>
+              </p> */}
             </div>
           </div>
 
           {/* Menu Tab */}
-          <div className="flex flex-row md:flex-col gap-2 overflow-x-auto pb-2 md:pb-0 mb-6 md:mb-0 snap-x hide-scrollbar">
+          <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0 mb-0 md:mb-0 snap-x hide-scrollbar">
             <button
               onClick={() => {
                 setActiveTab("info");
@@ -328,9 +328,9 @@ const Account = () => {
                   <h2 className="text-lg font-bold text-gray-900">
                     Thông tin cơ bản
                   </h2>
-                  <p className="text-sm text-gray-500">
+                  {/* <p className="text-sm text-gray-500">
                     Cập nhật thông tin hiển thị và liên hệ của bạn.
-                  </p>
+                  </p> */}
                 </div>
               </div>
 

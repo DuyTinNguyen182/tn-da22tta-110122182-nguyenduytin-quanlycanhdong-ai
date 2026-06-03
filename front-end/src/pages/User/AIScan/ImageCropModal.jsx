@@ -248,12 +248,12 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
         </div>
 
         {/* Footer */}
-        <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 px-4 py-4 sm:flex-row sm:justify-end md:px-6">
+        <div className="flex shrink-0 flex-row items-center gap-3 border-t border-slate-100 bg-slate-50 px-4 py-4 justify-between sm:justify-end md:px-6">
           <button
             type="button"
             onClick={onClose}
             disabled={submitting}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
           >
             {UI_TEXT.cancel}
           </button>
@@ -262,7 +262,7 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
             type="button"
             onClick={handleApplyCrop}
             disabled={submitting}
-            className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors sm:w-auto ${
+            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors sm:w-auto ${
               submitting
                 ? "cursor-not-allowed bg-slate-300"
                 : "bg-emerald-600 hover:bg-emerald-700"
