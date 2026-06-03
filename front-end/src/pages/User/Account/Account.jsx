@@ -287,7 +287,7 @@ const Account = () => {
               }`}
             >
               <User size={18} />
-              <span className="whitespace-nowrap">Thông tin cá nhân</span>
+              <span className="whitespace-nowrap">Thông tin</span>
             </button>
             <button
               onClick={() => setActiveTab("password")}
