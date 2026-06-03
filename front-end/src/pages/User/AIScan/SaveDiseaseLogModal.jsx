@@ -294,25 +294,25 @@ const SaveDiseaseLogModal = ({
   const confidenceWarning = buildLowConfidenceMessage(result);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] bg-white shadow-[0_32px_90px_-40px_rgba(15,23,42,0.45)]">
-        <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 text-white">
-          <div>
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[0_32px_90px_-40px_rgba(15,23,42,0.45)] sm:max-h-[88vh] sm:rounded-[28px]">
+        <div className="flex shrink-0 items-start justify-between gap-3 bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-4 text-white sm:px-6">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-emerald-50/80">
               Ghi nhận ca phát hiện
             </p>
-            <h3 className="text-xl font-bold">Lưu nhật ký bệnh</h3>
+            <h3 className="break-words text-lg font-bold sm:text-xl">Lưu nhật ký bệnh</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 transition-colors hover:bg-white/15"
+            className="shrink-0 rounded-xl p-2 transition-colors hover:bg-white/15"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
           {loadingModal ? (
             <div className="flex items-center justify-center gap-3 py-16 text-slate-400">
               <Loader2 size={24} className="animate-spin text-emerald-500" />
@@ -320,20 +320,20 @@ const SaveDiseaseLogModal = ({
             </div>
           ) : (
             <div className="space-y-5">
-              <div className="rounded-[22px] border border-emerald-100 bg-emerald-50/80 p-4">
+              <div className="min-w-0 rounded-[22px] border border-emerald-100 bg-emerald-50/80 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
                   Tóm tắt bản ghi
                 </p>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl bg-white px-4 py-3">
+                  <div className="min-w-0 rounded-2xl bg-white px-4 py-3">
                     <p className="text-xs text-slate-500">Bệnh</p>
-                    <p className="mt-1 font-semibold text-slate-900">
+                    <p className="mt-1 break-words font-semibold text-slate-900">
                       {result?.disease || "-"}
                     </p>
                   </div>
-                  <div className="rounded-2xl bg-white px-4 py-3">
+                  <div className="min-w-0 rounded-2xl bg-white px-4 py-3">
                     <p className="text-xs text-slate-500">Độ tin cậy</p>
-                    <p className="mt-1 font-semibold text-slate-900">
+                    <p className="mt-1 break-words font-semibold text-slate-900">
                       {typeof result?.confidence === "number"
                         ? formatPercent(result.confidence)
                         : "-"}
@@ -349,7 +349,7 @@ const SaveDiseaseLogModal = ({
                       size={17}
                       className="mt-0.5 shrink-0 text-amber-500"
                     />
-                    <p className="text-sm text-amber-800">
+                    <p className="min-w-0 break-words text-sm text-amber-800">
                       Cánh đồng này hiện{" "}
                       <strong>không có mùa vụ đang canh tác</strong>. Bạn chỉ có
                       thể lưu nhật ký khi đang trong một vụ mùa hoạt động.
@@ -379,9 +379,9 @@ const SaveDiseaseLogModal = ({
                     Mùa vụ đang canh tác
                   </label>
                   {currentSeason?.status === "active" ? (
-                    <div className="flex min-h-[50px] items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3">
+                    <div className="flex min-h-[50px] min-w-0 items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3">
                       <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-                      <span className="text-sm font-semibold text-emerald-800">
+                      <span className="min-w-0 break-words text-sm font-semibold text-emerald-800">
                         {formatSeasonLabel(currentSeason)}
                       </span>
                     </div>
@@ -417,7 +417,7 @@ const SaveDiseaseLogModal = ({
                     Thửa ruộng bị ảnh hưởng
                   </label>
                   {loggablePlots.length > 0 && (
-                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
+                    <label className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
                       <input
                         type="checkbox"
                         checked={selectAllPlots}
@@ -427,7 +427,7 @@ const SaveDiseaseLogModal = ({
                           if (e.target.checked) setSelectedPlotIds([]);
                         }}
                       />
-                      Tất cả các thửa ({loggablePlots.length})
+                      <span className="truncate">Tất cả các thửa ({loggablePlots.length})</span>
                     </label>
                   )}
                 </div>
@@ -446,7 +446,7 @@ const SaveDiseaseLogModal = ({
                       return (
                         <label
                           key={plot._id}
-                          className={`flex cursor-pointer items-center gap-3 rounded-2xl border bg-white px-3 py-3 transition-all ${
+                          className={`flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border bg-white px-3 py-3 transition-all ${
                             checked
                               ? "border-emerald-300 shadow-sm shadow-emerald-50"
                               : "border-slate-100 hover:border-slate-200"
@@ -460,7 +460,7 @@ const SaveDiseaseLogModal = ({
                           />
                           <div className="min-w-0 flex-1">
                             <p
-                              className={`truncate text-sm font-medium ${checked ? "text-emerald-700" : "text-slate-700"}`}
+                              className={`break-words text-sm font-medium ${checked ? "text-emerald-700" : "text-slate-700"}`}
                             >
                               {plot.name}
                             </p>
@@ -483,14 +483,14 @@ const SaveDiseaseLogModal = ({
                     size={17}
                     className="mt-0.5 shrink-0 text-amber-500"
                   />
-                  <p className="text-sm text-amber-800">{confidenceWarning}</p>
+                  <p className="min-w-0 break-words text-sm text-amber-800">{confidenceWarning}</p>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+        <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 bg-slate-50 px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
           <button
             type="button"
             onClick={onClose}

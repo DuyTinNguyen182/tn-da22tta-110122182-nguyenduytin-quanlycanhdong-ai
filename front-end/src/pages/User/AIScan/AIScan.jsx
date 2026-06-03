@@ -37,7 +37,49 @@ const formatFileSize = (sizeInBytes) => {
 
 const isRejectedDiagnosis = (scanResult) =>
   scanResult?.status === "rejected" ||
-  scanResult?.error_code === "UNSUPPORTED_IMAGE";
+  scanResult?.rejected === true ||
+  scanResult?.error_code === "UNSUPPORTED_IMAGE" ||
+  scanResult?.errorCode === "UNSUPPORTED_IMAGE";
+
+const getScanResponsePayload = (responseData) => {
+  if (!responseData) return null;
+
+  if (responseData.data?.status === "rejected") {
+    return responseData.data;
+  }
+
+  return responseData.data || responseData;
+};
+
+const normalizeRejectedDiagnosis = (responseData) => {
+  const payload = getScanResponsePayload(responseData);
+
+  if (!payload) return null;
+
+  if (
+    payload.status !== "rejected" &&
+    payload.rejected !== true &&
+    payload.error_code !== "UNSUPPORTED_IMAGE" &&
+    payload.errorCode !== "UNSUPPORTED_IMAGE"
+  ) {
+    return null;
+  }
+
+  const prediction = payload.data || payload.prediction || {};
+
+  return {
+    ...prediction,
+    status: "rejected",
+    rejected: true,
+    error_code: payload.error_code || payload.errorCode || "UNSUPPORTED_IMAGE",
+    message:
+      payload.message ||
+      "Ảnh tải lên không đủ điều kiện để dự đoán bệnh lúa.",
+    guidance:
+      payload.guidance ||
+      "Vui lòng dùng ảnh cận cảnh lá lúa rõ nét, đủ ánh sáng.",
+  };
+};
 
 const getConfidenceMeta = (score, isLowConfidence = false) => {
   if (isLowConfidence) {
@@ -118,6 +160,20 @@ const READY_NOTES = [
   "Để có kết quả tốt nhất, hãy chọn ảnh rõ nét và đủ ánh sáng ở vùng lá bệnh.",
   "AI hỗ trợ nhận diện các bệnh phổ biến như Đạo ôn, Bạc lá, Lem lép hạt...",
 ];
+
+const SUPPORTED_INPUT_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp"];
+const SUPPORTED_INPUT_IMAGE_MIME = /^image\/(jpe?g|png|webp)$/i;
+
+const isSupportedInputImage = (file) => {
+  if (!file) return false;
+
+  const extension = file.name?.split(".").pop()?.toLowerCase();
+
+  return (
+    SUPPORTED_INPUT_IMAGE_MIME.test(file.type || "") ||
+    SUPPORTED_INPUT_IMAGE_EXTENSIONS.includes(extension)
+  );
+};
 
 const sortSeasons = (items = []) =>
   [...items].sort((a, b) => {
@@ -268,7 +324,28 @@ const AIScan = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!isSupportedInputImage(file)) {
+      setSelectedImage(null);
+      setResult(null);
+      setCropSourceFile(null);
+      setError(
+        "Ảnh đầu vào chưa được hỗ trợ. Vui lòng chọn ảnh JPG, PNG hoặc WebP; nếu điện thoại đang chụp HEIC, hãy đổi sang định dạng tương thích nhất.",
+      );
+      toast.warning("Định dạng ảnh chưa được hỗ trợ để quét bệnh.");
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+      if (cameraInputRef.current) {
+        cameraInputRef.current.value = "";
+      }
+
+      return;
+    }
+
     setCropSourceFile(file);
+    setError(null);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -302,9 +379,6 @@ const AIScan = () => {
     setLoading(false);
     setShowSaveModal(false);
     setCropSourceFile(null);
-    setSelectedPlotIds([]);
-    setSelectAllPlots(true);
-    setSaveLoading(false);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -336,10 +410,10 @@ const AIScan = () => {
       });
 
       // Lấy dữ liệu trả về từ Node.js hoặc trực tiếp từ Flask
-      const scanResult = res.data.data || res.data;
+      const scanResult = getScanResponsePayload(res.data);
 
       // Kiểm tra ngay trong lúc code chạy thành công (Status 200)
-      if (scanResult?.status === "rejected") {
+      if (isRejectedDiagnosis(scanResult)) {
         setResult(scanResult); // Hiển thị UI bị từ chối
         // toast.warning(
         //   "Ảnh chưa phù hợp để chẩn đoán. Vui lòng chụp lại ảnh lá lúa rõ hơn.",
@@ -357,9 +431,28 @@ const AIScan = () => {
         );
       }
     } catch (scanError) {
-      // Bây giờ block catch chỉ còn bắt những lỗi thực sự như sập server, rớt mạng...
-      console.error(scanError);
+      const responseData = scanError?.response?.data;
+      const responseStatus = scanError?.response?.status;
+      const rejectedResult = normalizeRejectedDiagnosis(responseData);
+
+      if (rejectedResult) {
+        setResult(rejectedResult);
+        setError(null);
+        return;
+      }
+
       setResult(null);
+
+      if (responseStatus === 400) {
+        setError(
+          responseData?.message ||
+            "Ảnh đầu vào không hợp lệ. Vui lòng chọn ảnh JPEG, PNG hoặc WebP dưới 5MB.",
+        );
+        return;
+      }
+
+      // Block này chỉ còn bắt những lỗi thực sự như sập server, rớt mạng...
+      console.error(scanError);
       setError("Không thể dự đoán. Vui lòng kiểm tra lại kết nối hệ thống.");
     } finally {
       setLoading(false);
@@ -367,33 +460,33 @@ const AIScan = () => {
   };
 
   const uploadPanel = (
-    <section className="flex flex-col rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm md:min-h-0 md:overflow-y-auto md:custom-scrollbar">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <section className="flex min-w-0 flex-col rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[28px] sm:p-5 md:min-h-0 md:overflow-y-auto md:custom-scrollbar">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-emerald-700">Ảnh đầu vào</p>
-          <h3 className="text-xl font-bold text-slate-900">
+          <h3 className="break-words text-lg font-bold text-slate-900 sm:text-xl">
             Khung ảnh dùng để quét AI
           </h3>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+        <div className="flex max-w-full flex-wrap items-center gap-2 text-xs font-semibold">
           <button
             type="button"
             onClick={() => setShowGuideModal(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-emerald-700 transition-colors hover:bg-emerald-100"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-emerald-700 transition-colors hover:bg-emerald-100"
           >
             <BookOpen size={14} />
             Hướng dẫn
           </button>
           {selectedImageInfo ? (
             <>
-              <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">
+              <span className="max-w-full truncate rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">
                 {selectedImageInfo.extension}
               </span>
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
+              <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">
                 {selectedImageInfo.size}
               </span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+              <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-slate-700">
                 Đã crop vuông
               </span>
             </>
@@ -407,23 +500,23 @@ const AIScan = () => {
 
       <label
         htmlFor="upload-input"
-        className={`mt-4 flex min-h-[220px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[28px] border-2 border-dashed transition-colors md:min-h-0 md:flex-1 ${
+        className={`mt-4 flex min-h-[220px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[22px] border-2 border-dashed transition-colors sm:rounded-[28px] md:min-h-0 md:flex-1 ${
           previewUrl
             ? "border-emerald-200 bg-emerald-50/60"
             : "border-slate-200 bg-slate-50 hover:border-emerald-300 hover:bg-emerald-50/40"
         }`}
       >
         {previewUrl ? (
-          <div className="relative flex min-h-[220px] w-full items-center justify-center p-4 md:h-full">
+          <div className="relative flex min-h-[220px] w-full items-center justify-center p-3 sm:p-4 md:h-full">
             <img
               src={previewUrl}
               alt="Ảnh đã chọn"
               className="h-full w-full rounded-[22px] object-contain"
             />
-            <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm">
+            <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm sm:left-4 sm:top-4">
               Ảnh đã sẵn sàng để quét
             </div>
-            <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-slate-950/70 px-4 py-3 text-white backdrop-blur-sm">
+            <div className="absolute inset-x-3 bottom-3 rounded-2xl bg-slate-950/70 px-3 py-3 text-white backdrop-blur-sm sm:inset-x-4 sm:bottom-4 sm:px-4">
               <p className="truncate text-sm font-semibold">
                 {selectedImageInfo?.name}
               </p>
@@ -433,11 +526,11 @@ const AIScan = () => {
             </div>
           </div>
         ) : (
-          <div className="px-6 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[26px] bg-white text-emerald-600 shadow-[0_18px_45px_-24px_rgba(5,150,105,0.5)] ring-1 ring-emerald-100">
+          <div className="px-4 text-center sm:px-6">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-white text-emerald-600 shadow-[0_18px_45px_-24px_rgba(5,150,105,0.5)] ring-1 ring-emerald-100 sm:h-20 sm:w-20 sm:rounded-[26px]">
               <UploadCloud size={34} />
             </div>
-            <h4 className="mt-6 text-2xl font-bold text-slate-900">
+            <h4 className="mt-5 text-xl font-bold text-slate-900 sm:mt-6 sm:text-2xl">
               Chọn ảnh lá lúa để bắt đầu
             </h4>
             <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
@@ -466,17 +559,17 @@ const AIScan = () => {
         onChange={handleImageChange}
       />
 
-      <div className="mt-4 flex flex-wrap gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap">
         <label
           htmlFor="camera-input"
-          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-700 md:hidden"
+          className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-3 font-semibold text-white transition-colors hover:bg-emerald-700 sm:flex-1 md:hidden"
         >
           <ScanLine size={18} />
           Camera
         </label>
         <label
           htmlFor="upload-input"
-          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 sm:flex-none"
+          className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 sm:flex-1 lg:flex-none"
         >
           <UploadCloud size={18} />
           Tải ảnh mới
@@ -486,7 +579,7 @@ const AIScan = () => {
           type="button"
           onClick={handleRecrop}
           disabled={!selectedImage || loading}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-55 sm:flex-none"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-55 sm:flex-1 lg:flex-none"
         >
           <Crop size={18} />
           Crop lại
@@ -496,7 +589,7 @@ const AIScan = () => {
           type="button"
           onClick={handleRescan}
           disabled={loading}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-55 sm:flex-none"
+          className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-55 sm:flex-1 lg:flex-none"
         >
           <RefreshCcw size={18} />
           Làm mới
@@ -506,7 +599,7 @@ const AIScan = () => {
           type="button"
           onClick={handleScan}
           disabled={!selectedImage || loading}
-          className={`inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors sm:ml-auto sm:w-auto ${
+          className={`col-span-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold text-white transition-colors sm:ml-auto sm:w-auto ${
             !selectedImage || loading
               ? "cursor-not-allowed bg-slate-300"
               : "bg-emerald-600 hover:bg-emerald-700"
@@ -529,15 +622,15 @@ const AIScan = () => {
   );
 
   const resultPanel = (
-    <section className="flex flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm md:min-h-0">
-      <div className="p-5 md:flex-1 md:overflow-y-auto md:custom-scrollbar">
+    <section className="flex min-w-0 flex-col overflow-hidden rounded-[22px] border border-slate-200 bg-white shadow-sm sm:rounded-[28px] md:min-h-0">
+      <div className="p-4 sm:p-5 md:flex-1 md:overflow-y-auto md:custom-scrollbar">
         {!selectedImage && !loading && !result && !error && (
           <div className="flex h-full flex-col justify-between">
             <div>
               <p className="text-sm font-semibold text-emerald-700">
                 Kết quả phân tích
               </p>
-              <h3 className="mt-1 text-2xl font-bold text-slate-900">
+              <h3 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">
                 Sẵn sàng quét AI
               </h3>
               <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -562,15 +655,15 @@ const AIScan = () => {
                     desc: 'Bấm "Dự đoán ngay" để AI phân tích',
                   },
                 ].map((item) => (
-                  <div key={item.step} className="flex gap-3">
+                  <div key={item.step} className="flex min-w-0 gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-700">
                       {item.step}
                     </div>
-                    <div className="flex-1">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-slate-900">
                         {item.title}
                       </p>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 break-words text-xs text-slate-500">
                         {item.desc}
                       </p>
                     </div>
@@ -597,19 +690,19 @@ const AIScan = () => {
 
         {selectedImage && !loading && !result && !error && (
           <div className="flex h-full flex-col justify-between">
-            <div className="rounded-[24px] bg-emerald-50 p-4">
+            <div className="rounded-[22px] bg-emerald-50 p-4 sm:rounded-[24px]">
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-emerald-700">
                   <CheckCircle size={20} />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-emerald-800">
                     Ảnh đã sẵn sàng
                   </p>
-                  <h3 className="mt-1 text-xl font-bold text-slate-900">
+                  <h3 className="mt-1 break-words text-xl font-bold text-slate-900">
                     Có thể gửi AI dự đoán ngay
                   </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 break-words text-sm leading-6 text-slate-600">
                     Nếu cần, bạn có thể crop lại trước khi bấm dự đoán để lấy
                     đúng vùng lá muốn phân tích.
                   </p>
@@ -676,19 +769,19 @@ const AIScan = () => {
         )}
 
         {error && !loading && (
-          <div className="flex h-full flex-col justify-between rounded-[24px] border border-rose-100 bg-rose-50 p-4">
+          <div className="flex h-full flex-col justify-between rounded-[22px] border border-rose-100 bg-rose-50 p-4 sm:rounded-[24px]">
             <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-rose-600">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-rose-600">
                 <AlertCircle size={20} />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-rose-700">
                   Không thể phân tích ảnh
                 </p>
-                <h3 className="mt-1 text-xl font-bold text-slate-900">
+                <h3 className="mt-1 break-words text-xl font-bold text-slate-900">
                   Có lỗi trong lúc dự đoán
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-rose-700">{error}</p>
+                <p className="mt-2 break-words text-sm leading-6 text-rose-700">{error}</p>
               </div>
             </div>
           </div>
@@ -702,19 +795,19 @@ const AIScan = () => {
                   <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20 text-white">
                     <AlertTriangle size={18} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
                       Ảnh chưa phù hợp
                     </p>
-                    <h3 className="mt-1 text-xl font-bold">
+                    <h3 className="mt-1 break-words text-xl font-bold">
                       Không thể dự đoán từ ảnh này
                     </h3>
-                    <p className="mt-1 text-sm leading-5 text-white/90">
+                    <p className="mt-1 break-words text-sm leading-5 text-white/90">
                       {result.message ||
                         "Ảnh tải lên không đủ điều kiện để dự đoán bệnh lúa."}
                     </p>
                     {result.guidance && (
-                      <p className="mt-1 text-sm leading-5 text-white/90">
+                      <p className="mt-1 break-words text-sm leading-5 text-white/90">
                         Gợi ý: {result.guidance}
                       </p>
                     )}
@@ -730,8 +823,8 @@ const AIScan = () => {
                     <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/80">
                       Kết quả chính
                     </p>
-                    <div className="mt-0.5 flex items-baseline gap-2">
-                      <h3 className="text-2xl font-bold sm:text-3xl">
+                    <div className="mt-0.5 flex flex-wrap items-baseline gap-2">
+                      <h3 className="min-w-0 break-words text-2xl font-bold sm:text-3xl">
                         {result.disease}
                       </h3>
                       {/* Thêm phần trăm hiển thị ngay cạnh tên bệnh */}
@@ -753,11 +846,11 @@ const AIScan = () => {
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
                     <AlertTriangle size={18} />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-semibold text-amber-900">
                       Cần kiểm tra thêm
                     </p>
-                    <p className="text-xs text-amber-800 line-clamp-1">
+                    <p className="break-words text-xs text-amber-800 sm:line-clamp-1">
                       {confidenceWarning}
                     </p>
                   </div>
@@ -825,7 +918,7 @@ const AIScan = () => {
                       <span className="inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
                         {index + 1}
                       </span>
-                      <p className="text-sm text-slate-700">{tip}</p>
+                        <p className="min-w-0 break-words text-sm text-slate-700">{tip}</p>
                     </div>
                   ))}
                 </div>
@@ -861,9 +954,9 @@ const AIScan = () => {
   );
 
   return (
-    <div className="app-page-shell overflow-y-auto bg-[#f4f8f5] p-3 md:overflow-hidden md:p-5">
-      <div className="mx-auto flex min-h-full max-w-7xl flex-col gap-4 md:h-full">
-        <div className="grid gap-4 md:min-h-0 md:flex-1 xl:grid-cols-[1.06fr_0.94fr]">
+    <div className="app-page-shell overflow-y-auto bg-[#f4f8f5] p-3 sm:p-4 md:overflow-hidden md:p-5">
+      <div className="mx-auto flex min-h-full max-w-7xl min-w-0 flex-col gap-4 md:h-full">
+        <div className="grid min-w-0 gap-4 md:min-h-0 md:flex-1 xl:grid-cols-[1.06fr_0.94fr]">
           {uploadPanel}
           {resultPanel}
         </div>

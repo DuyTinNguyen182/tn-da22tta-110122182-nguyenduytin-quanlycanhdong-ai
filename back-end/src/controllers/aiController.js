@@ -33,7 +33,6 @@ exports.diagnoseDisease = async (req, res) => {
       imageName: req.file.originalname,
     });
   } catch (error) {
-    console.error("AI Service Error:", error.message);
     if (axios.isAxiosError(error) && error.response) {
       const { status, data } = error.response;
 
@@ -61,6 +60,7 @@ exports.diagnoseDisease = async (req, res) => {
       }
     }
 
+    console.error("AI Service Error:", error.message);
     res.status(500).json({
       message: "Không thể kết nối tới dịch vụ AI. Vui lòng thử lại sau.",
       details: error.message,

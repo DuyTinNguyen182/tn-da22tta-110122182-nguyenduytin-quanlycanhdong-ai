@@ -131,16 +131,16 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-slate-950/60 p-2 backdrop-blur-sm sm:items-center sm:p-4"
       role="dialog"
       aria-modal="true"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-[16px] border border-white/15 bg-white shadow-[0_40px_100px_-40px_rgba(15,23,42,0.7)]"
+        className="flex max-h-[calc(100dvh-1rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[18px] border border-white/15 bg-white shadow-[0_40px_100px_-40px_rgba(15,23,42,0.7)] sm:max-h-[94vh]"
       >
         {/* Header */}
-        <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-4 py-4 md:px-6">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-4 py-4 md:px-6">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-emerald-700">
               {UI_TEXT.eyebrow}
@@ -153,25 +153,25 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            className="shrink-0 rounded-xl p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Body  */}
-        <div className="flex-1 min-h-0 overflow-y-auto md:overflow-hidden px-4 py-4 md:px-0 md:py-0">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-4 sm:py-4 md:overflow-hidden md:px-0 md:py-0">
           {/* Thêm md:h-[65vh] và md:min-h-[520px] để ép khung chứa phải cao lên, ảnh sẽ to ra tối đa */}
-          <div className="flex flex-col md:grid md:h-[65vh] md:min-h-[520px] gap-4 md:grid-cols-[minmax(0,1fr)_280px] md:gap-6 md:p-6">
+          <div className="flex min-w-0 flex-col gap-4 md:grid md:h-[65vh] md:min-h-[520px] md:grid-cols-[minmax(0,1fr)_280px] md:gap-6 md:p-6">
             {/* Vùng Cropper */}
-            <div className="flex flex-col h-full min-h-[400px] md:min-h-0 rounded-[28px] border border-slate-200 bg-[radial-gradient(circle_at_top,#152238_0%,#050816_75%)] p-3 shadow-inner shadow-slate-950/30">
-              <div className="mb-3 self-start inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
+            <div className="flex h-[min(58dvh,360px)] min-h-[280px] min-w-0 flex-col rounded-[22px] border border-slate-200 bg-[radial-gradient(circle_at_top,#152238_0%,#050816_75%)] p-3 shadow-inner shadow-slate-950/30 sm:min-h-[320px] md:h-full md:min-h-0 md:rounded-[28px]">
+              <div className="mb-3 inline-flex max-w-full items-center gap-2 self-start rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-white/85 backdrop-blur-sm">
                 <ScanLine size={14} />
-                <span>{UI_TEXT.frameHint}</span>
+                <span className="min-w-0 break-words">{UI_TEXT.frameHint}</span>
               </div>
 
               {/* Vùng không gian hiển thị ảnh sẽ tự động lấp đầy phần cao còn lại */}
-              <div className="relative flex-1 w-full overflow-hidden rounded-[16px] bg-slate-950 ring-1 ring-white/10">
+              <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-[16px] bg-slate-950 ring-1 ring-white/10">
                 {imageLoading && (
                   <div className="absolute inset-0 z-20 flex items-center justify-center text-white/90">
                     <Loader2 className="animate-spin" />
@@ -197,8 +197,8 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
             </div>
 
             {/* Vùng Controls (Gợi ý và thanh trượt) */}
-            <div className="flex flex-col gap-4 overflow-y-auto md:overflow-visible">
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex min-w-0 flex-col gap-4 overflow-y-visible md:overflow-visible">
+              <div className="min-w-0 rounded-[22px] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[24px]">
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-semibold text-slate-900">
                     {UI_TEXT.zoomLabel}
@@ -223,12 +223,12 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
                   <span>3.0x</span>
                 </div>
 
-                <p className="mt-3 text-xs leading-5 text-slate-500">
+                <p className="mt-3 break-words text-xs leading-5 text-slate-500">
                   {UI_TEXT.dragHint}
                 </p>
               </div>
 
-              <div className="rounded-[24px] border border-emerald-100 bg-emerald-50/80 p-4">
+              <div className="min-w-0 rounded-[22px] border border-emerald-100 bg-emerald-50/80 p-4 sm:rounded-[24px]">
                 <p className="text-sm font-semibold text-emerald-900">
                   {UI_TEXT.quickTips}
                 </p>
@@ -236,7 +236,7 @@ const ImageCropModal = ({ open, imageFile, onClose, onConfirm }) => {
                   {QUICK_TIPS.map((tip) => (
                     <div
                       key={tip}
-                      className="rounded-2xl bg-white/75 px-3 py-2.5 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100"
+                      className="break-words rounded-2xl bg-white/75 px-3 py-2.5 text-sm leading-6 text-emerald-900 ring-1 ring-emerald-100"
                     >
                       {tip}
                     </div>
