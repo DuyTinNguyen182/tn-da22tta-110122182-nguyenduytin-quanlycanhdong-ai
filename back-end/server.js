@@ -38,8 +38,13 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-// Định nghĩa danh sách các domain được phép truy cập API
-const allowedOrigins = ["http://localhost:5173", FRONTEND_URL];
+// Tách chuỗi FRONTEND_URL từ biến môi trường thành một mảng các domain
+const frontendUrls = FRONTEND_URL ? FRONTEND_URL.split(",") : [];
+
+const allowedOrigins = [
+  "http://localhost:5173", // URL khi chạy ở máy local
+  ...frontendUrls, // Giải nén các domain cấu hình từ Render vào đây
+];
 
 app.use(
   cors({
