@@ -96,7 +96,11 @@ const TaskFilterDropdown = ({
         }`}
       >
         <Filter size={13} className="shrink-0 text-gray-400" />
-        <span className="flex-1 truncate text-left text-gray-700">
+        {/* Thêm title cho text trên nút button */}
+        <span
+          className="flex-1 truncate text-left text-gray-700"
+          title={displayLabel}
+        >
           {displayLabel}
         </span>
         <ChevronDown
@@ -108,7 +112,8 @@ const TaskFilterDropdown = ({
       </button>
 
       {open && (
-        <div className="absolute left-0 top-full z-[100] mt-1.5 w-[220px] rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50">
+        // Đổi w-[220px] thành w-max min-w-[220px] max-w-[320px]
+        <div className="absolute left-0 top-full z-[100] mt-1.5 w-max min-w-[220px] max-w-[320px] rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50">
           {options.map((option) => {
             const hasChildren =
               Array.isArray(option.children) && option.children.length > 0;
@@ -134,7 +139,9 @@ const TaskFilterDropdown = ({
                       : "text-gray-700 hover:bg-gray-50"
                   }`}
                 >
+                  {/* Thêm title cho text cấp 1 */}
                   <span
+                    title={option.label}
                     className={`flex-1 truncate text-sm ${isSelected ? "font-semibold" : ""}`}
                   >
                     {option.label}
@@ -151,8 +158,9 @@ const TaskFilterDropdown = ({
                 </button>
 
                 {showChildren && (
+                  // Đổi w-[240px] thành w-max min-w-[240px] max-w-[350px]
                   <div
-                    className="absolute left-full top-0 ml-1 w-[240px] rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50"
+                    className="absolute left-full top-0 ml-1 w-max min-w-[240px] max-w-[350px] rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50"
                     onMouseEnter={() => {
                       cancelCloseTimer();
                       setHoveredParent(option.value);
@@ -173,7 +181,9 @@ const TaskFilterDropdown = ({
                               : "text-gray-700 hover:bg-gray-50"
                           }`}
                         >
+                          {/* Thêm title cho text cấp 2 */}
                           <span
+                            title={child.label}
                             className={`flex-1 truncate text-sm ${
                               isChildSelected ? "font-semibold" : ""
                             }`}

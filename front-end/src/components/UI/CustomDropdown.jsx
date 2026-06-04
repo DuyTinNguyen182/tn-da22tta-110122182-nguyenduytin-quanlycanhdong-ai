@@ -90,14 +90,19 @@ const CustomDropdown = ({
                   <div className="flex flex-wrap items-center gap-2">
                     {selectedValues.map((selectedValue) => {
                       const selectedItem =
-                        options.find((option) => option.value === selectedValue) || {};
+                        options.find(
+                          (option) => option.value === selectedValue,
+                        ) || {};
 
                       return (
                         <span
                           key={selectedValue}
                           className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-800"
                         >
-                          <span className="max-w-[140px] truncate">
+                          <span
+                            className="max-w-[140px] truncate"
+                            title={selectedItem.label || selectedValue}
+                          >
                             {selectedItem.label || selectedValue}
                           </span>
                           <span
@@ -134,6 +139,7 @@ const CustomDropdown = ({
               </div>
             ) : (
               <span
+                title={displayLabel}
                 className={`flex-1 truncate text-left ${
                   selectedOption
                     ? variant === "active"
@@ -162,7 +168,7 @@ const CustomDropdown = ({
           >
             <ListboxOptions
               anchor="bottom start"
-              className="z-[9999] mt-1.5 w-[var(--button-width)] min-w-[180px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50 focus:outline-none"
+              className="z-[9999] mt-1.5 w-max min-w-[260px] max-w-[400px] overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-xl shadow-gray-200/50 focus:outline-none"
             >
               {options.map((option) => (
                 <ListboxOption
@@ -187,6 +193,7 @@ const CustomDropdown = ({
                       ) : null}
 
                       <span
+                        title={option.label}
                         className={`flex-1 truncate text-sm ${
                           selected ? "font-semibold" : ""
                         }`}

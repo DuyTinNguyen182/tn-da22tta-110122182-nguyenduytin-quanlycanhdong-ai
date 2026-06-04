@@ -26,7 +26,10 @@ const getSeasonYear = (seasonDetail) => {
   }
 
   const sourceDate =
-    seasonDetail?.startDate || seasonDetail?.endDate || seasonDetail?.createdAt || null;
+    seasonDetail?.startDate ||
+    seasonDetail?.endDate ||
+    seasonDetail?.createdAt ||
+    null;
 
   return sourceDate ? new Date(sourceDate).getFullYear() : null;
 };
@@ -101,25 +104,37 @@ const buildSystemStats = async () => {
                 {
                   $and: [
                     { $lte: ["$startDate", new Date()] },
-                    { $or: [{ $eq: ["$endDate", null] }, { $gte: ["$endDate", new Date()] }] }
-                  ]
+                    {
+                      $or: [
+                        { $eq: ["$endDate", null] },
+                        { $gte: ["$endDate", new Date()] },
+                      ],
+                    },
+                  ],
                 },
-                1, 0
-              ]
-            }
+                1,
+                0,
+              ],
+            },
           },
           completedSeasonCount: {
             $sum: {
-              $cond: [{ $lt: ["$endDate", new Date()] }, 1, 0]
-            }
+              $cond: [{ $lt: ["$endDate", new Date()] }, 1, 0],
+            },
           },
           plannedSeasonCount: {
             $sum: {
               $cond: [
-                { $or: [{ $eq: ["$startDate", null] }, { $gt: ["$startDate", new Date()] }] },
-                1, 0
-              ]
-            }
+                {
+                  $or: [
+                    { $eq: ["$startDate", null] },
+                    { $gt: ["$startDate", new Date()] },
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
         },
       },
@@ -185,13 +200,19 @@ const getCurrentSeasonInfo = async () => {
   };
 };
 
-const decorateSeasonInstances = (seasonDetails, assignmentsBySeason, logsBySeason) => {
+const decorateSeasonInstances = (
+  seasonDetails,
+  assignmentsBySeason,
+  logsBySeason,
+) => {
   return seasonDetails.map((seasonDetail) => {
     const key = String(seasonDetail._id);
     const assignments = assignmentsBySeason.get(key) || [];
     const logs = logsBySeason.get(key) || [];
     const assignedArea = sumBy(assignments, (item) => item.plot?.area);
-    const readyPlotCount = assignments.filter((item) => item.plot?.status === "active").length;
+    const readyPlotCount = assignments.filter(
+      (item) => item.plot?.status === "active",
+    ).length;
     const totalCost = sumBy(logs, (item) => item.cost);
     const lastActivityAt = logs[0]?.date || logs[0]?.createdAt || null;
 
@@ -200,8 +221,8 @@ const decorateSeasonInstances = (seasonDetails, assignmentsBySeason, logsBySeaso
     if (seasonDetail.endDate && new Date(seasonDetail.endDate) < now) {
       computedStatus = "completed";
     } else if (
-      seasonDetail.startDate && 
-      new Date(seasonDetail.startDate) <= now && 
+      seasonDetail.startDate &&
+      new Date(seasonDetail.startDate) <= now &&
       (!seasonDetail.endDate || new Date(seasonDetail.endDate) >= now)
     ) {
       computedStatus = "active";
@@ -264,13 +285,19 @@ const buildGroupedStats = (seasonInstances) => {
     if (item.status === "active") seasonBucket.activeSeasonCount += 1;
     if (item.status === "completed") seasonBucket.completedSeasonCount += 1;
     if (item.status === "planned") seasonBucket.plannedSeasonCount += 1;
-    if (!seasonBucket.lastActivityAt || new Date(item.lastActivityAt || 0) > new Date(seasonBucket.lastActivityAt || 0)) {
-      seasonBucket.lastActivityAt = item.lastActivityAt || seasonBucket.lastActivityAt;
+    if (
+      !seasonBucket.lastActivityAt ||
+      new Date(item.lastActivityAt || 0) >
+        new Date(seasonBucket.lastActivityAt || 0)
+    ) {
+      seasonBucket.lastActivityAt =
+        item.lastActivityAt || seasonBucket.lastActivityAt;
     }
   });
 
-  const seasonOverview = Array.from(seasonMap.values())
-    .sort((a, b) => a.seasonName.localeCompare(b.seasonName));
+  const seasonOverview = Array.from(seasonMap.values()).sort((a, b) =>
+    a.seasonName.localeCompare(b.seasonName),
+  );
 
   return { seasonOverview };
 };
@@ -290,11 +317,30 @@ const getLogTaskInfo = (log) => {
 
 const buildRecentActivities = (logs, seasonDetailMap, recentLimit) => {
   return logs.slice(0, recentLimit).map((log) => {
-    const firstAssignment = log.seasonPlotAssignments?.[0] || null;
-    const seasonDetailId = firstAssignment?.seasonDetail || null;
-    const seasonDetail = seasonDetailId ? seasonDetailMap.get(String(seasonDetailId)) : null;
+    const assignments = log.seasonPlotAssignments || [];
+
+    // 1. Lọc tên Nông dân & Cánh đồng
+    const farmerNames = [
+      ...new Set(assignments.map((a) => a.user?.fullName).filter(Boolean)),
+    ];
+    const farmerNameDisplay = farmerNames.join(", ") || "Chưa rõ";
+
+    const fieldNames = [
+      ...new Set(assignments.map((a) => a.field?.name).filter(Boolean)),
+    ];
+    const fieldNameDisplay = fieldNames.join(", ") || "Chưa rõ";
+
+    // 2. Lấy danh sách các thửa và biến scope
+    const plots = assignments.map((a) => a.plot).filter(Boolean);
+    const scope =
+      log.scope || (plots.length > 1 ? "selected_plots" : "single_plot");
+
+    const seasonDetailId = assignments[0]?.seasonDetail || null;
+    const seasonDetail = seasonDetailId
+      ? seasonDetailMap.get(String(seasonDetailId))
+      : null;
+
     const taskInfo = getLogTaskInfo(log);
-    const plot = firstAssignment?.plot || null;
 
     return {
       _id: log._id,
@@ -303,13 +349,16 @@ const buildRecentActivities = (logs, seasonDetailMap, recentLimit) => {
       description: log.description || "",
       taskId: taskInfo.taskId,
       taskName: taskInfo.taskName,
-      taskDetailId: taskInfo.taskDetailId,
-      taskDetailName: taskInfo.taskDetailName,
       activityName: taskInfo.activityName,
-      plotId: plot?._id || plot || null,
-      plotName: plot?.name || "",
-      seasonDetailId: seasonDetail?._id || seasonDetailId,
-      seasonLabel: seasonDetail?.seasonInstanceLabel || seasonDetail?.seasonLabel || "",
+
+      // TRẢ VỀ SCOPE VÀ MẢNG PLOTS CHO FRONTEND RENDER
+      scope: scope,
+      plots: plots.map((p) => ({ _id: p._id, name: p.name })),
+
+      fieldName: fieldNameDisplay,
+      farmerName: farmerNameDisplay,
+      seasonLabel:
+        seasonDetail?.seasonInstanceLabel || seasonDetail?.seasonLabel || "",
       status: seasonDetail?.status || "",
     };
   });
@@ -336,7 +385,7 @@ const buildTaskOverview = (logs) => {
   });
 
   return Array.from(taskMap.values()).sort(
-    (a, b) => b.diaryLogCount - a.diaryLogCount || b.totalCost - a.totalCost
+    (a, b) => b.diaryLogCount - a.diaryLogCount || b.totalCost - a.totalCost,
   );
 };
 
@@ -373,15 +422,19 @@ const getAdminOverview = async (rawFilters, currentUser) => {
   const logs = assignmentIds.length
     ? await DiaryLog.find({ seasonPlotAssignments: { $in: assignmentIds } })
         .populate("task", "name")
-        .populate({
-          path: "taskDetail",
-          select: "name task",
-          populate: { path: "task", select: "name" },
-        })
+        // .populate({
+        //   path: "taskDetail",
+        //   select: "name task",
+        //   populate: { path: "task", select: "name" },
+        // })
         .populate({
           path: "seasonPlotAssignments",
-          select: "seasonDetail plot",
-          populate: { path: "plot", select: "name" },
+          select: "seasonDetail plot field user",
+          populate: [
+            { path: "plot", select: "name" },
+            { path: "field", select: "name" },
+            { path: "user", select: "fullName" },
+          ],
         })
         .sort({ date: -1, createdAt: -1 })
         .lean()
@@ -399,7 +452,11 @@ const getAdminOverview = async (rawFilters, currentUser) => {
   const logsBySeason = new Map();
   logs.forEach((item) => {
     const seasonIds = Array.from(
-      new Set((item.seasonPlotAssignments || []).map((assignment) => String(assignment.seasonDetail)))
+      new Set(
+        (item.seasonPlotAssignments || []).map((assignment) =>
+          String(assignment.seasonDetail),
+        ),
+      ),
     );
 
     seasonIds.forEach((key) => {
@@ -410,21 +467,38 @@ const getAdminOverview = async (rawFilters, currentUser) => {
     });
   });
 
-  const seasonInstances = decorateSeasonInstances(seasonDetails, assignmentsBySeason, logsBySeason);
-  const seasonDetailMap = new Map(seasonInstances.map((item) => [String(item._id), item]));
+  const seasonInstances = decorateSeasonInstances(
+    seasonDetails,
+    assignmentsBySeason,
+    logsBySeason,
+  );
+  const seasonDetailMap = new Map(
+    seasonInstances.map((item) => [String(item._id), item]),
+  );
 
   const seasonalSummary = {
     seasonInstanceCount: seasonInstances.length,
-    activeSeasonCount: seasonInstances.filter((item) => item.status === "active").length,
-    completedSeasonCount: seasonInstances.filter((item) => item.status === "completed").length,
-    plannedSeasonCount: seasonInstances.filter((item) => item.status === "planned").length,
+    activeSeasonCount: seasonInstances.filter(
+      (item) => item.status === "active",
+    ).length,
+    completedSeasonCount: seasonInstances.filter(
+      (item) => item.status === "completed",
+    ).length,
+    plannedSeasonCount: seasonInstances.filter(
+      (item) => item.status === "planned",
+    ).length,
     assignedPlotCount: sumBy(seasonInstances, (item) => item.plotCount),
     readyPlotCount: sumBy(seasonInstances, (item) => item.readyPlotCount),
-    inactiveAssignedPlotCount: sumBy(seasonInstances, (item) => item.inactiveAssignedPlotCount),
+    inactiveAssignedPlotCount: sumBy(
+      seasonInstances,
+      (item) => item.inactiveAssignedPlotCount,
+    ),
     assignedArea: sumBy(seasonInstances, (item) => item.assignedArea),
     diaryLogCount: sumBy(seasonInstances, (item) => item.diaryLogCount),
     totalCost: sumBy(seasonInstances, (item) => item.totalCost),
-    seasonWithoutDiaryCount: seasonInstances.filter((item) => item.diaryLogCount === 0).length,
+    seasonWithoutDiaryCount: seasonInstances.filter(
+      (item) => item.diaryLogCount === 0,
+    ).length,
   };
 
   const { seasonOverview } = buildGroupedStats(seasonInstances);
@@ -439,7 +513,11 @@ const getAdminOverview = async (rawFilters, currentUser) => {
     seasonOverview,
     taskOverview: buildTaskOverview(logs),
     seasonInstances,
-    recentActivities: buildRecentActivities(logs, seasonDetailMap, filters.recentLimit),
+    recentActivities: buildRecentActivities(
+      logs,
+      seasonDetailMap,
+      filters.recentLimit,
+    ),
   };
 };
 

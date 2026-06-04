@@ -55,6 +55,8 @@ const AdminProgress = () => {
   const [sentWarningKeys, setSentWarningKeys] = useState(() => new Set());
   const [expandedFarmerKeys, setExpandedFarmerKeys] = useState(() => new Set());
   const [hasAppliedFilter, setHasAppliedFilter] = useState(false);
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [loadingMoreActivities, setLoadingMoreActivities] = useState(false);
 
   useEffect(() => {
     api
@@ -98,19 +100,32 @@ const AdminProgress = () => {
     const bootstrap = async () => {
       try {
         setLoading(true);
-        await fetchOptions();
+        const optionsRes = await api.get(
+          "/admin/progress/plot-statistics/options",
+        );
+        setOptions(optionsRes.data || emptyOptions);
+        try {
+          const overviewRes = await api.get("/admin/progress/overview", {
+            params: { recentLimit: 5 },
+          });
+          setRecentActivities(overviewRes.data?.recentActivities || []);
+        } catch (timelineError) {
+          console.warn("Không thể tải timeline hoạt động:", timelineError);
+          setRecentActivities([]);
+        }
         setBootstrapped(true);
       } catch (error) {
-        console.error("Lỗi tải bộ lọc thống kê:", error);
+        console.error("Lỗi tải dữ liệu khởi tạo:", error);
         toast.error(
-          error.response?.data?.message || "Không thể tải bộ lọc thống kê",
+          error.response?.data?.message || "Không thể tải dữ liệu khởi tạo",
         );
+      } finally {
         setLoading(false);
       }
     };
 
     bootstrap();
-  }, [fetchOptions, toast]);
+  }, [toast]);
 
   useEffect(() => {
     if (!bootstrapped || !defaultSeasonApplied) return;
@@ -575,6 +590,21 @@ const AdminProgress = () => {
     }
   };
 
+  const handleLoadMoreActivities = async () => {
+    try {
+      setLoadingMoreActivities(true);
+      const nextLimit = recentActivities.length + 5;
+      const res = await api.get("/admin/progress/overview", {
+        params: { recentLimit: nextLimit },
+      });
+      setRecentActivities(res.data?.recentActivities || []);
+    } catch (error) {
+      toast.error("Không thể tải thêm hoạt động gần đây");
+    } finally {
+      setLoadingMoreActivities(false);
+    }
+  };
+
   if (loading && !statistics) {
     return (
       <LoadingScreen fullScreen={true} message="Đang tải thống kê admin..." />
@@ -645,6 +675,10 @@ const AdminProgress = () => {
           currentPage={currentPage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          recentActivities={recentActivities}
+          isCompletedSeason={Boolean(summary?.isCompletedSeason)}
+          onLoadMoreActivities={handleLoadMoreActivities}
+          loadingMoreActivities={loadingMoreActivities}
         />
       </div>
     </div>

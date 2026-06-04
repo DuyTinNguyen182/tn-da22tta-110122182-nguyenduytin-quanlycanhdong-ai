@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { DollarSign, Calendar, X, FileText, MapPin } from "lucide-react";
 import CustomCheckbox from "./CustomCheckbox";
-import CustomDropdown from "./CustomDropdown"; // Đã thêm Import CustomDropdown
+import CustomDropdown from "./CustomDropdown";
 
 const FarmingLogModal = ({
   isOpen,

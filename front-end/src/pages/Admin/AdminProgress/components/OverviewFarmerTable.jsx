@@ -1,7 +1,6 @@
 import React from "react";
 import {
   BellRing,
-  Briefcase,
   ChevronDown,
   ChevronUp,
   Map as MapIcon,
@@ -9,6 +8,7 @@ import {
 } from "lucide-react";
 import LoadingScreen from "../../../../components/Layout/LoadingScreen";
 import PaginationControls from "../../../../components/Common/PaginationControls";
+import RecentActivitiesTimeline from "./RecentActivitiesTimeline";
 
 const OverviewFarmerTable = ({
   loading,
@@ -34,59 +34,55 @@ const OverviewFarmerTable = ({
   totalPages,
   onPageChange,
   selectedStageLabel,
+  recentActivities,
+  isCompletedSeason,
+  onLoadMoreActivities,
+  loadingMoreActivities,
 }) => {
-  const chooseTaskTitle =
-    "Vui lòng chọn giai đoạn và công việc để xem bảng dữ liệu";
-  const chooseTaskDescription =
-    "Bảng thống kê sẽ hiển thị khi bạn đã chọn một giai đoạn và một công việc trên bộ lọc.";
-
   return (
     <section className="rounded-[28px] border border-gray-100 bg-white shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Bảng thống kê</h2>
-        </div>
+      {hasSelectedFilter && (
+        <div className="flex flex-col gap-4 border-b border-gray-100 px-5 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Bảng thống kê</h2>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
-          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
-            <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-            Đã làm
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700">
-            <span className="h-2 w-2 rounded-full bg-amber-500"></span>
-            Chưa làm
-          </span>
-          <button
-            type="button"
-            onClick={onWarningAll}
-            disabled={
-              sendingAllWarnings ||
-              warnableFarmerGroups.length === 0 ||
-              loading ||
-              !appliedFilters.taskId
-            }
-            className="ml-1 inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 font-semibold text-white shadow-md shadow-amber-200 transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none"
-          >
-            <BellRing size={15} />
-            {sendingAllWarnings ? "Đang gửi..." : "Cảnh báo tất cả"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
+            <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
+              <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+              Đã làm
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-amber-50 px-3 py-1 font-medium text-amber-700">
+              <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+              Chưa làm
+            </span>
+            <button
+              type="button"
+              onClick={onWarningAll}
+              disabled={
+                sendingAllWarnings ||
+                warnableFarmerGroups.length === 0 ||
+                loading ||
+                !appliedFilters.taskId ||
+                isCompletedSeason
+              }
+              className="ml-1 inline-flex items-center gap-2 rounded-2xl bg-amber-500 px-4 py-2.5 font-semibold text-white shadow-md shadow-amber-200 transition-all hover:bg-amber-600 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 disabled:shadow-none"
+            >
+              <BellRing size={15} />
+              {sendingAllWarnings ? "Đang gửi..." : "Cảnh báo tất cả"}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {loading ? (
-        <LoadingScreen message="Đang cập nhật bảng thống kê..." />
+        <LoadingScreen message="Đang cập nhật dữ liệu..." />
       ) : !hasSelectedFilter ? (
-        <div className="flex h-72 flex-col items-center justify-center px-6 text-center">
-          <div className="rounded-3xl bg-sky-50 p-4 text-sky-600">
-            <Briefcase size={28} />
-          </div>
-          <p className="mt-4 text-lg font-semibold text-gray-800">
-            {chooseTaskTitle}
-          </p>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-gray-500">
-            {chooseTaskDescription}
-          </p>
-        </div>
+        <RecentActivitiesTimeline
+          activities={recentActivities}
+          onLoadMore={onLoadMoreActivities}
+          loadingMore={loadingMoreActivities}
+        />
       ) : groupedFarmerRows.length === 0 ? (
         <div className="flex h-72 flex-col items-center justify-center px-6 text-center">
           <div className="rounded-3xl bg-amber-50 p-4 text-amber-600">
@@ -200,12 +196,7 @@ const OverviewFarmerTable = ({
                             {selectedTaskLabel}
                           </p>
                           <p className="mt-1 text-sm text-gray-500">
-                            Giai đoạn: {selectedStageLabel}
-                          </p>
-                          <p className="mt-1 text-sm text-gray-500">
-                            {appliedFilters.taskId
-                              ? "Đang lọc theo công việc đã chọn"
-                              : "Tổng hợp theo giai đoạn hoặc bộ lọc hiện tại"}
+                            {selectedStageLabel}
                           </p>
                         </td>
 
@@ -238,12 +229,14 @@ const OverviewFarmerTable = ({
                               disabled={
                                 !canWarn ||
                                 sendingAllWarnings ||
-                                Boolean(sendingRecipientKey)
+                                Boolean(sendingRecipientKey) ||
+                                isCompletedSeason
                               }
                               className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${
                                 !canWarn ||
                                 sendingAllWarnings ||
-                                Boolean(sendingRecipientKey)
+                                Boolean(sendingRecipientKey) ||
+                                isCompletedSeason
                                   ? "cursor-not-allowed bg-gray-100 text-gray-400"
                                   : isSentInSession
                                     ? "bg-sky-600 text-white shadow-md shadow-sky-200 hover:bg-sky-700"
@@ -251,13 +244,15 @@ const OverviewFarmerTable = ({
                               }`}
                             >
                               <BellRing size={15} />
-                              {group.pendingCount === 0
-                                ? "Đã xong"
-                                : isSendingGroup
-                                  ? "Đang gửi..."
-                                  : isSentInSession
-                                    ? "Đã gửi"
-                                    : "Cảnh báo"}
+                              {isCompletedSeason
+                                ? "Kết thúc"
+                                : group.pendingCount === 0
+                                  ? "Đã xong"
+                                  : isSendingGroup
+                                    ? "Đang gửi..."
+                                    : isSentInSession
+                                      ? "Đã gửi"
+                                      : "Cảnh báo"}
                             </button>
                           </div>
                         </td>

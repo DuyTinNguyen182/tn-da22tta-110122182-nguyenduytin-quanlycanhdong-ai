@@ -5,7 +5,9 @@ const SeasonDetail = require("../models/seasonDetailModel");
 const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Stage = require("../models/stageModel");
 const Task = require("../models/taskModel");
-const { buildPlotWarningEmailTemplate } = require("../templates/plotWarningEmailTemplate");
+const {
+  buildPlotWarningEmailTemplate,
+} = require("../templates/plotWarningEmailTemplate");
 const announcementService = require("./announcementService");
 const { sendMail } = require("./mailService");
 
@@ -53,7 +55,10 @@ const getSeasonYear = (seasonDetail) => {
   }
 
   const sourceDate =
-    seasonDetail?.startDate || seasonDetail?.endDate || seasonDetail?.createdAt || null;
+    seasonDetail?.startDate ||
+    seasonDetail?.endDate ||
+    seasonDetail?.createdAt ||
+    null;
 
   if (!sourceDate) {
     return null;
@@ -148,15 +153,22 @@ const getFarmerGroupKey = (row) =>
     .trim()
     .toLowerCase();
 
-const buildPlotWarningAnnouncement = ({ farmerName, rows, selectedActivity, adminName }) => {
+const buildPlotWarningAnnouncement = ({
+  farmerName,
+  rows,
+  selectedActivity,
+  adminName,
+}) => {
   const activityLabel =
-    selectedActivity?.activityLabel || rows[0]?.activityLabel || "công việc được giao";
+    selectedActivity?.activityLabel ||
+    rows[0]?.activityLabel ||
+    "công việc được giao";
   const introLine = `Mùa vụ ${selectedActivity?.seasonLabel || rows[0]?.seasonLabel || "không xác định"}: Hệ thống ghi nhận bạn chưa thực hiện "${activityLabel}" cho ${rows.length} thửa ruộng sau:`;
   const plotLines = rows.map(
     (row, index) =>
       `${index + 1}. ${row.plotName} | ${row.fieldName} | Diện tích: ${Number(
-        row.plotArea || 0
-      ).toLocaleString("vi-VN")} m2`
+        row.plotArea || 0,
+      ).toLocaleString("vi-VN")} m2`,
   );
 
   return {
@@ -177,7 +189,9 @@ const buildPlotWarningAnnouncement = ({ farmerName, rows, selectedActivity, admi
 
 const getSelectedActivityMeta = async (filters) => {
   const [selectedTask, selectedTaskDetail] = await Promise.all([
-    filters.taskId ? Task.findById(filters.taskId).populate("stage", "name order").lean() : null,
+    filters.taskId
+      ? Task.findById(filters.taskId).populate("stage", "name order").lean()
+      : null,
     filters.stageId ? Stage.findById(filters.stageId).lean() : null,
   ]);
 
@@ -192,14 +206,18 @@ const getSelectedActivityMeta = async (filters) => {
   if (
     selectedTask &&
     selectedTaskDetail &&
-    String(selectedTask.stage?._id || selectedTask.stage) !== String(selectedTaskDetail._id)
+    String(selectedTask.stage?._id || selectedTask.stage) !==
+      String(selectedTaskDetail._id)
   ) {
     throw new Error("Công việc không thuộc giai đoạn đã chọn");
   }
 
   const stageName = selectedTaskDetail?.name || selectedTask?.stage?.name || "";
   const taskName = selectedTask?.name || "";
-  const activityLabel = stageName && taskName ? `${stageName} - ${taskName}` : taskName || stageName || "";
+  const activityLabel =
+    stageName && taskName
+      ? `${stageName} - ${taskName}`
+      : taskName || stageName || "";
 
   return {
     stageId: selectedTaskDetail?._id ? String(selectedTaskDetail._id) : "",
@@ -293,10 +311,12 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
 
   const fallbackTaskName = selectedActivity.taskName || "Chưa chọn công việc";
   const fallbackStageName = selectedActivity.stageName || "";
-  const fallbackActivityLabel = selectedActivity.activityLabel || "Chưa thực hiện";
+  const fallbackActivityLabel =
+    selectedActivity.activityLabel || "Chưa thực hiện";
 
   const rows = assignments.map((assignment) => {
-    const matchedLog = latestLogByAssignmentId.get(String(assignment._id)) || null;
+    const matchedLog =
+      latestLogByAssignmentId.get(String(assignment._id)) || null;
     const seasonDetail = assignment.seasonDetail || null;
     const seasonLabel = buildSeasonLabel(seasonDetail);
     const year = getSeasonYear(seasonDetail);
@@ -309,7 +329,9 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
       fieldId: assignment.field?._id ? String(assignment.field._id) : "",
       fieldName: assignment.field?.name || "Không xác định",
       seasonDetailId: seasonDetail?._id ? String(seasonDetail._id) : "",
-      seasonId: seasonDetail?.season?._id ? String(seasonDetail.season._id) : "",
+      seasonId: seasonDetail?.season?._id
+        ? String(seasonDetail.season._id)
+        : "",
       seasonName: seasonDetail?.season?.name || "Không xác định",
       seasonLabel,
       year,
@@ -325,7 +347,8 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
       performedAt: matchedLog?.performedAt || null,
       status: matchedLog ? "done" : "pending",
       statusLabel: matchedLog ? "Đã làm" : "Chưa làm",
-      warningAvailable: !matchedLog && Boolean(assignment.user?._id || assignment.user?.email),
+      warningAvailable:
+        !matchedLog && Boolean(assignment.user?._id || assignment.user?.email),
       recipientKey: getFarmerGroupKey({
         farmerId: assignment.user?._id ? String(assignment.user._id) : "",
         farmerEmail: assignment.user?.email || "",
@@ -337,6 +360,7 @@ const buildPlotStatisticsDataset = async (rawFilters, currentUser) => {
     filters,
     selectedActivity,
     rows: sortRows(rows, "all"),
+    seasonDetails,
   };
 };
 
@@ -344,16 +368,18 @@ const buildStatisticsSummary = (rows, filters = {}) => {
   const doneCount = rows.filter((item) => item.status === "done").length;
   const pendingRows = rows.filter((item) => item.status === "pending");
   const filteredRows =
-    filters.status === "all" ? rows : rows.filter((item) => item.status === filters.status);
+    filters.status === "all"
+      ? rows
+      : rows.filter((item) => item.status === filters.status);
 
   const pendingFarmerKeySet = new Set(
-    pendingRows.map((row) => getFarmerGroupKey(row)).filter(Boolean)
+    pendingRows.map((row) => getFarmerGroupKey(row)).filter(Boolean),
   );
   const pendingFarmerWithEmailKeySet = new Set(
     pendingRows
       .filter((row) => row.farmerEmail)
       .map((row) => getFarmerGroupKey(row))
-      .filter(Boolean)
+      .filter(Boolean),
   );
 
   return {
@@ -363,7 +389,9 @@ const buildStatisticsSummary = (rows, filters = {}) => {
       doneCount,
       pendingCount: pendingRows.length,
       visibleCount: filteredRows.length,
-      completionRate: rows.length ? Number(((doneCount / rows.length) * 100).toFixed(1)) : 0,
+      completionRate: rows.length
+        ? Number(((doneCount / rows.length) * 100).toFixed(1))
+        : 0,
       matchedSeasonCount: new Set(rows.map((item) => item.seasonDetailId)).size,
       pendingFarmerCount: pendingFarmerKeySet.size,
       pendingFarmerWithEmailCount: pendingFarmerWithEmailKeySet.size,
@@ -401,7 +429,24 @@ const groupPendingRowsByFarmer = (rows) => {
 
 const getAdminPlotTaskStatistics = async (rawFilters, currentUser) => {
   const dataset = await buildPlotStatisticsDataset(rawFilters, currentUser);
-  const { filteredRows, summary } = buildStatisticsSummary(dataset.rows, dataset.filters);
+  const { filteredRows, summary } = buildStatisticsSummary(
+    dataset.rows,
+    dataset.filters,
+  );
+
+  // Tính toán cờ isCompletedSeason
+  const now = new Date();
+  let isCompletedSeason = false;
+
+  if (dataset.seasonDetails && dataset.seasonDetails.length > 0) {
+    // Nếu tất cả các chi tiết mùa vụ đang lọc đều có endDate và endDate < hiện tại -> đã kết thúc
+    isCompletedSeason = dataset.seasonDetails.every(
+      (s) => s.endDate && new Date(s.endDate) < now,
+    );
+  }
+
+  // Bổ sung cờ này vào summary để Frontend (OverviewFarmerTable) bắt điều kiện chặn cảnh báo
+  summary.isCompletedSeason = isCompletedSeason;
 
   return {
     filters: dataset.filters,
@@ -425,7 +470,10 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
     throw new Error("Vui lòng chọn nông dân cần gửi cảnh báo");
   }
 
-  const dataset = await buildPlotStatisticsDataset(payload.filters || {}, currentUser);
+  const dataset = await buildPlotStatisticsDataset(
+    payload.filters || {},
+    currentUser,
+  );
 
   if (!dataset.selectedActivity.taskId) {
     throw new Error("Vui lòng chọn công việc trước khi gửi cảnh báo");
@@ -511,13 +559,18 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
   return {
     sendAll,
     activityLabel:
-      dataset.selectedActivity.activityLabel || dataset.rows[0]?.activityLabel || "Công việc",
+      dataset.selectedActivity.activityLabel ||
+      dataset.rows[0]?.activityLabel ||
+      "Công việc",
     sentFarmerCount: recipients.length,
-    sentPlotCount: recipients.reduce((total, item) => total + item.pendingPlotCount, 0),
+    sentPlotCount: recipients.reduce(
+      (total, item) => total + item.pendingPlotCount,
+      0,
+    ),
     webFarmerCount: recipients.filter((item) => item.webSent).length,
     emailedFarmerCount: recipients.filter((item) => item.emailSent).length,
     emailFailedFarmerCount: recipients.filter(
-      (item) => item.farmerEmail && !item.emailSent
+      (item) => item.farmerEmail && !item.emailSent,
     ).length,
     recipients,
   };
@@ -526,16 +579,26 @@ const sendPlotTaskWarnings = async (payload = {}, currentUser) => {
 const getAdminPlotStatisticsOptions = async () => {
   const [fields, seasons, stages, tasks, seasonYears] = await Promise.all([
     Field.find().sort({ name: 1 }).select("_id name").lean(),
-    Season.find({ isVisible: { $ne: false } }).sort({ name: 1 }).select("_id name").lean(),
+    Season.find({ isVisible: { $ne: false } })
+      .sort({ name: 1 })
+      .select("_id name")
+      .lean(),
     Stage.find().sort({ order: 1, name: 1 }).select("_id name order").lean(),
-    Task.find().sort({ stage: 1, order: 1, name: 1 }).populate("stage", "name order").lean(),
+    Task.find()
+      .sort({ stage: 1, order: 1, name: 1 })
+      .populate("stage", "name order")
+      .lean(),
     SeasonDetail.find().select("year startDate endDate createdAt").lean(),
   ]);
 
   const availableYears = seasonYears
     .map((item) => getSeasonYear(item))
     .filter((year) => typeof year === "number" && !Number.isNaN(year));
-  const maxYear = Math.max(new Date().getFullYear(), ...availableYears, MIN_YEAR);
+  const maxYear = Math.max(
+    new Date().getFullYear(),
+    ...availableYears,
+    MIN_YEAR,
+  );
 
   return {
     fields: fields.map((item) => ({
@@ -554,7 +617,11 @@ const getAdminPlotStatisticsOptions = async () => {
     tasks: tasks.map((item) => ({
       _id: String(item._id),
       name: item.name || "",
-      stageId: item.stage?._id ? String(item.stage._id) : item.stage ? String(item.stage) : "",
+      stageId: item.stage?._id
+        ? String(item.stage._id)
+        : item.stage
+          ? String(item.stage)
+          : "",
       stageName: item.stage?.name || "",
       order: item.order ?? 0,
     })),
@@ -563,7 +630,10 @@ const getAdminPlotStatisticsOptions = async () => {
       { value: "done", label: "Đã làm" },
       { value: "pending", label: "Chưa làm" },
     ],
-    years: Array.from({ length: maxYear - MIN_YEAR + 1 }, (_, index) => MIN_YEAR + index),
+    years: Array.from(
+      { length: maxYear - MIN_YEAR + 1 },
+      (_, index) => MIN_YEAR + index,
+    ),
   };
 };
 
