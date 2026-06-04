@@ -1,40 +1,32 @@
-const axios = require("axios");
-const FormData = require("form-data");
 const { randomUUID } = require("crypto");
-const { PYTHON_AI_SERVICE_URL } = require("../config/env");
 const aiChatService = require("../services/aiChatService");
+const aiScanService = require("../services/aiScanService");
 
 // ==========================================
 // LUỒNG AI SCAN
 // ==========================================
 exports.diagnoseDisease = async (req, res) => {
   try {
+    // 1. Kiểm tra đầu vào
     if (!req.file) {
       return res
         .status(400)
         .json({ message: "Vui lòng tải lên hình ảnh lá lúa" });
     }
 
-    const formData = new FormData();
-    formData.append("file", req.file.buffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype,
-    });
+    // 2. Gọi Service xử lý
+    const scanResult = await aiScanService.scanImage(req.file);
 
-    const response = await axios.post(PYTHON_AI_SERVICE_URL, formData, {
-      headers: {
-        ...formData.getHeaders(),
-      },
-    });
-
+    // 3. Trả kết quả thành công
     res.json({
       success: true,
-      data: response.data,
+      data: scanResult,
       imageName: req.file.originalname,
     });
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response) {
-      const { status, data } = error.response;
+    // 4. Xử lý các mã lỗi ném ra từ Service
+    if (error.isAxiosError) {
+      const { status, data } = error;
 
       if (status === 422 && data?.status === "rejected") {
         return res.status(422).json({
@@ -86,7 +78,6 @@ exports.chat = async (req, res) => {
         ? String(sessionId).trim()
         : randomUUID();
 
-    // Controller gọi Service
     const chatResult = await aiChatService.processChatRequest(
       req.user.id,
       resolvedSessionId,

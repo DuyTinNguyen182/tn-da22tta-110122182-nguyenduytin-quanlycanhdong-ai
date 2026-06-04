@@ -834,10 +834,9 @@ const AIScan = () => {
                       Kết quả chính
                     </p>
                     <div className="mt-0.5 flex flex-wrap items-baseline gap-2">
-                      <h3 className="min-w-0 break-words text-2xl font-bold sm:text-3xl">
+                      <h3 className="min-w-0 break-words text-xl font-bold sm:text-2xl">
                         {result.disease}
                       </h3>
-                      {/* Thêm phần trăm hiển thị ngay cạnh tên bệnh */}
                       <span className="text-lg font-medium text-white/90">
                         {formatPercent(result.confidence)}
                       </span>

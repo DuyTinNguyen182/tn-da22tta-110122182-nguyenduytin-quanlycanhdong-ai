@@ -22,14 +22,14 @@ LEGACY_CLASS_NAMES = [
     "tungro",
 ]
 DISPLAY_NAME_MAP = {
-    "bacterial_leaf_blight": "Bệnh bạc lá",
-    "bacterial_leaf_streak": "Bệnh sọc lá vi khuẩn",
+    "bacterial_leaf_blight": "Bệnh bạc lá (cháy bìa lá)",
+    "bacterial_leaf_streak": "Sọc lá vi khuẩn (sọc trong)",
     "bacterial_panicle_blight": "Bệnh lem lép hạt",
     "blast": "Bệnh đạo ôn",
     "brown_spot": "Bệnh đốm nâu",
-    "dead_heart": "Tim chết (dảnh héo)",
+    "dead_heart": "Tim chết (sâu đục thân)",
     "downy_mildew": "Bệnh sương mai",
-    "hispa": "Bọ hispa hại lá",
+    "hispa": "Bọ hispa (sâu gai) hại lá",
     "normal": "Lá lúa khỏe",
     "tungro": "Bệnh vàng lùn (tungro)",
 }
