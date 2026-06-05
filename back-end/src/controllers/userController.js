@@ -28,7 +28,8 @@ const getUserById = async (req, res) => {
 // CREATE user (Admin tạo user mới)
 const createUser = async (req, res) => {
   try {
-    const { fullName, email, password, phone, address, role } = req.body;
+    const { fullName, email, password, phone, address, role, accountStatus } =
+      req.body;
 
     // Kiểm tra email tồn tại
     const userExists = await User.findOne({ email });
@@ -48,6 +49,7 @@ const createUser = async (req, res) => {
       phone: phone || "",
       address: address || "",
       role: role || "farmer",
+      accountStatus: accountStatus || "active",
     });
 
     res.status(201).json({
@@ -58,6 +60,7 @@ const createUser = async (req, res) => {
         email: user.email,
         phone: user.phone,
         address: user.address,
+        accountStatus: user.accountStatus,
         role: user.role,
         createdAt: user.createdAt,
       },
@@ -70,8 +73,14 @@ const createUser = async (req, res) => {
 // UPDATE user
 const updateUser = async (req, res) => {
   try {
-    const { fullName, email, password, phone, address, role } = req.body;
+    const { fullName, email, password, phone, address, role, accountStatus } =
+      req.body;
     const userId = req.params.id;
+
+    const existingUser = await User.findById(userId).select("accountStatus");
+    if (!existingUser) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng" });
+    }
 
     // Kiểm tra email trùng (nếu đổi email)
     if (email) {
@@ -87,11 +96,14 @@ const updateUser = async (req, res) => {
       phone,
       address,
       role,
+      accountStatus: accountStatus || existingUser.accountStatus,
     };
 
     if (password) {
       if (password.length < 6) {
-        return res.status(400).json({ message: "Mật khẩu phải ít nhất 6 ký tự" });
+        return res
+          .status(400)
+          .json({ message: "Mật khẩu phải ít nhất 6 ký tự" });
       }
 
       const salt = await bcrypt.genSalt(10);
@@ -99,11 +111,10 @@ const updateUser = async (req, res) => {
     }
 
     // Update user
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      updateData,
-      { new: true, runValidators: true }
-    ).select("-password");
+    const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
+      new: true,
+      runValidators: true,
+    }).select("-password");
 
     if (!updatedUser) {
       return res.status(404).json({ message: "Không tìm thấy người dùng" });
@@ -124,7 +135,9 @@ const deleteUser = async (req, res) => {
     const userId = req.params.id;
 
     if (req.user.id === userId) {
-      return res.status(403).json({ message: "Không thể xóa tài khoản của chính mình" });
+      return res
+        .status(403)
+        .json({ message: "Không thể xóa tài khoản của chính mình" });
     }
 
     const deletedUser = await userService.deleteUserCascade(userId);
@@ -141,4 +154,10 @@ const deleteUser = async (req, res) => {
   }
 };
 
-module.exports = { getAllUsers, getUserById, createUser, updateUser, deleteUser };
+module.exports = {
+  getAllUsers,
+  getUserById,
+  createUser,
+  updateUser,
+  deleteUser,
+};

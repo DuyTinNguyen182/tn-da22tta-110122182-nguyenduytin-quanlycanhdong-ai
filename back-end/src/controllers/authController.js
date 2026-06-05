@@ -39,7 +39,8 @@ const login = async (req, res) => {
       user: userData,
     });
   } catch (error) {
-    res.status(401).json({ message: error.message });
+    const statusCode = error.statusCode || 401;
+    res.status(statusCode).json({ message: error.message });
   }
 };
 

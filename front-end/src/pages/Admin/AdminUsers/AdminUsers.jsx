@@ -17,11 +17,17 @@ const emptyForm = {
   phone: "",
   address: "",
   role: "farmer",
+  accountStatus: "active",
 };
 
 const roleOptions = [
   { value: "farmer", label: "Nông dân" },
   { value: "admin", label: "Quản trị viên" },
+];
+
+const statusOptions = [
+  { value: "active", label: "Hoạt động" },
+  { value: "locked", label: "Khóa" },
 ];
 
 const AdminUsers = () => {
@@ -84,6 +90,8 @@ const AdminUsers = () => {
       total: users.length,
       adminCount: users.filter((item) => item.role === "admin").length,
       farmerCount: users.filter((item) => item.role !== "admin").length,
+      lockedCount: users.filter((item) => item.accountStatus === "locked")
+        .length,
     }),
     [users],
   );
@@ -131,6 +139,7 @@ const AdminUsers = () => {
       phone: user.phone || "",
       address: user.address || "",
       role: user.role || "farmer",
+      accountStatus: user.accountStatus || "active",
     });
     setShowModal(true);
   };
@@ -156,6 +165,7 @@ const AdminUsers = () => {
         phone: formData.phone.trim(),
         address: formData.address.trim(),
         role: formData.role,
+        accountStatus: formData.accountStatus,
       });
 
       toast.success("Tạo tài khoản thành công.");
@@ -187,6 +197,7 @@ const AdminUsers = () => {
         phone: formData.phone.trim(),
         address: formData.address.trim(),
         role: formData.role,
+        accountStatus: formData.accountStatus,
       });
 
       toast.success("Cập nhật người dùng thành công.");
@@ -239,7 +250,7 @@ const AdminUsers = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <p className="text-sm text-gray-500">Tổng người dùng</p>
           <p className="mt-2 text-2xl font-bold text-gray-900">
@@ -256,6 +267,12 @@ const AdminUsers = () => {
           <p className="text-sm text-gray-500">Nông dân</p>
           <p className="mt-2 text-2xl font-bold text-blue-600">
             {summary.farmerCount}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+          <p className="text-sm text-gray-500">Tài khoản bị khóa</p>
+          <p className="mt-2 text-2xl font-bold text-amber-600">
+            {summary.lockedCount}
           </p>
         </div>
       </div>
@@ -321,9 +338,13 @@ const AdminUsers = () => {
         formData={formData}
         submitting={submitting}
         roleOptions={roleOptions}
+        statusOptions={statusOptions}
         onChange={handleFormChange}
         onRoleChange={(value) =>
           setFormData((prev) => ({ ...prev, role: value }))
+        }
+        onStatusChange={(value) =>
+          setFormData((prev) => ({ ...prev, accountStatus: value }))
         }
         onClose={closeUserModal}
         onSubmit={editingUser ? handleUpdateUser : handleCreateUser}

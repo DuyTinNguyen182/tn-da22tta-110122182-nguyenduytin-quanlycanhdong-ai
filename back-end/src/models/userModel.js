@@ -13,6 +13,12 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, select: false },
     phone: { type: String, default: "", trim: true },
     address: { type: String, default: "", trim: true },
+    accountStatus: {
+      type: String,
+      enum: ["active", "locked"],
+      default: "active",
+      trim: true,
+    },
     role: {
       type: String,
       enum: ["farmer", "admin"],
@@ -23,7 +29,7 @@ const userSchema = new mongoose.Schema(
   {
     collection: "users",
     timestamps: true,
-  }
+  },
 );
 
 module.exports = mongoose.model("User", userSchema);

@@ -5,6 +5,8 @@ const jwtConfig = require("../config/jwt");
 
 const normalizeEmail = (value = "") => value.trim().toLowerCase();
 
+const isAccountLocked = (user) => user?.accountStatus === "locked";
+
 const registerUser = async (data) => {
   const { fullName, password, phone, address } = data;
   const email = normalizeEmail(data.email);
@@ -31,13 +33,16 @@ const registerUser = async (data) => {
     email: user.email,
     phone: user.phone,
     address: user.address,
+    accountStatus: user.accountStatus,
     role: user.role,
   };
 };
 
 const loginUser = async (email, password) => {
   const normalizedEmail = normalizeEmail(email);
-  const user = await User.findOne({ email: normalizedEmail }).select("+password");
+  const user = await User.findOne({ email: normalizedEmail }).select(
+    "+password",
+  );
   if (!user) {
     throw new Error("Email không tồn tại!");
   }
@@ -47,9 +52,21 @@ const loginUser = async (email, password) => {
     throw new Error("Mật khẩu không đúng!");
   }
 
-  const token = jwt.sign({ id: user._id, role: user.role }, jwtConfig.SECRET_KEY, {
-    expiresIn: jwtConfig.EXPIRES_IN,
-  });
+  if (isAccountLocked(user)) {
+    const error = new Error(
+      "Tài khoản đã bị khóa. Vui lòng liên hệ Ban quản lý HTX.",
+    );
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const token = jwt.sign(
+    { id: user._id, role: user.role },
+    jwtConfig.SECRET_KEY,
+    {
+      expiresIn: jwtConfig.EXPIRES_IN,
+    },
+  );
 
   return {
     _id: user._id,
@@ -57,13 +74,16 @@ const loginUser = async (email, password) => {
     email: user.email,
     phone: user.phone,
     address: user.address,
+    accountStatus: user.accountStatus,
     role: user.role,
     token,
   };
 };
 
 const getUserById = async (id) => {
-  const user = await User.findById(id).select("_id fullName email phone address role");
+  const user = await User.findById(id).select(
+    "_id fullName email phone address accountStatus role",
+  );
   if (!user) {
     throw new Error("Không tìm thấy người dùng");
   }
@@ -73,7 +93,9 @@ const getUserById = async (id) => {
 
 const updateProfile = async (id, profileData) => {
   const { fullName, phone, address } = profileData;
-  const email = profileData.email ? normalizeEmail(profileData.email) : undefined;
+  const email = profileData.email
+    ? normalizeEmail(profileData.email)
+    : undefined;
 
   if (email) {
     const existingUser = await User.findOne({ email, _id: { $ne: id } });
@@ -90,8 +112,8 @@ const updateProfile = async (id, profileData) => {
       phone: phone || "",
       address: address || "",
     },
-    { new: true, runValidators: true }
-  ).select("_id fullName email phone address role");
+    { new: true, runValidators: true },
+  ).select("_id fullName email phone address accountStatus role");
 
   if (!updatedUser) {
     throw new Error("Không tìm thấy người dùng");
@@ -120,4 +142,10 @@ const changePassword = async (id, currentPassword, newPassword) => {
   await user.save();
 };
 
-module.exports = { registerUser, loginUser, getUserById, updateProfile, changePassword };
+module.exports = {
+  registerUser,
+  loginUser,
+  getUserById,
+  updateProfile,
+  changePassword,
+};

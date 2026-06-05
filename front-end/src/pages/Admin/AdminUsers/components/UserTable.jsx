@@ -18,6 +18,22 @@ const getRoleMeta = (role) => {
   };
 };
 
+const getStatusMeta = (status) => {
+  const normalized = String(status || "active").toLowerCase();
+
+  if (normalized === "locked") {
+    return {
+      label: "Khóa",
+      className: "bg-amber-100 text-amber-700",
+    };
+  }
+
+  return {
+    label: "Hoạt động",
+    className: "bg-emerald-100 text-emerald-700",
+  };
+};
+
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "--";
 
@@ -48,6 +64,9 @@ const UserTable = ({
                 Vai trò
               </th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Trạng thái
+              </th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Ngày tạo
               </th>
               <th className="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
@@ -59,6 +78,7 @@ const UserTable = ({
           <tbody className="divide-y divide-gray-100">
             {users.map((user) => {
               const roleMeta = getRoleMeta(user.role);
+              const statusMeta = getStatusMeta(user.accountStatus);
               const isCurrentUser =
                 String(currentUser?._id || currentUser?.id || "") ===
                 String(user._id);
@@ -93,6 +113,14 @@ const UserTable = ({
                       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${roleMeta.className}`}
                     >
                       {roleMeta.label}
+                    </span>
+                  </td>
+
+                  <td className="px-5 py-3 align-top">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusMeta.className}`}
+                    >
+                      {statusMeta.label}
                     </span>
                   </td>
 

@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { Eye, EyeOff, Mail, Phone, ShieldCheck, UserRound, X } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Phone,
+  ShieldCheck,
+  UserRound,
+  X,
+} from "lucide-react";
 import CustomDropdown from "../../../../components/UI/CustomDropdown";
 
 const UserFormModal = ({
@@ -8,8 +16,10 @@ const UserFormModal = ({
   formData,
   submitting,
   roleOptions,
+  statusOptions,
   onChange,
   onRoleChange,
+  onStatusChange,
   onClose,
   onSubmit,
 }) => {
@@ -123,6 +133,18 @@ const UserFormModal = ({
                   value: opt.value,
                   label: opt.label,
                 }))}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Trạng thái tài khoản
+              </label>
+              <CustomDropdown
+                value={formData.accountStatus}
+                onChange={onStatusChange}
+                icon={ShieldCheck}
+                options={statusOptions}
               />
             </div>
 
