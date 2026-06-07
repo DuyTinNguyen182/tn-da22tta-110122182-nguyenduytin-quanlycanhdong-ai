@@ -1,16 +1,51 @@
 import React from "react";
-import { Eye, EyeOff, Users, X } from "lucide-react";
+import { Eye, EyeOff, X } from "lucide-react";
 import {
   TYPE_STYLES,
   formatDateTime,
   getRecipientSummary,
 } from "../adminAnnouncementsUtils.jsx";
 
-const AnnouncementDetailModal = ({ item, onClose }) => {
+const getRecipientNames = (item, farmers = []) => {
+  const farmerNameById = new Map(
+    (farmers || []).map((farmer) => [
+      String(farmer._id || ""),
+      farmer.fullName || "",
+    ]),
+  );
+  const names = [];
+
+  if (Array.isArray(item.recipients)) {
+    item.recipients.forEach((recipient) => {
+      const recipientId = String(recipient?._id || recipient || "");
+      const recipientName =
+        recipient?.fullName || farmerNameById.get(recipientId) || "";
+
+      if (recipientName.trim()) {
+        names.push(recipientName.trim());
+      }
+    });
+  }
+
+  if (Array.isArray(item.audienceUserIds)) {
+    item.audienceUserIds.forEach((recipientId) => {
+      const recipientName = farmerNameById.get(String(recipientId || ""));
+
+      if (recipientName?.trim()) {
+        names.push(recipientName.trim());
+      }
+    });
+  }
+
+  return Array.from(new Set(names));
+};
+
+const AnnouncementDetailModal = ({ item, farmers = [], onClose }) => {
   if (!item) return null;
 
   const typeStyle = TYPE_STYLES[item.type] || TYPE_STYLES.notification;
   const Icon = typeStyle.icon;
+  const recipientNames = getRecipientNames(item, farmers);
 
   return (
     <div className="fixed inset-0 z-[125] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
@@ -59,12 +94,24 @@ const AnnouncementDetailModal = ({ item, onClose }) => {
 
             <div className="rounded-2xl bg-gray-50 p-4">
               <p className="text-xs font-bold uppercase tracking-wide text-gray-400">
-                Số người nhận
+                Danh sách nông dân nhận
               </p>
-              <p className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-gray-800">
-                <Users size={15} />
-                {item.recipientCount || 0} người
-              </p>
+              <div className="mt-3 max-h-28 space-y-2 overflow-y-auto pr-1">
+                {recipientNames.length ? (
+                  recipientNames.map((name) => (
+                    <p
+                      key={name}
+                      className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-gray-800"
+                    >
+                      {name}
+                    </p>
+                  ))
+                ) : (
+                  <p className="text-sm font-medium text-gray-500">
+                    Chưa có dữ liệu người nhận
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -95,6 +142,16 @@ const AnnouncementDetailModal = ({ item, onClose }) => {
                 {formatDateTime(item.updatedAt)}
               </p>
             </div>
+          </div>
+
+          <div className="flex justify-end border-t border-gray-100 pt-5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-black shadow-sm transition"
+            >
+              Đóng
+            </button>
           </div>
         </div>
       </div>

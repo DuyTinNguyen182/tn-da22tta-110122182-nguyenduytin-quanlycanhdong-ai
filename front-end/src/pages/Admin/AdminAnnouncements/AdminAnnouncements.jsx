@@ -420,6 +420,7 @@ const AdminAnnouncements = () => {
 
       <AnnouncementDetailModal
         item={selectedItem}
+        farmers={options.farmers}
         onClose={() => setSelectedItem(null)}
       />
     </div>

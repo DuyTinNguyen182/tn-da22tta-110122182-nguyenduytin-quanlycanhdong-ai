@@ -15,32 +15,6 @@ import {
   getRecipientSummary,
 } from "../adminAnnouncementsUtils.jsx";
 
-const ActionButton = ({
-  label,
-  icon: Icon,
-  onClick,
-  disabled = false,
-  tone = "default",
-}) => {
-  const toneClassName =
-    tone === "danger"
-      ? "border-red-200 text-red-600 hover:bg-red-50"
-      : "border-gray-200 text-gray-500 hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700";
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={label}
-      aria-label={label}
-      className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition-all disabled:cursor-not-allowed disabled:opacity-50 ${toneClassName}`}
-    >
-      <Icon size={16} />
-    </button>
-  );
-};
-
 const AdminAnnouncementsTable = ({
   loading,
   items,
@@ -92,7 +66,7 @@ const AdminAnnouncementsTable = ({
               <th className="px-4 py-3">Đối tượng nhận</th>
               <th className="px-4 py-3">Trạng thái</th>
               <th className="px-4 py-3">Ngày tạo</th>
-              <th className="px-4 py-3 text-right">Thao tác</th>
+              <th className="px-4 py-3 text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody>
@@ -146,24 +120,35 @@ const AdminAnnouncementsTable = ({
                     </p>
                   </td>
                   <td className="px-4 py-4">
-                    <div className="flex justify-end gap-2">
-                      <ActionButton
-                        label="Xem chi tiết"
-                        icon={Eye}
+                    <div className="flex justify-center gap-1.5">
+                      <button
+                        type="button"
                         onClick={() => onView(item)}
-                      />
-                      <ActionButton
-                        label="Chỉnh sửa"
-                        icon={Pencil}
+                        className="rounded-lg bg-emerald-50 p-1.5 text-emerald-700 transition hover:bg-emerald-100"
+                        title="Xem chi tiết"
+                        aria-label="Xem chi tiết"
+                      >
+                        <Eye size={15} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => onEdit(item)}
-                      />
-                      <ActionButton
-                        label="Xóa"
-                        icon={Trash2}
+                        className="rounded-lg bg-blue-50 p-1.5 text-blue-700 transition hover:bg-blue-100"
+                        title="Chỉnh sửa"
+                        aria-label="Chỉnh sửa"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => onDelete(item)}
                         disabled={submitting}
-                        tone="danger"
-                      />
+                        className="rounded-lg bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        title="Xóa"
+                        aria-label="Xóa"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                     </div>
                   </td>
                 </tr>

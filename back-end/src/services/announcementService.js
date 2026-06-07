@@ -222,29 +222,51 @@ const buildQueryOptions = (query = {}, { adminView = false, currentUser = null }
   return { page, limit, filters };
 };
 
-const mapAnnouncementForAdmin = (item) => ({
-  _id: String(item._id),
-  type: item.type,
-  title: item.title,
-  content: item.content,
-  isVisible: item.isVisible === true,
-  source: item.source || "manual",
-  audienceScope: item.audience?.scope || "all",
-  audienceUserIds: Array.isArray(item.audience?.userIds)
-    ? item.audience.userIds.map((entry) => String(entry._id || entry))
-    : [],
-  deliveryChannels: Array.isArray(item.deliveryChannels) ? item.deliveryChannels : ["web", "email"],
-  targetMode: item.targetConfig?.mode || "all_farmers",
-  targetFieldId: item.targetConfig?.fieldId?._id
-    ? String(item.targetConfig.fieldId._id)
-    : item.targetConfig?.fieldId
-      ? String(item.targetConfig.fieldId)
-      : "",
-  targetFieldName: item.targetConfig?.fieldId?.name || "",
-  recipientCount: Array.isArray(item.audience?.userIds) ? item.audience.userIds.length : 0,
-  createdAt: item.createdAt,
-  updatedAt: item.updatedAt,
-});
+const getRecipientId = (entry) => {
+  const recipientId = entry?._id ? String(entry._id) : String(entry || "");
+
+  return recipientId;
+};
+
+const mapRecipientForAdmin = (entry) => {
+  const recipientId = getRecipientId(entry);
+
+  if (!recipientId) {
+    return null;
+  }
+
+  return {
+    _id: recipientId,
+    fullName: entry?.fullName || "",
+  };
+};
+
+const mapAnnouncementForAdmin = (item) => {
+  const recipientItems = Array.isArray(item.audience?.userIds) ? item.audience.userIds : [];
+
+  return {
+    _id: String(item._id),
+    type: item.type,
+    title: item.title,
+    content: item.content,
+    isVisible: item.isVisible === true,
+    source: item.source || "manual",
+    audienceScope: item.audience?.scope || "all",
+    audienceUserIds: recipientItems.map(getRecipientId).filter(Boolean),
+    recipients: recipientItems.map(mapRecipientForAdmin).filter(Boolean),
+    deliveryChannels: Array.isArray(item.deliveryChannels) ? item.deliveryChannels : ["web", "email"],
+    targetMode: item.targetConfig?.mode || "all_farmers",
+    targetFieldId: item.targetConfig?.fieldId?._id
+      ? String(item.targetConfig.fieldId._id)
+      : item.targetConfig?.fieldId
+        ? String(item.targetConfig.fieldId)
+        : "",
+    targetFieldName: item.targetConfig?.fieldId?.name || "",
+    recipientCount: recipientItems.length,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  };
+};
 
 const mapAnnouncementForVisibleList = (item) => ({
   _id: String(item._id),
@@ -574,6 +596,7 @@ const listAdminAnnouncements = async (query = {}) => {
     await Promise.all([
       Announcement.find(filters)
         .populate("targetConfig.fieldId", "name")
+        .populate("audience.userIds", "fullName")
         .sort({ createdAt: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
@@ -614,6 +637,7 @@ const createAnnouncement = async (payload = {}) => {
 
   const populated = await Announcement.findById(created._id)
     .populate("targetConfig.fieldId", "name")
+    .populate("audience.userIds", "fullName")
     .lean();
 
   return mapAnnouncementForAdmin(populated);
@@ -653,6 +677,7 @@ const updateAnnouncement = async (id, payload = {}) => {
 
   const populated = await Announcement.findById(announcement._id)
     .populate("targetConfig.fieldId", "name")
+    .populate("audience.userIds", "fullName")
     .lean();
   return mapAnnouncementForAdmin(populated);
 };
