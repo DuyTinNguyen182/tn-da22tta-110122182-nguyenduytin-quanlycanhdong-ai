@@ -80,7 +80,8 @@ const updatePlot = async (id, data, currentUser, imageUrl = null) => {
 };
 
 const deletePlot = async (id, currentUser) => {
-  const query = isAdminUser(currentUser) ? { _id: id } : { _id: id, user: currentUser.id };
+  const isAdmin = isAdminUser(currentUser);
+  const query = isAdmin ? { _id: id } : { _id: id, user: currentUser.id };
   const plot = await Plot.findOne(query);
   if (!plot) {
     throw new Error("Không tìm thấy thửa ruộng");
@@ -88,6 +89,21 @@ const deletePlot = async (id, currentUser) => {
 
   const assignments = await SeasonPlotAssignment.find({ plot: plot._id }).select("_id").lean();
   const assignmentIds = assignments.map((item) => item._id);
+
+  if (isAdmin) {
+    await Promise.all([
+      assignmentIds.length
+        ? DiaryLog.deleteMany({ seasonPlotAssignments: { $in: assignmentIds } })
+        : Promise.resolve(),
+      assignmentIds.length
+        ? DiseaseLog.deleteMany({ seasonPlotAssignments: { $in: assignmentIds } })
+        : Promise.resolve(),
+      SeasonPlotAssignment.deleteMany({ plot: plot._id }),
+    ]);
+
+    await Plot.deleteOne({ _id: plot._id });
+    return plot;
+  }
 
   const [diaryLogCount, diseaseLogCount] = assignmentIds.length
     ? await Promise.all([

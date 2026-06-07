@@ -34,6 +34,7 @@ const AdminFields = () => {
   const [detailKeyword, setDetailKeyword] = useState("");
   const [fieldPlotsMap, setFieldPlotsMap] = useState({});
   const [detailLoadingMap, setDetailLoadingMap] = useState({});
+  const [deletingPlotId, setDeletingPlotId] = useState(null);
 
   const fetchFields = useCallback(async () => {
     try {
@@ -173,6 +174,34 @@ const AdminFields = () => {
     }
   };
 
+  const handleDeletePlot = async (plot) => {
+    if (!plot?._id) return;
+
+    const confirmed = await confirm({
+      title: "Xóa thửa ruộng?",
+      message: `Admin sẽ xóa vĩnh viễn thửa "${plot.name}" cùng mùa vụ và nhật ký liên quan nếu có.`,
+      confirmText: "Xóa thửa",
+      tone: "danger",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      setDeletingPlotId(plot._id);
+      await api.delete(`/plots/${plot._id}`);
+      toast.success("Đã xóa thửa ruộng.");
+
+      if (detailFieldId) {
+        await fetchFieldPlots(detailFieldId, { force: true });
+      }
+      await fetchFields();
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Không thể xóa thửa ruộng");
+    } finally {
+      setDeletingPlotId(null);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -236,7 +265,9 @@ const AdminFields = () => {
         plots={detailPlots}
         loading={isDetailLoading}
         keyword={detailKeyword}
+        deletingPlotId={deletingPlotId}
         onKeywordChange={setDetailKeyword}
+        onDeletePlot={handleDeletePlot}
         onClose={() => {
           setDetailFieldId(null);
           setDetailKeyword("");
