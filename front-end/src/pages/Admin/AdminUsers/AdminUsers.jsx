@@ -14,6 +14,7 @@ const emptyForm = {
   fullName: "",
   email: "",
   password: "",
+  gender: "",
   phone: "",
   address: "",
   role: "farmer",
@@ -28,6 +29,13 @@ const roleOptions = [
 const statusOptions = [
   { value: "active", label: "Hoạt động" },
   { value: "locked", label: "Khóa" },
+];
+
+const genderOptions = [
+  { value: "", label: "Chưa cập nhật" },
+  { value: "male", label: "Nam" },
+  { value: "female", label: "Nữ" },
+  { value: "other", label: "Khác" },
 ];
 
 const AdminUsers = () => {
@@ -76,6 +84,10 @@ const AdminUsers = () => {
         !keyword ||
         user.fullName?.toLowerCase().includes(keyword) ||
         user.email?.toLowerCase().includes(keyword) ||
+        genderOptions
+          .find((option) => option.value === user.gender)
+          ?.label.toLowerCase()
+          .includes(keyword) ||
         user.phone?.toLowerCase().includes(keyword) ||
         user.address?.toLowerCase().includes(keyword);
 
@@ -136,6 +148,7 @@ const AdminUsers = () => {
       fullName: user.fullName || "",
       email: user.email || "",
       password: "",
+      gender: user.gender || "",
       phone: user.phone || "",
       address: user.address || "",
       role: user.role || "farmer",
@@ -162,6 +175,7 @@ const AdminUsers = () => {
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
         password: formData.password,
+        gender: formData.gender,
         phone: formData.phone.trim(),
         address: formData.address.trim(),
         role: formData.role,
@@ -194,6 +208,7 @@ const AdminUsers = () => {
         fullName: formData.fullName.trim(),
         email: formData.email.trim(),
         password: formData.password.trim(),
+        gender: formData.gender,
         phone: formData.phone.trim(),
         address: formData.address.trim(),
         role: formData.role,
@@ -339,7 +354,11 @@ const AdminUsers = () => {
         submitting={submitting}
         roleOptions={roleOptions}
         statusOptions={statusOptions}
+        genderOptions={genderOptions}
         onChange={handleFormChange}
+        onGenderChange={(value) =>
+          setFormData((prev) => ({ ...prev, gender: value }))
+        }
         onRoleChange={(value) =>
           setFormData((prev) => ({ ...prev, role: value }))
         }

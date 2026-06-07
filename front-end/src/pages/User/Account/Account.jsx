@@ -18,6 +18,13 @@ import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import ConfirmLogout from "../../../components/Common/ConfirmLogout";
 
+const genderOptions = [
+  { value: "", label: "Chưa cập nhật" },
+  { value: "male", label: "Nam" },
+  { value: "female", label: "Nữ" },
+  { value: "other", label: "Khác" },
+];
+
 const Account = () => {
   const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -50,6 +57,7 @@ const Account = () => {
   const [formData, setFormData] = useState({
     fullName: user?.fullName || "",
     email: user?.email || "",
+    gender: user?.gender || "",
     phone: user?.phone || "",
     address: user?.address || "",
   });
@@ -58,6 +66,7 @@ const Account = () => {
     setFormData({
       fullName: user?.fullName || "",
       email: user?.email || "",
+      gender: user?.gender || "",
       phone: user?.phone || "",
       address: user?.address || "",
     });
@@ -90,6 +99,10 @@ const Account = () => {
       errors.email = "Vui lòng nhập địa chỉ email.";
     } else if (!emailRegex.test(formData.email)) {
       errors.email = "Email chưa đúng định dạng.";
+    }
+
+    if (!genderOptions.some((option) => option.value === formData.gender)) {
+      errors.gender = "Giới tính chưa hợp lệ.";
     }
 
     if (!formData.phone?.trim()) {
@@ -163,6 +176,7 @@ const Account = () => {
     setFormData({
       fullName: user?.fullName || "",
       email: user?.email || "",
+      gender: user?.gender || "",
       phone: user?.phone || "",
       address: user?.address || "",
     });
@@ -224,6 +238,7 @@ const Account = () => {
   const hasProfileChanges =
     (formData.fullName || "") !== (user?.fullName || "") ||
     (formData.email || "") !== (user?.email || "") ||
+    (formData.gender || "") !== (user?.gender || "") ||
     (formData.phone || "") !== (user?.phone || "") ||
     (formData.address || "") !== (user?.address || "");
 
@@ -381,6 +396,33 @@ const Account = () => {
                 </div>
 
                 {/* Phone */}
+                <div className="col-span-1">
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5 ml-1">
+                    <User size={16} className="text-gray-400" /> Giới tính
+                  </label>
+                  <select
+                    name="gender"
+                    value={formData.gender}
+                    onChange={handleFormChange}
+                    disabled={!isEditingInfo}
+                    className={getInputClass(
+                      infoErrors.gender,
+                      !isEditingInfo,
+                    )}
+                  >
+                    {genderOptions.map((option) => (
+                      <option key={option.value || "empty"} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {infoErrors.gender && (
+                    <p className="mt-1.5 ml-1 text-xs text-red-500 font-medium">
+                      {infoErrors.gender}
+                    </p>
+                  )}
+                </div>
+
                 <div className="col-span-1">
                   <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 mb-1.5 ml-1">
                     <Phone size={16} className="text-gray-400" /> Số điện thoại

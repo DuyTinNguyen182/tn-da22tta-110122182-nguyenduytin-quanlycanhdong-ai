@@ -8,7 +8,7 @@ const normalizeEmail = (value = "") => value.trim().toLowerCase();
 const isAccountLocked = (user) => user?.accountStatus === "locked";
 
 const registerUser = async (data) => {
-  const { fullName, password, phone, address } = data;
+  const { fullName, password, gender, phone, address } = data;
   const email = normalizeEmail(data.email);
 
   const userExists = await User.findOne({ email });
@@ -23,6 +23,7 @@ const registerUser = async (data) => {
     fullName,
     email,
     password: hashedPassword,
+    gender: gender || "",
     phone: phone || "",
     address: address || "",
   });
@@ -31,6 +32,7 @@ const registerUser = async (data) => {
     _id: user._id,
     fullName: user.fullName,
     email: user.email,
+    gender: user.gender,
     phone: user.phone,
     address: user.address,
     accountStatus: user.accountStatus,
@@ -72,6 +74,7 @@ const loginUser = async (email, password) => {
     _id: user._id,
     fullName: user.fullName,
     email: user.email,
+    gender: user.gender,
     phone: user.phone,
     address: user.address,
     accountStatus: user.accountStatus,
@@ -82,7 +85,7 @@ const loginUser = async (email, password) => {
 
 const getUserById = async (id) => {
   const user = await User.findById(id).select(
-    "_id fullName email phone address accountStatus role",
+    "_id fullName email gender phone address accountStatus role",
   );
   if (!user) {
     throw new Error("Không tìm thấy người dùng");
@@ -92,7 +95,7 @@ const getUserById = async (id) => {
 };
 
 const updateProfile = async (id, profileData) => {
-  const { fullName, phone, address } = profileData;
+  const { fullName, gender, phone, address } = profileData;
   const email = profileData.email
     ? normalizeEmail(profileData.email)
     : undefined;
@@ -104,16 +107,21 @@ const updateProfile = async (id, profileData) => {
     }
   }
 
-  const updatedUser = await User.findByIdAndUpdate(
-    id,
-    {
-      fullName,
-      email,
-      phone: phone || "",
-      address: address || "",
-    },
-    { new: true, runValidators: true },
-  ).select("_id fullName email phone address accountStatus role");
+  const updateData = {
+    fullName,
+    email,
+    phone: phone || "",
+    address: address || "",
+  };
+
+  if (gender !== undefined) {
+    updateData.gender = gender || "";
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(id, updateData, {
+    new: true,
+    runValidators: true,
+  }).select("_id fullName email gender phone address accountStatus role");
 
   if (!updatedUser) {
     throw new Error("Không tìm thấy người dùng");

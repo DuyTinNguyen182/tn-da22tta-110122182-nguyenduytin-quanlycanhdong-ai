@@ -28,7 +28,7 @@ const getUserById = async (req, res) => {
 // CREATE user (Admin tạo user mới)
 const createUser = async (req, res) => {
   try {
-    const { fullName, email, password, phone, address, role, accountStatus } =
+    const { fullName, email, password, gender, phone, address, role, accountStatus } =
       req.body;
 
     // Kiểm tra email tồn tại
@@ -46,6 +46,7 @@ const createUser = async (req, res) => {
       fullName,
       email,
       password: hashedPassword,
+      gender: gender || "",
       phone: phone || "",
       address: address || "",
       role: role || "farmer",
@@ -58,6 +59,7 @@ const createUser = async (req, res) => {
         _id: user._id,
         fullName: user.fullName,
         email: user.email,
+        gender: user.gender,
         phone: user.phone,
         address: user.address,
         accountStatus: user.accountStatus,
@@ -73,7 +75,7 @@ const createUser = async (req, res) => {
 // UPDATE user
 const updateUser = async (req, res) => {
   try {
-    const { fullName, email, password, phone, address, role, accountStatus } =
+    const { fullName, email, password, gender, phone, address, role, accountStatus } =
       req.body;
     const userId = req.params.id;
 
@@ -98,6 +100,10 @@ const updateUser = async (req, res) => {
       role,
       accountStatus: accountStatus || existingUser.accountStatus,
     };
+
+    if (gender !== undefined) {
+      updateData.gender = gender || "";
+    }
 
     if (password) {
       if (password.length < 6) {

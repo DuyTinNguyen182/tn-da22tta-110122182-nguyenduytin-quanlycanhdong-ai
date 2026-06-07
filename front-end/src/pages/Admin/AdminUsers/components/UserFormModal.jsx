@@ -17,7 +17,9 @@ const UserFormModal = ({
   submitting,
   roleOptions,
   statusOptions,
+  genderOptions,
   onChange,
+  onGenderChange,
   onRoleChange,
   onStatusChange,
   onClose,
@@ -145,6 +147,18 @@ const UserFormModal = ({
                 onChange={onStatusChange}
                 icon={ShieldCheck}
                 options={statusOptions}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-gray-700">
+                Giới tính
+              </label>
+              <CustomDropdown
+                value={formData.gender}
+                onChange={onGenderChange}
+                icon={UserRound}
+                options={genderOptions}
               />
             </div>
 

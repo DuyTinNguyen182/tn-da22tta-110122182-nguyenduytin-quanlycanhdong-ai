@@ -34,6 +34,16 @@ const getStatusMeta = (status) => {
   };
 };
 
+const getGenderLabel = (gender) => {
+  const normalized = String(gender || "").toLowerCase();
+
+  if (normalized === "male") return "Nam";
+  if (normalized === "female") return "Nữ";
+  if (normalized === "other") return "Khác";
+
+  return "Chưa cập nhật";
+};
+
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString("vi-VN") : "--";
 
@@ -59,6 +69,9 @@ const UserTable = ({
               </th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Liên hệ
+              </th>
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Giới tính
               </th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Vai trò
@@ -106,6 +119,10 @@ const UserTable = ({
                     <p className="mt-0.5 max-w-[180px] truncate text-xs text-gray-400">
                       {user.address || ""}
                     </p>
+                  </td>
+
+                  <td className="px-5 py-3 align-top text-sm text-gray-600">
+                    {getGenderLabel(user.gender)}
                   </td>
 
                   <td className="px-5 py-3 align-top">

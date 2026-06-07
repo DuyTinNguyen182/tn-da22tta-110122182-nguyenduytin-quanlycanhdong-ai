@@ -14,7 +14,7 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, jwtConfig.SECRET_KEY);
 
     const user = await User.findById(decoded.id).select(
-      "_id role fullName email phone address accountStatus",
+      "_id role fullName email gender phone address accountStatus",
     );
 
     if (!user) {
@@ -39,6 +39,7 @@ const protect = async (req, res, next) => {
       role: user.role,
       fullName: user.fullName,
       email: user.email,
+      gender: user.gender,
       phone: user.phone,
       address: user.address,
       accountStatus: user.accountStatus,
