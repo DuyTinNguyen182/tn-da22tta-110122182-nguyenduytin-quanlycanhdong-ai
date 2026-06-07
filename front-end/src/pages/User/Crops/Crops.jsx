@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import CropsSidebar from "./CropsSidebar";
@@ -102,6 +102,27 @@ const Crops = () => {
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
   const [logForm, setLogForm] = useState(emptyLogForm);
+
+  // --- Logic ẩn/hiện header khi cuộn ---
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+  const lastScrollY = useRef(0);
+
+  const handleScroll = (e) => {
+    const currentScrollY = e.target.scrollTop;
+
+    if (Math.abs(currentScrollY - lastScrollY.current) < 50) return;
+
+    if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+      // Đang cuộn xuống -> Ẩn header
+      if (isHeaderVisible) setIsHeaderVisible(false);
+    } else {
+      // Đang cuộn lên -> Hiện header
+      if (!isHeaderVisible) setIsHeaderVisible(true);
+    }
+
+    lastScrollY.current = currentScrollY;
+  };
+  // ------------------------------------------
 
   const sortedSeasons = useMemo(() => sortSeasons(seasons), [seasons]);
 
@@ -414,31 +435,40 @@ const Crops = () => {
         onSelectField={setSelectedField}
       />
 
-      <section className="relative flex flex-1 flex-col bg-gray-50/60">
+      <section
+        className="relative flex flex-1 flex-col bg-gray-50/60 overflow-y-auto"
+        onScroll={handleScroll}
+      >
         {selectedField ? (
           <>
-            <SeasonHeader
-              selectedField={selectedField}
-              sortedSeasons={sortedSeasons}
-              selectedSeasonId={selectedSeasonId}
-              currentSeason={currentSeason}
-              isSeasonActive={isSeasonActive}
-              filterPlotId={filterPlotId}
-              filterTaskId={filterTaskId}
-              filterPlotOptions={filterPlotOptions}
-              taskFilterOptions={taskGroups}
-              totalCost={totalCost}
-              onSelectSeason={setSelectedSeasonId}
-              onCreateLog={openCreateLogModal}
-              onFilterPlotChange={setFilterPlotId}
-              onFilterTaskChange={setFilterTaskId}
-              onResetFilters={() => {
-                setFilterPlotId("");
-                setFilterTaskId("");
-              }}
-            />
+            <div
+              className={`sticky top-0 z-20 transition-transform duration-300 ease-in-out ${
+                isHeaderVisible ? "translate-y-0" : "-translate-y-full"
+              }`}
+            >
+              <SeasonHeader
+                selectedField={selectedField}
+                sortedSeasons={sortedSeasons}
+                selectedSeasonId={selectedSeasonId}
+                currentSeason={currentSeason}
+                isSeasonActive={isSeasonActive}
+                filterPlotId={filterPlotId}
+                filterTaskId={filterTaskId}
+                filterPlotOptions={filterPlotOptions}
+                taskFilterOptions={taskGroups}
+                totalCost={totalCost}
+                onSelectSeason={setSelectedSeasonId}
+                onCreateLog={openCreateLogModal}
+                onFilterPlotChange={setFilterPlotId}
+                onFilterTaskChange={setFilterTaskId}
+                onResetFilters={() => {
+                  setFilterPlotId("");
+                  setFilterTaskId("");
+                }}
+              />
+            </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-5 lg:px-6">
+            <div className="flex-1 px-5 py-5 lg:px-6">
               <FarmingLogList
                 loading={loadingFieldDetail || loadingLogs}
                 currentSeason={currentSeason}

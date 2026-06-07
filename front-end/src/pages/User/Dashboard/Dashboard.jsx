@@ -252,7 +252,7 @@ const FarmerDashboard = () => {
   if (kpis.comparison.type === "bad") compColor = "text-red-600";
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-100 px-2 py-2 sm:px-4 lg:px-6">
+    <div className="min-h-[calc(100vh-80px)] bg-gray-100 px-2 py-2 sm:px-4 lg:px-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-2">
         {/* ROW 1: KPIs & Bộ Lọc */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-5">

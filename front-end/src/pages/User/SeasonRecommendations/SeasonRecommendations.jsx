@@ -43,7 +43,7 @@ const SeasonRecommendations = () => {
   });
 
   return (
-    <div className="h-[calc(100vh-80px)] overflow-y-auto bg-gray-50 p-4 lg:p-5">
+    <div className="min-h-[calc(100vh-80px)] bg-gray-50 p-4 lg:p-5">
       <div className="mt-0 space-y-4">
         {loading ? (
           <LoadingScreen message="Đang tải khuyến nghị mùa vụ..." />

@@ -510,7 +510,7 @@ const DiseaseLogs = () => {
   // â”€â”€ Render â”€â”€
 
   return (
-    <div className="app-page-shell overflow-y-auto bg-gray-50 p-3 md:p-4 lg:p-5">
+    <div className="app-page-shell page-scroll-shell overflow-y-auto bg-gray-50 p-3 md:p-4 lg:p-5">
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 [&>h1]:hidden md:[&>h1]:block">

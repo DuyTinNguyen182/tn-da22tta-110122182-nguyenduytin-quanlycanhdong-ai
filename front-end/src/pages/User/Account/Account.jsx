@@ -265,7 +265,7 @@ const Account = () => {
   `;
 
   return (
-    <div className="app-page-shell overflow-y-auto bg-gray-50 px-4 py-3 pb-28 sm:px-6 sm:py-8 lg:px-8">
+    <div className="app-page-shell page-scroll-shell overflow-y-auto bg-gray-50 px-4 py-3 pb-28 sm:px-6 sm:py-8 lg:px-8">
       <div className="max-w-5xl mx-auto flex flex-col md:flex-row gap-2 lg:gap-8 items-start">
         {/* Cột trái: Tiêu đề + Sidebar Menu */}
         <div className="w-full md:w-72 flex flex-col shrink-0 md:sticky md:top-8">

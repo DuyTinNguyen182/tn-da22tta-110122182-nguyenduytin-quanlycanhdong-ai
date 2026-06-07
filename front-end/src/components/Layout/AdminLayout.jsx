@@ -20,20 +20,19 @@ const AdminLayout = () => {
   }
 
   return (
-    <div className="flex bg-gray-50 min-h-screen font-sans text-gray-900">
+    <div className="flex min-h-screen bg-gray-50 font-sans text-gray-900">
       <AdminSidebar
         collapsed={isSidebarCollapsed}
         setCollapsed={setIsSidebarCollapsed}
       />
 
       <div
-        className={`flex-1 flex flex-col transition-all duration-300 h-screen
+        className={`flex min-h-screen flex-1 flex-col transition-all duration-300
         ${isSidebarCollapsed ? "ml-20" : "ml-64"}`}
       >
         <AdminHeader />
 
-        {/* Đổi overflow-hidden thành overflow-y-auto để phần content có thể scroll độc lập */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1">
           <Outlet />
         </main>
       </div>

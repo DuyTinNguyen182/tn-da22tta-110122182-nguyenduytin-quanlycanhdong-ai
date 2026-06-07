@@ -93,7 +93,7 @@ const AllowedProducts = () => {
   const closeDetailModal = () => setViewingProduct(null);
 
   return (
-    <div className="h-full overflow-y-auto bg-gray-50 p-6">
+    <div className="min-h-[calc(100vh-80px)] bg-gray-50 p-6">
       <div className="mb-6 flex flex-col xl:flex-row xl:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Danh mục Vật tư</h1>

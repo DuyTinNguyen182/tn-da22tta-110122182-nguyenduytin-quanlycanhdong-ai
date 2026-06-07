@@ -185,7 +185,7 @@ const Announcements = () => {
   };
 
   return (
-    <div className="app-page-shell overflow-y-auto bg-gray-50 p-4 lg:p-6">
+    <div className="app-page-shell page-scroll-shell overflow-y-auto bg-gray-50 p-4 lg:p-6">
       <div className="mx-auto max-w-5xl space-y-5">
         <section className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm lg:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
