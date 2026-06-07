@@ -25,8 +25,38 @@ export const formatDateTime = (value) =>
 
 export const formatSeasonLabel = (season) => {
   if (!season) return "";
-  const baseName = season.seasonName || season.name || "Mùa vụ";
-  return season.year ? `${baseName} ${season.year}` : baseName;
+  const baseName =
+    season.seasonName || season.season?.name || season.name || "Mùa vụ";
+  const year =
+    season.year ||
+    (season.startDate ? new Date(season.startDate).getFullYear() : "");
+  return year ? `${baseName} ${year}` : baseName;
+};
+
+export const getDefaultSeasonId = (seasonDetails = []) =>
+  seasonDetails.find((season) => season.status === "active")?._id ||
+  seasonDetails[0]?._id ||
+  "";
+
+export const getSeasonStatusMeta = (status) => {
+  if (status === "active") {
+    return {
+      label: "Đang hoạt động",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    };
+  }
+
+  if (status === "completed") {
+    return {
+      label: "Đã kết thúc",
+      className: "border-gray-200 bg-gray-50 text-gray-700",
+    };
+  }
+
+  return {
+    label: "Chưa bắt đầu",
+    className: "border-sky-200 bg-sky-50 text-sky-800",
+  };
 };
 
 export const getPlotSummary = (log) => {
@@ -40,6 +70,25 @@ export const getPlotSummary = (log) => {
 
   return plotNames.join(", ");
 };
+
+export const getCompactPlotSummary = (log) => {
+  const plotNames = Array.isArray(log?.plots)
+    ? log.plots.map((plot) => plot?.name).filter(Boolean)
+    : [];
+
+  if (plotNames.length === 0) {
+    return log?.scope === "all_plots" ? "Toàn bộ thửa tham gia vụ" : "--";
+  }
+
+  if (plotNames.length >= 2) {
+    return `${plotNames[0]}, ...`;
+  }
+
+  return plotNames[0];
+};
+
+export const isSeasonCompletedForLog = (log, selectedSeason) =>
+  log?.seasonStatus === "completed" || selectedSeason?.status === "completed";
 
 export const getStatusMeta = (status) => {
   if (status === "processed") {

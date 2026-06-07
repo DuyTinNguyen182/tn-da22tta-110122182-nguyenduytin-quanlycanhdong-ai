@@ -6,12 +6,16 @@ import { useFeedback } from "../../../hooks/useFeedback";
 import DiseaseMonitoringSummaryCards from "./components/DiseaseMonitoringSummaryCards.jsx";
 import DiseaseMonitoringFilterBar from "./components/DiseaseMonitoringFilterBar.jsx";
 import DiseaseMonitoringTable from "./components/DiseaseMonitoringTable.jsx";
+import DiseaseLogDetailModal from "./components/DiseaseLogDetailModal.jsx";
 import DiseaseWarningModal from "./components/DiseaseWarningModal.jsx";
 import {
   PAGE_SIZE,
   buildWarningFormFromPreview,
   filterLogsByTimeRange,
   formatSeasonLabel,
+  getDefaultSeasonId,
+  getSeasonStatusMeta,
+  isSeasonCompletedForLog,
   isInToday,
 } from "./adminDiseaseMonitoringUtils.jsx";
 
@@ -20,9 +24,10 @@ const AdminDiseaseMonitoring = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [fields, setFields] = useState([]);
-  const [activeSeason, setActiveSeason] = useState(null);
+  const [seasonDetails, setSeasonDetails] = useState([]);
   const [logs, setLogs] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedDetailLog, setSelectedDetailLog] = useState(null);
   const [warningLoadingLogId, setWarningLoadingLogId] = useState("");
   const [warningSubmitting, setWarningSubmitting] = useState(false);
   const [warningModalOpen, setWarningModalOpen] = useState(false);
@@ -32,6 +37,7 @@ const AdminDiseaseMonitoring = () => {
   const [warningForm, setWarningForm] = useState(null);
   const [filters, setFilters] = useState({
     fieldId: "",
+    seasonId: "",
     timeRange: "all",
     status: "",
   });
@@ -47,6 +53,28 @@ const AdminDiseaseMonitoring = () => {
     [fields],
   );
 
+  const seasonOptions = useMemo(
+    () => [
+      ...(seasonDetails || []).map((season) => ({
+        value: season._id,
+        label: formatSeasonLabel(season),
+        badge:
+          season.status === "active"
+            ? {
+                text: "Đang vụ",
+                className: "bg-emerald-100 text-emerald-700",
+              }
+            : null,
+      })),
+    ],
+    [seasonDetails],
+  );
+
+  const selectedSeason = useMemo(
+    () => seasonDetails.find((season) => season._id === filters.seasonId) || null,
+    [filters.seasonId, seasonDetails],
+  );
+
   const updateLogInState = useCallback((updatedLog) => {
     if (!updatedLog?._id) return;
 
@@ -59,13 +87,18 @@ const AdminDiseaseMonitoring = () => {
     try {
       setLoading(true);
 
-      const [fieldRes, activeSeasonRes] = await Promise.all([
+      const [fieldRes, seasonRes] = await Promise.all([
         api.get("/fields"),
-        api.get("/season-details/active"),
+        api.get("/season-details/admin/all"),
       ]);
+      const nextSeasonDetails = seasonRes.data || [];
 
       setFields(fieldRes.data || []);
-      setActiveSeason(activeSeasonRes.data || null);
+      setSeasonDetails(nextSeasonDetails);
+      setFilters((prev) => ({
+        ...prev,
+        seasonId: prev.seasonId || getDefaultSeasonId(nextSeasonDetails),
+      }));
     } catch (error) {
       console.error("Lỗi tải dữ liệu theo dõi dịch bệnh:", error);
       toast.error(
@@ -126,10 +159,10 @@ const AdminDiseaseMonitoring = () => {
   useEffect(() => {
     if (loading) return;
 
-    fetchLogs(filters.fieldId, activeSeason?._id || "", filters.status, {
+    fetchLogs(filters.fieldId, filters.seasonId, filters.status, {
       silent: true,
     });
-  }, [activeSeason?._id, fetchLogs, filters.fieldId, filters.status, loading]);
+  }, [fetchLogs, filters.fieldId, filters.seasonId, filters.status, loading]);
 
   const filteredLogs = useMemo(
     () => filterLogsByTimeRange(logs, filters.timeRange),
@@ -162,7 +195,7 @@ const AdminDiseaseMonitoring = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters.fieldId, filters.timeRange, filters.status]);
+  }, [filters.fieldId, filters.seasonId, filters.timeRange, filters.status]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -177,6 +210,15 @@ const AdminDiseaseMonitoring = () => {
     }));
   };
 
+  const handleResetFilters = () => {
+    setFilters({
+      fieldId: "",
+      seasonId: getDefaultSeasonId(seasonDetails),
+      timeRange: "all",
+      status: "",
+    });
+  };
+
   const closeWarningModal = () => {
     setWarningModalOpen(false);
     setWarningPreviewLoading(false);
@@ -187,6 +229,11 @@ const AdminDiseaseMonitoring = () => {
 
   const handleOpenWarningModal = async (log) => {
     if (!log?._id) return;
+
+    if (isSeasonCompletedForLog(log, selectedSeason)) {
+      toast.warning("Vụ mùa đã kết thúc, không thể gửi cảnh báo.");
+      return;
+    }
 
     try {
       setWarningLoadingLogId(log._id);
@@ -265,7 +312,9 @@ const AdminDiseaseMonitoring = () => {
     }
   };
 
-  if (loading && !activeSeason && logs.length === 0) {
+  const seasonStatusMeta = getSeasonStatusMeta(selectedSeason?.status);
+
+  if (loading && seasonDetails.length === 0 && logs.length === 0) {
     return (
       <div className="h-full overflow-y-auto bg-gray-50 p-6 lg:p-8">
         <LoadingScreen message="Đang tải theo dõi dịch bệnh..." />
@@ -287,10 +336,12 @@ const AdminDiseaseMonitoring = () => {
             </p> */}
           </div>
 
-          {activeSeason ? (
-            <div className="inline-flex items-center gap-2 self-start rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">
+          {selectedSeason ? (
+            <div
+              className={`inline-flex items-center gap-2 self-start rounded-2xl border px-4 py-3 text-sm font-semibold ${seasonStatusMeta.className}`}
+            >
               <CalendarDays size={16} />
-              Mùa vụ hiện tại: {formatSeasonLabel(activeSeason)}
+              Mùa vụ đang xem: {formatSeasonLabel(selectedSeason)}
             </div>
           ) : (
             <div className="inline-flex items-center gap-2 self-start rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
@@ -317,12 +368,14 @@ const AdminDiseaseMonitoring = () => {
             <DiseaseMonitoringFilterBar
               filters={filters}
               fieldOptions={fieldOptions}
+              seasonOptions={seasonOptions}
               onFilterChange={handleFilterChange}
+              onReset={handleResetFilters}
             />
           </div>
 
           <DiseaseMonitoringTable
-            activeSeason={activeSeason}
+            selectedSeason={selectedSeason}
             loading={loading}
             refreshing={refreshing}
             paginatedLogs={paginatedLogs}
@@ -330,11 +383,19 @@ const AdminDiseaseMonitoring = () => {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            onOpenDetailModal={setSelectedDetailLog}
             onOpenWarningModal={handleOpenWarningModal}
             warningLoadingLogId={warningLoadingLogId}
           />
         </section>
       </div>
+
+      <DiseaseLogDetailModal
+        open={Boolean(selectedDetailLog)}
+        log={selectedDetailLog}
+        selectedSeason={selectedSeason}
+        onClose={() => setSelectedDetailLog(null)}
+      />
 
       <DiseaseWarningModal
         open={warningModalOpen}

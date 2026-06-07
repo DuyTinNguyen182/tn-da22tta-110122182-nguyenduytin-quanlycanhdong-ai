@@ -1,5 +1,5 @@
 import React from "react";
-import { Leaf, MapPinned, ShieldCheck } from "lucide-react";
+import { Leaf, MapPinned, RotateCcw, ShieldCheck, Sprout } from "lucide-react";
 import CustomDropdown from "../../../../components/UI/CustomDropdown";
 import {
   STATUS_FILTER_OPTIONS,
@@ -9,7 +9,9 @@ import {
 const DiseaseMonitoringFilterBar = ({
   filters,
   fieldOptions,
+  seasonOptions,
   onFilterChange,
+  onReset,
 }) => (
   <div className="flex flex-wrap gap-3">
     <CustomDropdown
@@ -18,6 +20,17 @@ const DiseaseMonitoringFilterBar = ({
       options={fieldOptions}
       placeholder="Tất cả cánh đồng"
       icon={MapPinned}
+      variant="filter"
+      className="min-w-[220px]"
+      size="default"
+    />
+
+    <CustomDropdown
+      value={filters.seasonId}
+      onChange={(value) => onFilterChange("seasonId", value)}
+      options={seasonOptions}
+      placeholder="Chọn mùa vụ"
+      icon={Sprout}
       variant="filter"
       className="min-w-[220px]"
       size="default"
@@ -44,6 +57,14 @@ const DiseaseMonitoringFilterBar = ({
       className="min-w-[190px]"
       size="default"
     />
+
+    <button
+      type="button"
+      onClick={onReset}
+      className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-100 bg-gray-50/80 px-3 py-2 text-sm font-semibold text-gray-600 transition-all hover:border-gray-200 hover:bg-white"
+    >
+      <RotateCcw size={15} />
+    </button>
   </div>
 );
 
