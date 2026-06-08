@@ -1,34 +1,83 @@
 import React, { useState } from "react";
-import { LogIn, LogOut } from "lucide-react";
+import { Bell, Headset, LogIn } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useAnnouncements } from "../../context/AnnouncementContext";
 import HeaderOverview from "./HeaderOverview";
-import ConfirmLogout from "../Common/ConfirmLogout";
+
+const CONTACT_PHONE = "0794325729";
 
 const Header = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
+  const { unreadCount, hasUnread } = useAnnouncements();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [showLogout, setShowLogout] = useState(false);
-
-  const handleLogoutConfirm = async () => {
-    setShowLogout(false);
-    await logout();
-    navigate("/");
-  };
+  const [isContactOpen, setIsContactOpen] = useState(false);
 
   return (
     <header
-      className={`sticky top-0 z-40 flex min-h-20 w-full items-center gap-4 border-b border-gray-200 bg-white/90 px-6 py-2 backdrop-blur-sm md:px-8 } ${location.pathname === "/" ? "hidden" : ""}`}
+      className={`sticky top-0 z-40 flex min-h-20 w-full items-center gap-4 border-b border-gray-200 bg-white/90 px-6 py-2 backdrop-blur-sm md:px-8 ${location.pathname === "/" ? "hidden" : ""}`}
     >
       <HeaderOverview className="flex-1" />
 
       <div className="flex items-center gap-4">
         {user ? (
           <>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/announcements"
+                onClick={() => setIsContactOpen(false)}
+                className="relative flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                aria-label="Thông báo và cảnh báo"
+                title="Thông báo và cảnh báo"
+              >
+                <Bell size={18} />
+                {hasUnread ? (
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                ) : null}
+              </Link>
+
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsContactOpen((current) => !current)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-600 shadow-sm transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                  aria-expanded={isContactOpen}
+                  aria-label="Hỗ trợ"
+                  title="Hỗ trợ"
+                >
+                  <Headset size={18} />
+                </button>
+
+                {isContactOpen ? (
+                  <div className="absolute right-0 top-12 z-50 w-72 rounded-lg border border-gray-200 bg-white p-4 text-left shadow-xl">
+                    <p className="text-sm font-bold text-gray-900">
+                      Hỗ trợ
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">
+                      Mọi thắc mắc xin liên hệ đến ban quản lý hợp tác xã qua
+                      số điện thoại{" "}
+                      <a
+                        href={`tel:${CONTACT_PHONE}`}
+                        className="font-bold text-emerald-700 hover:text-emerald-800"
+                      >
+                        {CONTACT_PHONE}
+                      </a>
+                      .
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
             <div
-              onClick={() => navigate("/account")}
+              onClick={() => {
+                setIsContactOpen(false);
+                navigate("/account");
+              }}
               className="ml-1 flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
             >
               <div className="hidden text-right leading-tight md:block">
