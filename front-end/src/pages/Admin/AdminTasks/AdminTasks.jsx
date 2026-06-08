@@ -356,7 +356,7 @@ const AdminTasks = () => {
             Quản lý mục công việc
           </h1>
           <p className="text-sm text-gray-500">
-            Thiết lập quy trình công việc tiêu chuẩn và cấu hình gợi ý nhắc việc
+            Thiết lập quy trình công việc tiêu chuẩn và cấu hình gợi ý công việc
           </p>
         </div>
 

@@ -78,7 +78,7 @@ const SmartAssistantCard = () => {
           <div className="rounded-xl bg-white p-1.5 shadow-sm border border-gray-100 text-gray-500">
             <Info className="h-4 w-4" />
           </div>
-          <h2 className="text-sm font-bold text-gray-700">Trợ lý sinh học</h2>
+          <h2 className="text-sm font-bold text-gray-700">Gợi ý công việc</h2>
         </div>
         <p className="text-xs text-gray-500 ml-9 leading-relaxed">
           Chưa có mùa vụ nào đang hoạt động. Hãy chờ Hợp tác xã cấu hình mùa vụ
@@ -97,7 +97,7 @@ const SmartAssistantCard = () => {
             <CheckCircle2 className="h-4 w-4" />
           </div>
           <h2 className="text-sm font-bold text-emerald-800">
-            Trợ lý sinh học
+            Gợi ý công việc
           </h2>
         </div>
         <p className="text-xs text-emerald-700 ml-9 leading-relaxed">

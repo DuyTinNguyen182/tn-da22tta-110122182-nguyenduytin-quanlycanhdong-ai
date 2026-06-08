@@ -50,8 +50,8 @@ const TaskFormModal = ({
             </h2>
             <p className="text-xs text-gray-500">
               {modalMode === "edit"
-                ? "Cập nhật thông tin và cấu hình nhắc việc cho công việc đã chọn"
-                : "Thiết lập công việc tiêu chuẩn và cấu hình trợ lý nhắc việc"}
+                ? "Cập nhật thông tin và cấu hình gợi ý cho công việc đã chọn"
+                : "Thiết lập công việc tiêu chuẩn và cấu hình gợi ý công việc"}
             </p>
           </div>
           <button
@@ -150,7 +150,7 @@ const TaskFormModal = ({
 
           <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-3">
             <h3 className="text-sm font-bold text-blue-800">
-              Thiết lập tự động nhắc việc
+              Thiết lập tự động gợi ý công việc
             </h3>
 
             <div>

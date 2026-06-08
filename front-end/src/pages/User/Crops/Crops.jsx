@@ -152,12 +152,23 @@ const Crops = () => {
 
     logs.forEach((log) => {
       getLogPlots(log).forEach((plot) => {
-        if (plot?._id) optionMap.set(plot._id, plot);
+        if (plot?._id) {
+          const plotFieldId =
+            typeof plot.field === "object" ? plot.field?._id : plot.field;
+          if (
+            plotFieldId &&
+            String(plotFieldId) !== String(selectedField?._id)
+          ) {
+            return;
+          }
+
+          optionMap.set(plot._id, plot);
+        }
       });
     });
 
     return Array.from(optionMap.values());
-  }, [currentSeason, logs]);
+  }, [currentSeason, logs, selectedField]);
 
   const filteredLogs = useMemo(() => {
     const next = logs.filter((log) => {
