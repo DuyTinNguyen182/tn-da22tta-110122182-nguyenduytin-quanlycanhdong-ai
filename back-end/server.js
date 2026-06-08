@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 const connectDB = require("./src/config/db");
+const startSeasonPlotAutoAssignmentScheduler = require("./src/services/seasonPlotAutoAssignmentScheduler");
 
 const authRoutes = require("./src/routes/authRoute");
 const userRoutes = require("./src/routes/userRoute");
@@ -59,7 +60,9 @@ app.use(
   }),
 );
 // --- Database Connection ---
-connectDB();
+connectDB().then(() => {
+  startSeasonPlotAutoAssignmentScheduler();
+});
 
 // --- Routes ---
 app.use("/api/auth", authRoutes);

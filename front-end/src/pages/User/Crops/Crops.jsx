@@ -112,7 +112,7 @@ const Crops = () => {
 
     if (Math.abs(currentScrollY - lastScrollY.current) < 50) return;
 
-    if (currentScrollY > lastScrollY.current && currentScrollY > 60) {
+    if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
       // Đang cuộn xuống -> Ẩn header
       if (isHeaderVisible) setIsHeaderVisible(false);
     } else {

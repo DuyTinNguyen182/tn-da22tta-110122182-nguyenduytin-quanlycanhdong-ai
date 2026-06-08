@@ -8,6 +8,10 @@ const {
   resolveSeasonId,
   getSeasonNameById,
 } = require("./seasonService");
+const {
+  autoAssignActivePlotsForCurrentSeason,
+  autoAssignActivePlotsToSeason,
+} = require("./seasonPlotAutoAssignmentService");
 
 const inferSeasonYear = (value) => {
   const sourceDate =
@@ -123,6 +127,8 @@ const getSeasonDetailById = async (id) => {
 };
 
 const getActiveSeasonDetail = async () => {
+  await autoAssignActivePlotsForCurrentSeason();
+
   const now = new Date();
   const seasonDoc = await SeasonDetail.findOne({
     startDate: { $lte: now },
@@ -184,12 +190,16 @@ const createSeasonDetail = async (data) => {
     startDate: startDate || null,
     endDate: endDate || null,
   });
+  const autoAssignment = await autoAssignActivePlotsToSeason(seasonDetail);
 
   const seasonDoc = await SeasonDetail.findById(seasonDetail._id).populate(
     "season",
     "name",
   );
-  return decorateSeasonDetail(seasonDoc, catalogMap);
+  return {
+    ...decorateSeasonDetail(seasonDoc, catalogMap),
+    autoAssignment,
+  };
 };
 
 const updateSeasonDetail = async (id, data) => {
@@ -251,9 +261,15 @@ const updateSeasonDetail = async (id, data) => {
   const updatedDoc = await SeasonDetail.findByIdAndUpdate(id, updateData, {
     new: true,
   }).populate("season", "name");
+  const autoAssignment = await autoAssignActivePlotsToSeason(updatedDoc);
 
   const catalogMap = await getSeasonMap();
-  return updatedDoc ? decorateSeasonDetail(updatedDoc, catalogMap) : null;
+  return updatedDoc
+    ? {
+        ...decorateSeasonDetail(updatedDoc, catalogMap),
+        autoAssignment,
+      }
+    : null;
 };
 
 const finishSeasonDetail = async (id) => {
@@ -303,6 +319,8 @@ const deleteSeasonDetail = async (id) => {
 };
 
 const getFarmerSeasonDetails = async (userId, fieldId) => {
+  await autoAssignActivePlotsForCurrentSeason();
+
   const seasonDocs = await SeasonDetail.find()
     .populate("season", "name")
     .sort({ year: -1, startDate: -1, createdAt: -1 });

@@ -3,6 +3,9 @@ const SeasonPlotAssignment = require("../models/seasonPlotAssignmentModel");
 const Plot = require("../models/plotModel");
 const DiaryLog = require("../models/farmingLogModel");
 const DiseaseLog = require("../models/diseaseLogModel");
+const {
+  autoAssignActivePlotsForCurrentSeason,
+} = require("./seasonPlotAutoAssignmentService");
 
 const sortByRelationNames = (left, right) => {
   const leftFieldName = left?.field?.name || "";
@@ -101,11 +104,13 @@ const normalizePlotIds = (plotIds) => {
 };
 
 const getActiveSeasonPlotAssignments = async () => {
+  const autoAssignment = await autoAssignActivePlotsForCurrentSeason();
   const seasonDoc = await getActiveSeasonDetailDoc();
 
   if (!seasonDoc) {
     return {
       seasonDetail: null,
+      autoAssignment,
       summary: {
         assignedCount: 0,
         availableCount: 0,
@@ -180,6 +185,7 @@ const getActiveSeasonPlotAssignments = async () => {
 
   return {
     seasonDetail: buildSeasonDetailPayload(seasonDoc),
+    autoAssignment,
     summary: {
       assignedCount: assignedPlots.length,
       availableCount: availablePlots.length,
@@ -317,24 +323,12 @@ const removePlotFromActiveSeason = async (plotId) => {
   const assignmentId = String(assignment._id);
   const diaryLogCount = diaryLogCountMap.get(assignmentId) || 0;
   const diseaseLogCount = diseaseLogCountMap.get(assignmentId) || 0;
-  const hasLogs = diaryLogCount > 0 || diseaseLogCount > 0;
 
-  if (hasLogs) {
-    assignment.status = "inactive";
-    await assignment.save();
-
-    return {
-      action: "deactivated",
-      plotName: assignment.plot?.name || "Khong xac dinh",
-      diaryLogCount,
-      diseaseLogCount,
-    };
-  }
-
-  await assignment.deleteOne();
+  assignment.status = "inactive";
+  await assignment.save();
 
   return {
-    action: "deleted",
+    action: "deactivated",
     plotName: assignment.plot?.name || "Khong xac dinh",
     diaryLogCount,
     diseaseLogCount,
