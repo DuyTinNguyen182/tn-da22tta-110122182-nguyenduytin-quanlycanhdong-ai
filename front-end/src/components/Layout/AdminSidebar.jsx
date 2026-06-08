@@ -25,10 +25,14 @@ const AdminSidebar = ({ collapsed, setCollapsed }) => {
     { name: "Tổng quan", icon: LayoutDashboard, path: "/admin/dashboard" },
     { name: "Người dùng", icon: Users, path: "/admin/users" },
     { name: "Cánh đồng", icon: Map, path: "/admin/fields" },
-    { name: "Mùa vụ gốc", icon: CalendarDays, path: "/admin/seasons" },
-    { name: "Lịch mùa vụ", icon: CalendarRange, path: "/admin/season-details" },
+    { name: "Mùa vụ", icon: CalendarDays, path: "/admin/seasons" },
+    {
+      name: "Chi tiết mùa vụ",
+      icon: CalendarRange,
+      path: "/admin/season-details",
+    },
     { name: "Thửa tham gia vụ", icon: Sprout, path: "/admin/season-plots" },
-    { name: "Giai đoạn", icon: ListChecks, path: "/admin/stages" },
+    { name: "Giai đoạn mùa vụ", icon: ListChecks, path: "/admin/stages" },
     { name: "Công việc", icon: Briefcase, path: "/admin/tasks" },
     { name: "Quản lý tiến độ", icon: BarChart3, path: "/admin/progress" },
     {

@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  Eye,
-  EyeOff,
-  Pencil,
-  ShieldAlert,
-  Trash2,
-} from "lucide-react";
+import { Eye, EyeOff, Pencil, ShieldAlert, Trash2 } from "lucide-react";
 import LoadingScreen from "../../../../components/Layout/LoadingScreen";
 import PaginationControls from "../../../../components/Common/PaginationControls";
 import CustomCheckbox from "../../../../components/UI/CustomCheckbox";
@@ -71,11 +65,15 @@ const AdminAnnouncementsTable = ({
           </thead>
           <tbody>
             {items.map((item) => {
-              const typeStyle = TYPE_STYLES[item.type] || TYPE_STYLES.notification;
+              const typeStyle =
+                TYPE_STYLES[item.type] || TYPE_STYLES.notification;
               const Icon = typeStyle.icon;
 
               return (
-                <tr key={item._id} className="border-b border-gray-50 align-top">
+                <tr
+                  key={item._id}
+                  className="border-b border-gray-50 align-top"
+                >
                   <td className="px-4 py-4">
                     <CustomCheckbox
                       checked={selectedIds.includes(item._id)}
@@ -109,7 +107,11 @@ const AdminAnnouncementsTable = ({
                           : "bg-gray-100 text-gray-600"
                       }`}
                     >
-                      {item.isVisible ? <Eye size={14} /> : <EyeOff size={14} />}
+                      {item.isVisible ? (
+                        <Eye size={14} />
+                      ) : (
+                        <EyeOff size={14} />
+                      )}
                       {item.isVisible ? "Đang hiển thị" : "Đang ẩn"}
                     </span>
                   </td>
@@ -160,8 +162,8 @@ const AdminAnnouncementsTable = ({
 
       <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-sm text-gray-500">
-          Hiển thị {items.length} mục trong tổng số {pagination.totalItems} mục theo
-          bộ lọc hiện tại.
+          Hiển thị {items.length} thông báo/Cảnh báo trong tổng số{" "}
+          {pagination.totalItems} thông báo/Cảnh báo.
         </p>
 
         <PaginationControls

@@ -5,7 +5,7 @@ import {
   CheckCircle2,
   RefreshCcw,
   Search,
-  XIcon,
+  RotateCcw,
 } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
@@ -507,7 +507,7 @@ const AdminSeasonPlots = () => {
                 className="flex items-center justify-center rounded-xl border border-gray-200 bg-white p-2 text-gray-500 hover:bg-gray-50 hover:text-gray-700"
                 title="Xóa bộ lọc"
               >
-                <XIcon size={18} />
+                <RotateCcw size={15} />
               </button>
             </div>
           </section>

@@ -246,27 +246,26 @@ const getDashboardData = async (querySeasonDetailId = "") => {
         ])
       : Promise.resolve([]),
 
-    // Recent Farming Logs
+    // 6. Recent Farming Logs
     assignmentIds.length
       ? FarmingLog.find({ seasonPlotAssignments: { $in: assignmentIds } })
           .populate("task", "name")
           .populate("user", "fullName")
-          .sort({ createdAt: -1 })
-          .limit(5)
+          .populate({
+            path: "seasonPlotAssignments",
+            select: "seasonDetail plot field user",
+            populate: [
+              { path: "plot", select: "name" },
+              { path: "field", select: "name" },
+              { path: "user", select: "fullName" },
+            ],
+          })
+          .sort({ date: -1, createdAt: -1 })
+          .limit(3)
           .lean()
       : Promise.resolve([]),
 
-    // Recent Disease Logs
-    assignmentIds.length
-      ? DiseaseLog.find({
-          status: "unprocessed",
-          seasonPlotAssignments: { $in: assignmentIds },
-        })
-          .populate("user", "fullName")
-          .sort({ detectedAt: -1, createdAt: -1 })
-          .limit(5)
-          .lean()
-      : Promise.resolve([]),
+    Promise.resolve([]),
 
     // Crop Progress
     assignmentIds.length

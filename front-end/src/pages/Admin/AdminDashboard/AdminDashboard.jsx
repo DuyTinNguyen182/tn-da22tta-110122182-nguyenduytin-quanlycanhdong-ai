@@ -146,18 +146,43 @@ const KpiCard = ({ title, value, icon, accentClass, iconClass, trend }) => {
   );
 };
 
-const FeedItem = ({ title, subtitle, meta, icon, iconClass }) => {
+const FeedItem = ({
+  title,
+  subtitle,
+  meta,
+  icon,
+  iconClass,
+  fieldName,
+  plotName,
+}) => {
   const IconComponent = icon;
 
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-gray-100 bg-gray-50 px-2 py-1.5">
-      <div className="mt-0.5 rounded-lg bg-white p-1 shadow-sm">
-        <IconComponent className={`h-3 w-3 ${iconClass}`} />
+    <div className="flex items-start gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+      <div className="mt-0.5 rounded-lg bg-white p-1.5 shadow-sm">
+        <IconComponent className={`h-4 w-4 ${iconClass}`} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-semibold text-gray-900">{title}</p>
-        <p className="mt-0.5 truncate text-xs text-gray-600">{subtitle}</p>
-        <p className="mt-0.5 text-xs text-gray-500">{meta}</p>
+        <div className="flex justify-between items-start">
+          <p className="truncate text-sm font-semibold text-gray-900">
+            {title}
+          </p>
+          <p className="shrink-0 text-[11px] text-gray-500">{meta}</p>
+        </div>
+        <p className="mt-0.5 text-xs text-gray-700 font-medium">{subtitle}</p>
+
+        {(fieldName || plotName) && (
+          <p
+            className="mt-1 text-[11px] text-gray-500 truncate"
+            title={`${fieldName} - ${plotName}`}
+          >
+            <span className="font-medium text-amber-600">
+              {fieldName || "Chưa xác định"}
+            </span>
+            <span className="mx-1.5 text-gray-300">|</span>
+            <span className="text-gray-500">{plotName || "Tất cả thửa"}</span>
+          </p>
+        )}
       </div>
     </div>
   );
@@ -175,41 +200,49 @@ const CustomDiseaseTooltip = ({ active, payload, label }) => {
     const data = payload[0].payload;
 
     return (
-      <div className="rounded-lg border border-red-100 bg-white p-3 shadow-md min-w-[350px] max-w-[450px]">
-        <p className="text-xs font-bold text-gray-900 mb-2 border-b border-gray-100 pb-1.5">
-          Ngày {label} ({data.diseaseCount} báo cáo)
+      /* Mở rộng bảng hiển thị theo chiều ngang (min-w-[400px]) */
+      <div className="rounded-lg border border-red-100 bg-white p-3 shadow-md min-w-[400px] max-w-[550px]">
+        <p className="text-sm font-bold text-gray-900 mb-3 border-b border-gray-100 pb-2">
+          Ngày {label}{" "}
+          <span className="font-normal text-gray-500">
+            ({data.diseaseCount} báo cáo)
+          </span>
         </p>
 
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-2.5">
           {data.details && data.details.length > 0 ? (
             data.details.map((item, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between gap-3 text-[11px] py-1.5 border-b border-gray-50 last:border-0"
+                className="flex flex-col pb-2 border-b border-gray-50 last:border-0 last:pb-0"
               >
-                <div className="flex items-center gap-1.5 truncate">
-                  <span className="font-semibold text-red-600 whitespace-nowrap">
+                {/* Tên bệnh được đưa hẳn lên dòng trên cùng */}
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <span className="font-bold text-red-600 text-sm">
                     {item.diseaseName}
                   </span>
-                  <span className="text-gray-500 truncate">
-                    {/* Nối mảng plotNames lại thành chuỗi, cách nhau bằng dấu phẩy */}
-                    •{" "}
-                    {item.plotNames?.length
-                      ? item.plotNames.join(", ")
-                      : "Chưa xác định"}{" "}
-                    ({item.farmerName})
+                  <span
+                    className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                      item.status === "processed"
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                        : "bg-amber-50 text-amber-600 border-amber-200"
+                    }`}
+                  >
+                    {item.status === "processed" ? "Đã xử lý" : "Chưa xử lý"}
                   </span>
                 </div>
 
-                <span
-                  className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-semibold border ${
-                    item.status === "processed"
-                      ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-                      : "bg-amber-50 text-amber-600 border-amber-200"
-                  }`}
-                >
-                  {item.status === "processed" ? "Đã xử lý" : "Chưa xử lý"}
-                </span>
+                {/* Các thửa đất ghi nhận nhiễm dịch bệnh và người báo cáo ở dòng dưới */}
+                <div className="text-xs text-gray-700 pl-2 border-l-2 border-gray-200">
+                  <p>
+                    {item.plotNames?.length
+                      ? item.plotNames.join(", ")
+                      : "Chưa xác định"}{" "}
+                    <span className="text-gray-500 italic">
+                      ({item.farmerName})
+                    </span>
+                  </p>
+                </div>
               </div>
             ))
           ) : (
@@ -272,7 +305,7 @@ const AdminDashboard = () => {
               skipNextDashboardFetch.current = true;
               return nextDashboard.seasonDetailId;
             }
-            return prevId; // Bỏ qua, không bật cờ nếu ID đã trùng khớp
+            return prevId;
           });
         }
       } catch (error) {
@@ -491,7 +524,6 @@ const AdminDashboard = () => {
         </div>
 
         <div className="grid grid-cols-1 gap-2 xl:grid-cols-5">
-          {/* Thay thế biểu đồ Chi phí lũy kế thành Biểu đồ cảnh báo dịch bệnh */}
           <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm xl:col-span-3">
             <div className="mb-3 flex items-center gap-2">
               <div className="rounded-lg bg-red-50 p-2">
@@ -542,7 +574,6 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          {/* Top 5 Nông dân chi phí/1000m2 cao nhất */}
           <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm xl:col-span-2">
             <div className="mb-3 flex items-center gap-2">
               <div className="rounded-lg bg-orange-50 p-2">
@@ -593,25 +624,24 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-3">
-          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm overflow-hidden flex flex-col">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="rounded-lg bg-sky-50 p-1.5">
+        <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm overflow-hidden flex flex-col">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="rounded-lg bg-sky-50 p-2">
                 <Activity className="h-4 w-4 text-sky-600" />
               </div>
-              <h2 className="text-xs font-semibold text-gray-900">
-                Tiến độ canh tác diện tích
+              <h2 className="text-sm font-semibold text-gray-900">
+                Tiến độ canh tác theo giai đoạn
               </h2>
             </div>
 
             {charts.cropProgress.length === 0 ? (
               <EmptyBlock text="Chưa có dữ liệu tiến độ." />
             ) : (
-              <div className="w-full flex-1 min-h-[150px] overflow-hidden">
-                {/* Tính toán chiều cao linh hoạt tránh bị rỗng khoảng không */}
+              <div className="w-full flex-1 min-h-[250px] overflow-hidden">
                 <div
                   style={{
-                    height: Math.max(100, charts.cropProgress.length * 40 + 40),
+                    height: Math.max(250, charts.cropProgress.length * 45 + 40),
                     minHeight: "100%",
                   }}
                 >
@@ -628,13 +658,13 @@ const AdminDashboard = () => {
                       />
                       <XAxis
                         type="number"
-                        tick={{ fill: "#6b7280", fontSize: 9 }}
+                        tick={{ fill: "#6b7280", fontSize: 10 }}
                       />
                       <YAxis
                         type="category"
                         dataKey="stageName"
-                        tick={{ fill: "#374151", fontSize: 9 }}
-                        width={70}
+                        tick={{ fill: "#374151", fontSize: 10 }}
+                        width={80}
                       />
                       <Tooltip
                         formatter={(value) => [
@@ -652,7 +682,7 @@ const AdminDashboard = () => {
                         name="Diện tích"
                         radius={[0, 4, 4, 0]}
                         fill="#0ea5e9"
-                        barSize={16}
+                        barSize={20}
                       />
                     </BarChart>
                   </ResponsiveContainer>
@@ -661,62 +691,59 @@ const AdminDashboard = () => {
             )}
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="rounded-lg bg-emerald-50 p-1.5">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3.5 shadow-sm flex flex-col">
+            <div className="mb-3 flex items-center gap-2">
+              <div className="rounded-lg bg-emerald-50 p-2">
                 <Sprout className="h-4 w-4 text-emerald-700" />
               </div>
-              <h2 className="text-xs font-semibold text-gray-900">
+              <h2 className="text-sm font-semibold text-gray-900">
                 Hoạt động canh tác gần đây
               </h2>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-2 overflow-y-auto pr-1 flex-1 max-h-[350px]">
               {liveFeeds.recentFarmingLogs.length === 0 ? (
                 <EmptyBlock text="Chưa có hoạt động canh tác." />
               ) : (
-                liveFeeds.recentFarmingLogs
-                  .slice(0, 3)
-                  .map((item) => (
+                liveFeeds.recentFarmingLogs.slice(0, 6).map((item) => {
+                  const farmerNames = [
+                    ...new Set(
+                      (item.seasonPlotAssignments || [])
+                        .map((spa) => spa.user?.fullName)
+                        .filter(Boolean),
+                    ),
+                  ].join(", ");
+                  const farmerDisplay =
+                    farmerNames || item.user?.fullName || "Không xác định";
+
+                  const fieldNames = [
+                    ...new Set(
+                      (item.seasonPlotAssignments || [])
+                        .map((spa) => spa.field?.name)
+                        .filter(Boolean),
+                    ),
+                  ].join(", ");
+
+                  const plotNames = (item.seasonPlotAssignments || [])
+                    .map((spa) => spa.plot?.name)
+                    .filter(Boolean)
+                    .join(", ");
+
+                  const logDate = item.date || item.createdAt;
+
+                  return (
                     <FeedItem
                       key={item._id}
                       icon={Sprout}
                       iconClass="text-emerald-700"
                       title={item.task?.name || "Công việc chưa xác định"}
-                      subtitle={`${item.user?.fullName || "Không xác định"} • ${formatCurrency(item.cost)}`}
-                      meta={formatDateOnly(item.createdAt)}
+                      subtitle={`${farmerDisplay} • ${formatCurrency(item.cost)}`}
+                      meta={formatDateOnly(logDate)}
+                      fieldName={fieldNames}
+                      plotName={plotNames}
                     />
-                  ))
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="rounded-lg bg-red-50 p-1.5">
-                <Bug className="h-4 w-4 text-red-600" />
-              </div>
-              <h2 className="text-xs font-semibold text-gray-900">
-                Nhật kí dịch bệnh gần đây
-              </h2>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              {liveFeeds.recentDiseaseLogs.length === 0 ? (
-                <EmptyBlock text="Không có nhật kí dịch bệnh." />
-              ) : (
-                liveFeeds.recentDiseaseLogs
-                  .slice(0, 3)
-                  .map((item) => (
-                    <FeedItem
-                      key={item._id}
-                      icon={Bug}
-                      iconClass="text-red-600"
-                      title={item.diseaseName || "Bệnh chưa xác định"}
-                      subtitle={`${item.user?.fullName || "Không xác định"}`}
-                      meta={formatDateOnly(item.detectedAt)}
-                    />
-                  ))
+                  );
+                })
               )}
             </div>
           </div>

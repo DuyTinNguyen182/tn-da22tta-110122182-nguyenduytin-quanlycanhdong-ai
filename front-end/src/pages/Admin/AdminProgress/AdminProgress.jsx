@@ -106,7 +106,7 @@ const AdminProgress = () => {
         setOptions(optionsRes.data || emptyOptions);
         try {
           const overviewRes = await api.get("/admin/progress/overview", {
-            params: { recentLimit: 5 },
+            params: { recentLimit: 6 },
           });
           setRecentActivities(overviewRes.data?.recentActivities || []);
         } catch (timelineError) {
@@ -593,7 +593,7 @@ const AdminProgress = () => {
   const handleLoadMoreActivities = async () => {
     try {
       setLoadingMoreActivities(true);
-      const nextLimit = recentActivities.length + 5;
+      const nextLimit = recentActivities.length + 6;
       const res = await api.get("/admin/progress/overview", {
         params: { recentLimit: nextLimit },
       });

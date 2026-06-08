@@ -35,7 +35,10 @@ const AdminSeasonDetails = () => {
     fetchData();
   }, []);
 
-  const totalPages = Math.max(1, Math.ceil(seasonDetails.length / DETAILS_PER_PAGE));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(seasonDetails.length / DETAILS_PER_PAGE),
+  );
 
   const paginatedDetails = useMemo(() => {
     const startIndex = (currentPage - 1) * DETAILS_PER_PAGE;
@@ -88,8 +91,12 @@ const AdminSeasonDetails = () => {
     setFormData({
       seasonId: detail?.season?._id || "",
       year: existingYear,
-      startDate: detail.startDate ? new Date(detail.startDate).toISOString().slice(0, 10) : "",
-      endDate: detail.endDate ? new Date(detail.endDate).toISOString().slice(0, 10) : "",
+      startDate: detail.startDate
+        ? new Date(detail.startDate).toISOString().slice(0, 10)
+        : "",
+      endDate: detail.endDate
+        ? new Date(detail.endDate).toISOString().slice(0, 10)
+        : "",
     });
     setShowFormModal(true);
   };
@@ -138,7 +145,9 @@ const AdminSeasonDetails = () => {
         });
 
         setSeasonDetails((prev) =>
-          prev.map((item) => (item._id === editingDetail._id ? res.data : item)),
+          prev.map((item) =>
+            item._id === editingDetail._id ? res.data : item,
+          ),
         );
         toast.success("Đã cập nhật chi tiết mùa vụ.");
       } else {
@@ -155,7 +164,9 @@ const AdminSeasonDetails = () => {
 
       closeFormModal();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể lưu chi tiết mùa vụ");
+      toast.error(
+        err.response?.data?.message || "Không thể lưu chi tiết mùa vụ",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -189,7 +200,7 @@ const AdminSeasonDetails = () => {
     const confirmed = await confirm({
       title: "Xóa chi tiết",
       message:
-        "Bạn có chắc muốn xóa lịch trình mùa vụ này không? Dữ liệu nhật ký liên quan có thể bị ảnh hưởng.",
+        "Bạn có chắc muốn xóa chi tiết mùa vụ này không? Dữ liệu nhật ký liên quan có thể bị ảnh hưởng.",
       confirmText: "Xóa",
       tone: "danger",
     });
@@ -198,10 +209,14 @@ const AdminSeasonDetails = () => {
     setSubmitting(true);
     try {
       await api.delete(`/season-details/${detail._id}`);
-      setSeasonDetails((prev) => prev.filter((item) => item._id !== detail._id));
-      toast.success("Đã xóa lịch trình mùa vụ.");
+      setSeasonDetails((prev) =>
+        prev.filter((item) => item._id !== detail._id),
+      );
+      toast.success("Đã xóa chi tiết mùa vụ.");
     } catch (err) {
-      toast.error(err.response?.data?.message || "Không thể xóa lịch trình mùa vụ");
+      toast.error(
+        err.response?.data?.message || "Không thể xóa chi tiết mùa vụ",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -211,7 +226,9 @@ const AdminSeasonDetails = () => {
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Quản lý chi tiết mùa vụ</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Quản lý chi tiết mùa vụ
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
             Lên lịch và quản lý thời gian diễn ra của các vụ mưa
           </p>
@@ -223,7 +240,7 @@ const AdminSeasonDetails = () => {
           className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700"
         >
           <Plus size={16} />
-          Thêm lịch trình
+          Thêm chi tiết mùa vụ
         </button>
       </div>
 

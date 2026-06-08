@@ -64,15 +64,15 @@ const SeasonDetailTable = ({
   return (
     <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-        <h2 className="font-bold text-gray-800">Danh sách lịch trình</h2>
+        <h2 className="font-bold text-gray-800">Danh sách chi tiết mùa vụ</h2>
         <span className="text-sm font-medium text-gray-500">
-          Tổng: {totalCount} | Trang: {currentPage}/{totalPages}
+          Tổng: {totalCount}
         </span>
       </div>
 
       {seasonDetails.length === 0 ? (
         <div className="flex h-44 items-center justify-center text-gray-500">
-          Chưa có lịch trình mùa vụ nào
+          Chưa có chi tiết mùa vụ nào
         </div>
       ) : (
         <>
@@ -177,7 +177,8 @@ const SeasonDetailTable = ({
 
           <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
             <p className="text-sm text-gray-500">
-              Hiển thị {seasonDetails.length} lịch trình trong tổng số {totalCount} lịch trình.
+              Hiển thị {seasonDetails.length} chi tiết mùa vụ trong tổng số{" "}
+              {totalCount} chi tiết mùa vụ.
             </p>
 
             <PaginationControls

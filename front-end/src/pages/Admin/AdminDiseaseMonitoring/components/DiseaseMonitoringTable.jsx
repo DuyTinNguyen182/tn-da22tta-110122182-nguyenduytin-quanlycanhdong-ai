@@ -189,8 +189,8 @@ const DiseaseMonitoringTable = ({
                           : isSeasonCompleted
                             ? "Vụ đã kết thúc"
                             : log.warningSent
-                            ? "Gửi lại"
-                            : "Gửi cảnh báo"}
+                              ? "Gửi lại"
+                              : "Gửi cảnh báo"}
                       </button>
                     </div>
                   </td>
@@ -203,8 +203,8 @@ const DiseaseMonitoringTable = ({
 
       <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-sm text-gray-500">
-          Hiển thị {paginatedLogs.length} mục trong tổng số{" "}
-          {filteredLogs.length} log bệnh theo bộ lọc hiện tại.
+          Hiển thị {paginatedLogs.length} nhật ký bệnh trong tổng số{" "}
+          {filteredLogs.length} nhật ký bệnh.
         </p>
 
         <PaginationControls

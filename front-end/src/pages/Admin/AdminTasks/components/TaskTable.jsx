@@ -104,7 +104,8 @@ const TaskTable = ({
             <tbody className="divide-y divide-gray-100">
               {tasks.map((task) => {
                 const stageName =
-                  stageOptions?.find((s) => s.value === task.stage?._id)?.label ||
+                  stageOptions?.find((s) => s.value === task.stage?._id)
+                    ?.label ||
                   stageOptions?.find((s) => s.value === task.stage)?.label ||
                   "Chưa xác định";
 
@@ -113,7 +114,8 @@ const TaskTable = ({
                   .filter(Boolean)
                   .join(", ");
 
-                const categoryLabel = TASK_CATEGORY_LABELS[task.category] || "Khác";
+                const categoryLabel =
+                  TASK_CATEGORY_LABELS[task.category] || "Khác";
                 const categoryBadgeClass =
                   TASK_CATEGORY_BADGE_STYLES[task.category] ||
                   TASK_CATEGORY_BADGE_STYLES.OTHER;
@@ -121,43 +123,66 @@ const TaskTable = ({
                 return (
                   <tr key={task._id} className="transition hover:bg-gray-50/50">
                     <td className="px-5 py-3">
-                      <span className="text-sm font-medium text-gray-700">{stageName}</span>
+                      <span className="text-sm font-medium text-gray-700">
+                        {stageName}
+                      </span>
                     </td>
 
                     <td className="px-5 py-3">
-                      <span className="text-sm font-semibold text-gray-800">{task.name}</span>
+                      <span className="text-sm font-semibold text-gray-800">
+                        {task.name}
+                      </span>
                     </td>
 
                     <td className="px-5 py-3">
-                      <span className="text-sm font-semibold text-gray-600">{task.order}</span>
+                      <span className="text-sm font-semibold text-gray-600">
+                        {task.order}
+                      </span>
                     </td>
 
                     <td className="px-5 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${categoryBadgeClass}`}>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${categoryBadgeClass}`}
+                      >
                         {categoryLabel}
                       </span>
                     </td>
 
                     <td className="px-5 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${task.isRepeatable ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                      <span
+                        className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${task.isRepeatable ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}
+                      >
                         {task.isRepeatable ? "Có" : "Không"}
                       </span>
                     </td>
 
                     <td className="px-5 py-3">
-                      <span className="block max-w-[150px] truncate text-xs font-medium text-gray-500" title={prerequisiteNames}>
+                      <span
+                        className="block max-w-[150px] truncate text-xs font-medium text-gray-500"
+                        title={prerequisiteNames}
+                      >
                         {prerequisiteNames || "—"}
                       </span>
                     </td>
 
-                    <td className="px-5 py-3">{renderRecommendationBadge(task.recommendation)}</td>
+                    <td className="px-5 py-3">
+                      {renderRecommendationBadge(task.recommendation)}
+                    </td>
 
                     <td className="px-5 py-3">
                       <div className="flex justify-center gap-1.5">
-                        <button onClick={() => onStartEdit(task)} className="rounded-lg bg-blue-50 p-1.5 text-blue-700 transition hover:bg-blue-100" title="Chỉnh sửa">
+                        <button
+                          onClick={() => onStartEdit(task)}
+                          className="rounded-lg bg-blue-50 p-1.5 text-blue-700 transition hover:bg-blue-100"
+                          title="Chỉnh sửa"
+                        >
                           <Pencil size={15} />
                         </button>
-                        <button onClick={() => onDelete(task)} className="rounded-lg bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100" title="Xóa công việc">
+                        <button
+                          onClick={() => onDelete(task)}
+                          className="rounded-lg bg-red-50 p-1.5 text-red-700 transition hover:bg-red-100"
+                          title="Xóa công việc"
+                        >
                           <Trash2 size={15} />
                         </button>
                       </div>
@@ -173,9 +198,14 @@ const TaskTable = ({
       {!loading && tasks.length > 0 && (
         <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
           <p className="text-sm text-gray-500">
-            Hiển thị {tasks.length} công việc trong tổng số {totalTasks} công việc theo bộ lọc hiện tại.
+            Hiển thị {tasks.length} công việc trong tổng số {totalTasks} công
+            việc.
           </p>
-          <PaginationControls page={currentPage} totalPages={totalPages} onPageChange={onPageChange} />
+          <PaginationControls
+            page={currentPage}
+            totalPages={totalPages}
+            onPageChange={onPageChange}
+          />
         </div>
       )}
     </div>
@@ -183,4 +213,3 @@ const TaskTable = ({
 };
 
 export default TaskTable;
-

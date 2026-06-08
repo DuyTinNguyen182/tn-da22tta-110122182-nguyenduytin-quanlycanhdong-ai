@@ -29,7 +29,7 @@ const SeasonDetailFormModal = ({
           <p className="mt-1 text-sm text-gray-500">
             {isEditing
               ? "Cập nhật năm và mốc thời gian của chi tiết mùa vụ."
-              : "Chọn mùa vụ gốc và nhập mốc thời gian để tạo lịch trình mới."}
+              : "Chọn mùa vụ và nhập mốc thời gian để tạo chi tiết mùa vụ mới."}
           </p>
 
           <button

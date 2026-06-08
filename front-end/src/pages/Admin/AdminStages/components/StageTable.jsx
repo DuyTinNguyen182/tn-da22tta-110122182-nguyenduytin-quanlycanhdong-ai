@@ -94,8 +94,8 @@ const StageTable = ({
 
       <div className="flex flex-col gap-3 border-t border-gray-100 px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-sm text-gray-500">
-          Hiển thị {stages.length} giai đoạn trong tổng số {totalStages} theo bộ
-          lọc hiện tại.
+          Hiển thị {stages.length} giai đoạn trong tổng số {totalStages} giai
+          đoạn.
         </p>
 
         <PaginationControls
