@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { AlertCircle, CalendarDays, Loader2, X } from "lucide-react";
+import { AlertCircle, CalendarDays, Loader2, MapPin, X } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
+import CustomCheckbox from "../../../components/UI/CustomCheckbox";
 
 const getLocalDatetime = (date = new Date()) => {
   const d = new Date(date);
@@ -105,7 +106,6 @@ const SaveDiseaseLogModal = ({
   const [selectedSeason, setSelectedSeason] = useState("");
   const [selectedField, setSelectedField] = useState(null);
   const [selectedPlotIds, setSelectedPlotIds] = useState([]);
-  const [selectAllPlots, setSelectAllPlots] = useState(true);
   const [detectedDate, setDetectedDate] = useState(getLocalDatetime());
   const [saveLoading, setSaveLoading] = useState(false);
   const [loadingModal, setLoadingModal] = useState(false);
@@ -128,7 +128,6 @@ const SaveDiseaseLogModal = ({
 
     fetchFields();
     setDetectedDate(getLocalDatetime());
-    setSelectAllPlots(true);
     setSelectedPlotIds([]);
   }, [open]);
 
@@ -160,8 +159,6 @@ const SaveDiseaseLogModal = ({
         setSeasons(seasonList);
         setSelectedSeason(active?._id || seasonList[0]?._id || "");
         setPlots(farmerPlots);
-        setSelectAllPlots(true);
-        setSelectedPlotIds([]);
       } catch (fetchError) {
         console.error("Lỗi khi tải mùa vụ hoặc thửa ruộng", fetchError);
       } finally {
@@ -185,17 +182,17 @@ const SaveDiseaseLogModal = ({
     [currentSeason, plots],
   );
 
+  useEffect(() => {
+    if (open) {
+      setSelectedPlotIds(loggablePlots.map((p) => p._id));
+    }
+  }, [loggablePlots, open]);
+
   const canSave = Boolean(
     result && currentSeason && currentSeason.status === "active",
   );
 
   const togglePlotSelection = (plotId) => {
-    if (selectAllPlots) {
-      setSelectAllPlots(false);
-      setSelectedPlotIds([plotId]);
-      return;
-    }
-
     setSelectedPlotIds((prev) =>
       prev.includes(plotId)
         ? prev.filter((id) => id !== plotId)
@@ -221,15 +218,14 @@ const SaveDiseaseLogModal = ({
       return;
     }
 
-    if (!selectAllPlots && selectedPlotIds.length === 0) {
-      toast.warning("Vui lòng chọn ít nhất 1 thửa hoặc chọn tất cả các thửa.");
+    if (selectedPlotIds.length === 0) {
+      toast.warning("Vui lòng chọn ít nhất 1 thửa.");
       return;
     }
 
     const allPlotIds = loggablePlots.map((p) => p._id);
-    const finalPlotIds = selectAllPlots ? allPlotIds : selectedPlotIds;
     const scope =
-      selectAllPlots || finalPlotIds.length === allPlotIds.length
+      selectedPlotIds.length === allPlotIds.length
         ? "all_plots"
         : "selected_plots";
 
@@ -241,7 +237,7 @@ const SaveDiseaseLogModal = ({
       seasonId: selectedSeason,
       date: detectedDate,
       scope,
-      plotIds: finalPlotIds,
+      plotIds: selectedPlotIds,
       imageName: selectedImage?.name || "",
       source: "ai_scan",
     };
@@ -286,22 +282,19 @@ const SaveDiseaseLogModal = ({
     label: field.name,
   }));
 
-  const seasonOptions = seasons.map((season) => ({
-    value: season._id,
-    label: formatSeasonLabel(season),
-  }));
-
   const confidenceWarning = buildLowConfidenceMessage(result);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm sm:items-center sm:p-4">
-      <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[0_32px_90px_-40px_rgba(15,23,42,0.45)] sm:max-h-[88vh] sm:rounded-[28px]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-slate-950/45 p-3 backdrop-blur-sm sm:p-4">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-[22px] bg-white shadow-[0_32px_90px_-40px_rgba(15,23,42,0.45)] sm:max-h-[88vh] sm:rounded-[28px]">
         <div className="flex shrink-0 items-start justify-between gap-3 bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-4 text-white sm:px-6">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-emerald-50/80">
               Ghi nhận ca phát hiện
             </p>
-            <h3 className="break-words text-lg font-bold sm:text-xl">Lưu nhật ký bệnh</h3>
+            <h3 className="break-words text-lg font-bold sm:text-xl">
+              Lưu nhật ký bệnh
+            </h3>
           </div>
           <button
             type="button"
@@ -411,66 +404,70 @@ const SaveDiseaseLogModal = ({
                 </div>
               </div>
 
-              <div>
-                <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-                  <label className="text-sm font-semibold text-slate-700">
-                    Thửa ruộng bị ảnh hưởng
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-600">
+                    <MapPin size={12} className="text-slate-400" /> Áp dụng cho
+                    thửa
                   </label>
                   {loggablePlots.length > 0 && (
-                    <label className="inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={selectAllPlots}
-                        className="accent-emerald-600"
-                        onChange={(e) => {
-                          setSelectAllPlots(e.target.checked);
-                          if (e.target.checked) setSelectedPlotIds([]);
-                        }}
-                      />
-                      <span className="truncate">Tất cả các thửa ({loggablePlots.length})</span>
-                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (selectedPlotIds.length === loggablePlots.length) {
+                          setSelectedPlotIds([]);
+                        } else {
+                          setSelectedPlotIds(loggablePlots.map((p) => p._id));
+                        }
+                      }}
+                      className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
+                    >
+                      {selectedPlotIds.length === loggablePlots.length
+                        ? "Bỏ chọn tất cả"
+                        : "Chọn tất cả"}
+                    </button>
                   )}
                 </div>
 
-                <div className="max-h-52 space-y-2 overflow-y-auto rounded-[22px] border border-slate-200 bg-slate-50 p-2">
+                <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
                   {loggablePlots.length === 0 ? (
-                    <p className="p-3 text-sm text-slate-400">
+                    <div className="col-span-2 rounded-xl border border-dashed border-slate-200 bg-white p-4 text-sm text-slate-500">
                       {selectedField
                         ? "Cánh đồng này chưa có thửa canh tác."
                         : "Vui lòng chọn cánh đồng."}
-                    </p>
+                    </div>
                   ) : (
                     loggablePlots.map((plot) => {
-                      const checked =
-                        selectAllPlots || selectedPlotIds.includes(plot._id);
+                      const checked = selectedPlotIds.includes(plot._id);
                       return (
-                        <label
+                        <div
                           key={plot._id}
-                          className={`flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border bg-white px-3 py-3 transition-all ${
+                          onClick={() => togglePlotSelection(plot._id)}
+                          className={`flex cursor-pointer items-center gap-2.5 rounded-xl border px-3 py-2.5 transition-all duration-200 ${
                             checked
-                              ? "border-emerald-300 shadow-sm shadow-emerald-50"
-                              : "border-slate-100 hover:border-slate-200"
+                              ? "border-emerald-400 bg-emerald-50/50"
+                              : "border-slate-200 bg-white hover:border-slate-300"
                           }`}
                         >
-                          <input
-                            type="checkbox"
+                          <CustomCheckbox
                             checked={checked}
-                            className="accent-emerald-600"
-                            onChange={() => togglePlotSelection(plot._id)}
+                            onChange={() => {}}
                           />
                           <div className="min-w-0 flex-1">
                             <p
-                              className={`break-words text-sm font-medium ${checked ? "text-emerald-700" : "text-slate-700"}`}
+                              className={`truncate text-sm font-semibold ${
+                                checked ? "text-emerald-800" : "text-slate-700"
+                              }`}
                             >
                               {plot.name}
                             </p>
-                            {plot.area ? (
-                              <p className="text-xs text-slate-400">
-                                {Number(plot.area).toLocaleString("vi-VN")} m²
-                              </p>
-                            ) : null}
                           </div>
-                        </label>
+                          {plot.area ? (
+                            <span className="text-[10px] font-medium text-slate-400">
+                              {Number(plot.area).toLocaleString("vi-VN")} m²
+                            </span>
+                          ) : null}
+                        </div>
                       );
                     })
                   )}
@@ -483,7 +480,9 @@ const SaveDiseaseLogModal = ({
                     size={17}
                     className="mt-0.5 shrink-0 text-amber-500"
                   />
-                  <p className="min-w-0 break-words text-sm text-amber-800">{confidenceWarning}</p>
+                  <p className="min-w-0 break-words text-sm text-amber-800">
+                    {confidenceWarning}
+                  </p>
                 </div>
               )}
             </div>

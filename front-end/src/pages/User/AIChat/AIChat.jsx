@@ -27,12 +27,7 @@ const getOrCreateTransientSessionId = () => {
 const buildWelcomeMessage = () => ({
   role: "assistant",
   content:
-    "Chào bạn! Tôi là trợ lý AI nông nghiệp. Hãy gửi câu hỏi hoặc kết quả chẩn đoán để tôi tư vấn.",
-});
-
-const buildDiagnosisIntroMessage = () => ({
-  role: "assistant",
-  content: "Đã nhận kết quả chẩn đoán. Tôi sẽ tư vấn dựa trên bệnh vừa quét.",
+    "Chào bà con! Tôi là trợ lý AI nông nghiệp. Hãy gửi câu hỏi hoặc kết quả dự đoán để tôi tư vấn.",
 });
 
 const trimConversationMessages = (messages) =>
@@ -96,9 +91,9 @@ const buildDiagnosisPrompt = (diagnosisResult) => {
       : "";
 
   return [
-    `Tôi vừa quét lá lúa và hệ thống phát hiện bệnh: ${disease} (Độ tin cậy: ${confidence}).`,
-    confidenceWarning,
-    topPredictionText,
+    `Tôi vừa quét lá lúa và hệ thống phát hiện bệnh: ${disease}. `, //(Độ tin cậy: ${confidence}).
+    // confidenceWarning,
+    // topPredictionText,
     "Hãy tư vấn cho tôi hướng xử lý, phòng ngừa và các bước theo dõi.",
   ]
     .filter(Boolean)
@@ -122,16 +117,13 @@ const AIChat = () => {
     const rawScrollY = e.target.scrollTop;
     const maxScroll = e.target.scrollHeight - e.target.clientHeight;
 
-    // Nếu nội dung không có thanh cuộn, luôn hiển thị header
     if (maxScroll <= 0) {
       setShowHeader(true);
       return;
     }
 
-    // Ép giá trị scroll thực vào trong giới hạn [0, maxScroll] để khử quán tính nảy (overscroll/rubber-band bounce) ở đáy hoặc đỉnh màn hình
     const currentScrollY = Math.max(0, Math.min(rawScrollY, maxScroll));
 
-    // Nếu chạm đỉnh thực sự, chắc chắn hiện header
     if (currentScrollY <= 0) {
       setShowHeader(true);
       lastScrollY.current = currentScrollY;
@@ -140,7 +132,6 @@ const AIChat = () => {
 
     const diff = currentScrollY - lastScrollY.current;
 
-    // Ngưỡng 30px để bỏ qua các rung động li ti
     if (Math.abs(diff) < 30) return;
 
     if (diff > 0 && currentScrollY > 80) {
@@ -151,7 +142,9 @@ const AIChat = () => {
     lastScrollY.current = currentScrollY;
   };
 
-  const displayedMessages = [pinnedMessage, ...conversationMessages];
+  const displayedMessages = [pinnedMessage, ...conversationMessages].filter(
+    Boolean,
+  );
 
   const setActiveSessionId = (nextSessionId) => {
     transientChatSessionId = nextSessionId;
@@ -223,7 +216,7 @@ const AIChat = () => {
         const prompt = buildDiagnosisPrompt(location.state.result);
 
         setActiveSessionId(nextSessionId);
-        setPinnedMessage(buildDiagnosisIntroMessage());
+        setPinnedMessage(null);
 
         // Optimistic setup: Show the user's message immediately
         syncConversationMessages([

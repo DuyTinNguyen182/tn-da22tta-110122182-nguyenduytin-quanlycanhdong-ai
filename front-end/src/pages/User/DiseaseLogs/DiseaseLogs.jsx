@@ -1,7 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
-  ClipboardList,
   Edit2,
   ImageIcon,
   Plus,
@@ -12,6 +11,7 @@ import {
   Trash2,
   X,
   RefreshCw,
+  MapPin,
 } from "lucide-react";
 import api from "../../../services/api";
 import { useFeedback } from "../../../hooks/useFeedback";
@@ -25,7 +25,6 @@ const emptyForm = {
   detectedAt: "",
   fieldId: "",
   seasonId: "",
-  scope: "all_plots",
   plotIds: [],
   status: "unprocessed",
   processingNote: "",
@@ -47,11 +46,6 @@ const filterStatusOptions = [
 const formStatusOptions = [
   { value: "unprocessed", label: "Chưa xử lý", dot: "bg-amber-400" },
   { value: "processed", label: "Đã xử lý", dot: "bg-emerald-500" },
-];
-
-const scopeOptions = [
-  { value: "all_plots", label: "Toàn bộ thửa tham gia vụ" },
-  { value: "selected_plots", label: "Chỉ một số thửa" },
 ];
 
 const getStatusMeta = (status) => {
@@ -181,7 +175,6 @@ const DiseaseLogs = () => {
       const res = await api.get("/disease-logs", { params });
       const data = res.data || [];
       setLogs(data);
-      // if returned less than requested, no more available
       setHasMore(Array.isArray(data) ? data.length >= effectiveLimit : false);
     } catch (error) {
       console.error("Lỗi tải nhật ký bệnh", error);
@@ -224,14 +217,18 @@ const DiseaseLogs = () => {
   };
 
   useEffect(() => {
+    let isMounted = true;
     const syncFormSeasonData = async () => {
-      if (!isModalOpen) {
-        setFormSeasons([]);
-        setFormPlots([]);
+      if (!isModalOpen || !form.fieldId) {
+        if (!form.fieldId && isModalOpen) {
+          setFormSeasons([]);
+          setFormPlots([]);
+        }
         return;
       }
 
       const seasons = await loadSeasonsByField(form.fieldId);
+      if (!isMounted) return;
       setFormSeasons(seasons);
 
       const selectedSeasonId =
@@ -240,42 +237,50 @@ const DiseaseLogs = () => {
           : seasons.find((s) => s.status === "active")?._id || "";
 
       const selectedSeason = seasons.find((s) => s._id === selectedSeasonId);
-      // Prefer loggablePlots for active, assignedPlots for others
       const plots = selectedSeason?.loggablePlots?.length
         ? selectedSeason.loggablePlots
         : selectedSeason?.assignedPlots || [];
       setFormPlots(plots);
 
-      setForm((prev) => ({
-        ...prev,
-        seasonId: selectedSeasonId,
-        plotIds:
-          prev.scope === "selected_plots"
-            ? prev.plotIds.filter((id) => plots.some((p) => p._id === id))
-            : [],
-      }));
+      setForm((prev) => {
+        const validIds = prev.plotIds.filter((id) =>
+          plots.some((p) => p._id === id),
+        );
+        return {
+          ...prev,
+          seasonId: selectedSeasonId,
+          plotIds: validIds.length > 0 ? validIds : plots.map((p) => p._id),
+        };
+      });
     };
     syncFormSeasonData();
+    return () => {
+      isMounted = false;
+    };
   }, [isModalOpen, form.fieldId]);
 
   useEffect(() => {
     if (!isModalOpen || !form.seasonId) {
-      setFormPlots([]);
       return;
     }
 
     const selectedSeason = formSeasons.find((s) => s._id === form.seasonId);
+    if (!selectedSeason) return;
+
     const plots = selectedSeason?.loggablePlots?.length
       ? selectedSeason.loggablePlots
       : selectedSeason?.assignedPlots || [];
     setFormPlots(plots);
-    setForm((prev) => ({
-      ...prev,
-      plotIds:
-        prev.scope === "selected_plots"
-          ? prev.plotIds.filter((id) => plots.some((p) => p._id === id))
-          : [],
-    }));
+
+    setForm((prev) => {
+      const validIds = prev.plotIds.filter((id) =>
+        plots.some((p) => p._id === id),
+      );
+      return {
+        ...prev,
+        plotIds: validIds.length > 0 ? validIds : plots.map((p) => p._id),
+      };
+    });
   }, [isModalOpen, form.seasonId, formSeasons]);
 
   const filteredLogs = useMemo(() => {
@@ -334,13 +339,13 @@ const DiseaseLogs = () => {
       fieldId,
       seasonId,
       detectedAt: getLocalDatetime(),
+      plotIds: plots.map((p) => p._id),
       imageFile: null,
     });
     setIsModalOpen(true);
   };
 
   const openEditModal = async (log) => {
-    // Use new field names returned by the updated backend
     const fieldId = log.fieldId || log.field?._id || log.field || "";
     const seasonId = log.seasonId || log.season?._id || log.season || "";
 
@@ -356,14 +361,19 @@ const DiseaseLogs = () => {
     setEditingLog(log);
     setFormSeasons(seasons);
     setFormPlots(plots);
+
+    const initialPlotIds =
+      log.scope === "all_plots"
+        ? plots.map((p) => p._id)
+        : (log.plots || []).map((p) => p._id || String(p));
+
     setForm({
       diseaseName: log.diseaseName || "",
       description: log.description || "",
       detectedAt: log.detectedAt ? getLocalDatetime(log.detectedAt) : "",
       fieldId,
       seasonId,
-      scope: log.scope || "all_plots",
-      plotIds: (log.plots || []).map((p) => p._id || String(p)),
+      plotIds: initialPlotIds,
       status: log.status || "unprocessed",
       processingNote: log.processingNote || "",
       source: log.source || "manual",
@@ -391,14 +401,16 @@ const DiseaseLogs = () => {
       toast.warning("Vui lòng nhập tên bệnh.");
       return;
     }
-    if (
-      !isHistoricalEdit &&
-      form.scope === "selected_plots" &&
-      form.plotIds.length === 0
-    ) {
+    if (!isHistoricalEdit && form.plotIds.length === 0) {
       toast.warning("Vui lòng chọn ít nhất 1 thửa.");
       return;
     }
+
+    const allPlotIds = formPlots.map((p) => p._id);
+    const isAllSelected =
+      allPlotIds.length > 0 &&
+      form.plotIds.length === allPlotIds.length &&
+      allPlotIds.every((id) => form.plotIds.includes(id));
 
     const payload = {
       diseaseName: form.diseaseName,
@@ -406,8 +418,8 @@ const DiseaseLogs = () => {
       detectedAt: form.detectedAt,
       fieldId: form.fieldId,
       seasonId: form.seasonId,
-      scope: form.scope,
-      plotIds: form.scope === "selected_plots" ? form.plotIds : [],
+      scope: isAllSelected ? "all_plots" : "selected_plots",
+      plotIds: form.plotIds,
       status: form.status,
       processingNote: form.processingNote,
       source: editingLog?.source || "manual",
@@ -457,8 +469,7 @@ const DiseaseLogs = () => {
   const handleDelete = async (id) => {
     const confirmed = await confirm({
       title: "Xóa nhật ký bệnh?",
-      message:
-        "Nhật ký của vụ đã kết thúc sẽ không thể xóa. Với vụ đang hoạt động, thao tác này sẽ xóa bản ghi hiện tại.",
+      message: "Thao tác này sẽ xóa bản ghi hiện tại. Bạn có muốn xóa?",
       confirmText: "Xóa nhật ký",
       tone: "danger",
     });
@@ -507,8 +518,6 @@ const DiseaseLogs = () => {
     await loadDiseaseLogs(defaultFilters, 5);
   };
 
-  // â”€â”€ Render â”€â”€
-
   return (
     <div className="app-page-shell page-scroll-shell overflow-y-auto bg-gray-50 p-3 md:p-4 lg:p-5">
       {/* Header */}
@@ -527,8 +536,6 @@ const DiseaseLogs = () => {
           <Plus size={16} /> Thêm nhật ký
         </button>
       </div>
-
-      {/* (Pager moved below list) */}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-2.5 md:gap-3">
@@ -731,9 +738,7 @@ const DiseaseLogs = () => {
                   </div>
                 </div>
 
-                {/* Body: info + optional image */}
                 <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                  {/* Info grid */}
                   <div className="grid flex-1 grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                     <div className="rounded-xl bg-gray-50/80 p-3 ring-1 ring-gray-100">
                       <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
@@ -771,7 +776,6 @@ const DiseaseLogs = () => {
                     </div>
                   </div>
 
-                  {/* Image thumbnail if from AI scan */}
                   {log.imageUrl && (
                     <a
                       href={log.imageUrl}
@@ -803,7 +807,6 @@ const DiseaseLogs = () => {
         )}
       </div>
 
-      {/* Load more / pager (moved below list) */}
       <div className="mt-4 flex flex-col items-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
         <p className="text-sm text-gray-500">
           Đang hiển thị {filteredLogs.length} mục.
@@ -825,11 +828,9 @@ const DiseaseLogs = () => {
         )}
       </div>
 
-      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
           <div className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-dropdown-enter">
-            {/* Gradient header */}
             <div className="flex shrink-0 items-center justify-between bg-gradient-to-r from-emerald-600 to-emerald-700 px-6 py-4">
               <div>
                 <h3 className="text-base font-bold text-white">
@@ -914,7 +915,6 @@ const DiseaseLogs = () => {
                       setForm((prev) => ({
                         ...prev,
                         fieldId: val,
-                        plotIds: [],
                       }))
                     }
                     options={fieldFormOptions}
@@ -957,24 +957,6 @@ const DiseaseLogs = () => {
                     }
                     options={formStatusOptions}
                     placeholder="Chọn trạng thái"
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-gray-500">
-                    Phạm vi ghi nhận
-                  </label>
-                  <CustomDropdown
-                    value={form.scope}
-                    onChange={(val) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        scope: val,
-                        plotIds: val === "all_plots" ? [] : prev.plotIds,
-                      }))
-                    }
-                    options={scopeOptions}
-                    placeholder="Chọn phạm vi"
                     className="w-full"
                   />
                 </div>
@@ -1068,62 +1050,90 @@ const DiseaseLogs = () => {
                 </div>
               </div>
 
-              {form.scope === "selected_plots" && (
-                <div className="mt-3.5">
-                  <div className="mb-2 flex items-center gap-2">
-                    <ClipboardList size={14} className="text-gray-500" />
-                    <p className="text-xs font-bold uppercase tracking-wider text-gray-500">
-                      Chọn thửa bị ảnh hưởng
-                    </p>
-                  </div>
-                  <div className="grid max-h-48 gap-2 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50/50 p-2 md:grid-cols-2">
-                    {formPlots.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-500">
-                        Chưa có thửa nào tham gia mùa vụ này.
-                      </div>
-                    ) : (
-                      formPlots.map((plot) => {
-                        const checked = form.plotIds.includes(plot._id);
-                        return (
-                          <div
-                            key={plot._id}
-                            onClick={() => {
-                              if (!isHistoricalEdit) togglePlot(plot._id);
-                            }}
-                            className={`flex items-center gap-2.5 rounded-xl border p-2.5 transition-all duration-200 ${
-                              checked
-                                ? "border-emerald-300 bg-white shadow-sm shadow-emerald-50"
-                                : "border-gray-200 bg-white"
-                            } ${isHistoricalEdit ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:border-gray-300"}`}
-                          >
-                            <CustomCheckbox
-                              checked={checked}
-                              disabled={isHistoricalEdit}
-                              onChange={() => {
-                                if (!isHistoricalEdit) togglePlot(plot._id);
-                              }}
-                            />
-                            <div className="min-w-0">
-                              <p
-                                className={`truncate text-sm font-semibold ${checked ? "text-emerald-700" : "text-gray-700"}`}
-                              >
-                                {plot.name}
-                              </p>
-                              <p className="text-[11px] text-gray-400">
-                                {Number(plot.area || 0).toLocaleString("vi-VN")}{" "}
-                                m²
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
+              {/* Row: Áp dụng cho thửa */}
+              <div className="mt-3.5 rounded-xl border border-gray-100 bg-gray-50 p-3.5">
+                <div className="mb-3 flex items-center justify-between">
+                  <label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-gray-600">
+                    <MapPin size={12} className="text-gray-400" /> Áp dụng cho
+                    thửa
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isHistoricalEdit) {
+                        const allIds = formPlots.map((p) => p._id);
+                        const isAll = form.plotIds.length === allIds.length;
+                        setForm((prev) => ({
+                          ...prev,
+                          plotIds: isAll ? [] : allIds,
+                        }));
+                      }
+                    }}
+                    disabled={isHistoricalEdit}
+                    className={`text-xs font-semibold ${
+                      isHistoricalEdit
+                        ? "cursor-not-allowed text-gray-400"
+                        : "text-emerald-600 hover:text-emerald-700 hover:underline"
+                    }`}
+                  >
+                    {formPlots.length > 0 &&
+                    form.plotIds.length === formPlots.length
+                      ? "Bỏ chọn tất cả"
+                      : "Chọn tất cả"}
+                  </button>
                 </div>
-              )}
+
+                <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+                  {formPlots.length === 0 ? (
+                    <div className="col-span-2 rounded-xl border border-dashed border-gray-200 bg-white p-4 text-sm text-gray-500">
+                      Chưa có thửa nào tham gia mùa vụ này.
+                    </div>
+                  ) : (
+                    formPlots.map((plot) => {
+                      const checked = form.plotIds.includes(plot._id);
+                      return (
+                        <div
+                          key={plot._id}
+                          onClick={() => {
+                            if (!isHistoricalEdit) togglePlot(plot._id);
+                          }}
+                          className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-all duration-200 ${
+                            checked
+                              ? "border-emerald-400 bg-emerald-50/50"
+                              : "border-gray-200 bg-white hover:border-gray-300"
+                          } ${
+                            isHistoricalEdit
+                              ? "cursor-not-allowed opacity-50"
+                              : "cursor-pointer"
+                          }`}
+                        >
+                          <CustomCheckbox
+                            checked={checked}
+                            disabled={isHistoricalEdit}
+                            onChange={() => {
+                              // Đã xử lý onClick ở div bọc ngoài
+                            }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`truncate text-sm font-semibold ${
+                                checked ? "text-emerald-800" : "text-gray-700"
+                              }`}
+                            >
+                              {plot.name}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-medium text-gray-400">
+                            {Number(plot.area || 0).toLocaleString("vi-VN")} m²
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             </div>
 
-            {/* Sticky footer for buttons */}
             <div className="flex shrink-0 justify-end gap-2.5 border-t border-gray-100 bg-gray-50 px-6 py-4">
               <button
                 type="button"

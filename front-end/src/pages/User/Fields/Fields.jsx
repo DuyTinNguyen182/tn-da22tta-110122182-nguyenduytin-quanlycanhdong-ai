@@ -635,12 +635,22 @@ const Fields = () => {
                 />
               </div>
 
-              <button
-                onClick={handleSavePlot}
-                className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-lg"
-              >
-                {editingPlot ? "Lưu thay đổi" : "Tạo thửa ruộng"}
-              </button>
+              <div className="mt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsPlotModalOpen(false)}
+                  className="w-full rounded-xl bg-gray-100 py-3 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePlot}
+                  className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white shadow-md shadow-emerald-200 transition-all hover:bg-emerald-700 hover:shadow-lg"
+                >
+                  {editingPlot ? "Lưu thay đổi" : "Tạo thửa ruộng"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
