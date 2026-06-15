@@ -109,9 +109,9 @@ const FieldRelationsDrawer = ({
       );
       const farmerMatches = farmerHaystack.includes(normalizedKeyword);
       const matchingPlots = group.plots.filter((plot) =>
-        normalizeText([plot.name, plot.status].filter(Boolean).join(" ")).includes(
-          normalizedKeyword,
-        ),
+        normalizeText(
+          [plot.name, plot.status].filter(Boolean).join(" "),
+        ).includes(normalizedKeyword),
       );
 
       if (farmerMatches) {
@@ -159,8 +159,8 @@ const FieldRelationsDrawer = ({
 
   const allVisibleExpanded =
     Boolean(normalizedKeyword) ||
-    allVisibleFarmerIds.length > 0 &&
-      allVisibleFarmerIds.every((id) => expandedFarmerIds.includes(id));
+    (allVisibleFarmerIds.length > 0 &&
+      allVisibleFarmerIds.every((id) => expandedFarmerIds.includes(id)));
 
   const toggleFarmer = (farmerId) => {
     setExpandedState((prev) => {
@@ -281,7 +281,9 @@ const FieldRelationsDrawer = ({
               <button
                 type="button"
                 onClick={toggleAllVisible}
-                disabled={filteredGroups.length === 0 || Boolean(normalizedKeyword)}
+                disabled={
+                  filteredGroups.length === 0 || Boolean(normalizedKeyword)
+                }
                 className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:text-gray-300"
               >
                 {normalizedKeyword
@@ -368,7 +370,8 @@ const FieldRelationsDrawer = ({
                       </div>
 
                       <div className="flex items-center justify-between gap-3 lg:justify-end">
-                        {normalizedKeyword && displayPlots.length !== group.plotCount ? (
+                        {normalizedKeyword &&
+                        displayPlots.length !== group.plotCount ? (
                           <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
                             Khớp {displayPlots.length} thửa
                           </span>
@@ -419,12 +422,12 @@ const FieldRelationsDrawer = ({
                                     <p className="truncate text-sm font-semibold text-gray-900">
                                       {plot.name}
                                     </p>
-                                    {plot.imageUrl ? (
+                                    {/* {plot.imageUrl ? (
                                       <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-sky-600">
                                         <ImageIcon size={11} />
                                         Có ảnh
                                       </p>
-                                    ) : null}
+                                    ) : null} */}
                                   </div>
                                 </div>
 

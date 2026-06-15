@@ -1,18 +1,36 @@
 import React from "react";
+import { X } from "lucide-react";
 
-const FieldModal = ({ open, editingField, fieldForm, onChange, onClose, onSave }) => {
+const FieldModal = ({
+  open,
+  editingField,
+  fieldForm,
+  onChange,
+  onClose,
+  onSave,
+}) => {
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
+      <div className="relative w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl">
         <h2 className="mb-6 text-2xl font-bold text-gray-800">
           {editingField ? "Chỉnh sửa cánh đồng" : "Thêm cánh đồng mới"}
         </h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-6 top-6 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          aria-label="Đóng form"
+        >
+          <X size={18} />
+        </button>
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Tên cánh đồng</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Tên cánh đồng
+            </label>
             <input
               type="text"
               value={fieldForm.name}

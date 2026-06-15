@@ -230,7 +230,7 @@ const AdminSeasonDetails = () => {
             Quản lý chi tiết mùa vụ
           </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Lên lịch và quản lý thời gian diễn ra của các vụ mưa
+            Lên lịch và quản lý thời gian diễn ra của các mùa vụ
           </p>
         </div>
 

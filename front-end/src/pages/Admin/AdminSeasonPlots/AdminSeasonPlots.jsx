@@ -360,7 +360,7 @@ const AdminSeasonPlots = () => {
           </p>
         </div>
 
-        <button
+        {/* <button
           type="button"
           onClick={fetchData}
           disabled={loading || submitting}
@@ -368,7 +368,7 @@ const AdminSeasonPlots = () => {
         >
           <RefreshCcw size={16} />
           Làm mới
-        </button>
+        </button> */}
       </div>
 
       {loading ? (
