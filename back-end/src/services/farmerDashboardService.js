@@ -50,7 +50,7 @@ const resolveSeasonDetail = async (querySeasonDetailId) => {
   return activeSeasonDetail || null;
 };
 
-// ĐÃ THÊM: Hàm lấy thông tin vụ trước
+// Hàm lấy thông tin vụ trước
 const getPreviousSeasonDetail = async (currentSeasonDetail) => {
   if (!currentSeasonDetail) return null;
   return await SeasonDetail.findOne({
@@ -113,8 +113,8 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
   const [
     userAreaResult,
     userCostResult,
-    prevAreaResult, // Thay thế allAreaResult
-    prevCostResult, // Thay thế allCostResult
+    prevAreaResult,
+    prevCostResult,
     costByCategory,
     costByStage,
     cropProgress,
@@ -141,7 +141,7 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
         ])
       : Promise.resolve([{ totalCost: 0 }]),
 
-    // Diện tích vụ trước (Của riêng nông dân này)
+    // Diện tích vụ trước
     prevUserPlotIds.length
       ? Plot.aggregate([
           {
@@ -152,7 +152,7 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
           { $group: { _id: null, totalArea: { $sum: "$area" } } },
         ])
       : Promise.resolve([{ totalArea: 0 }]),
-    // Chi phí vụ trước (Của riêng nông dân này)
+    // Chi phí vụ trước
     prevUserAssignmentIds.length
       ? FarmingLog.aggregate([
           {
@@ -165,7 +165,7 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
         ])
       : Promise.resolve([{ totalCost: 0 }]),
 
-    // Biểu đồ: Chi phí theo danh mục (Của riêng user)
+    // Biểu đồ: Chi phí theo danh mục
     userAssignmentIds.length
       ? FarmingLog.aggregate([
           {
@@ -388,13 +388,13 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
 
     if (diffPercent < -5) {
       comparisonText = `Tiết kiệm hơn ${Math.abs(diffPercent).toFixed(1)}% so với vụ trước`;
-      comparisonType = "good"; // Xanh lá (tốt vì tiết kiệm chi phí)
+      comparisonType = "good";
     } else if (diffPercent > 5) {
       comparisonText = `Cao hơn ${diffPercent.toFixed(1)}% so với vụ trước`;
-      comparisonType = "bad"; // Đỏ (cảnh báo lố ngân sách)
+      comparisonType = "bad";
     } else {
       comparisonText = `Đang bám sát mức chi tiêu của vụ trước`;
-      comparisonType = "neutral"; // Xám
+      comparisonType = "neutral";
     }
   } else if (userCostPer1000 > 0) {
     comparisonText = "Vụ đầu tiên ghi nhận chi phí trên hệ thống";
@@ -416,30 +416,43 @@ const getFarmerDashboardData = async (userId, querySeasonDetailId = "") => {
   };
 };
 
-const getDailyRecommendations = async (farmerId) => {
+const getDailyRecommendations = async (farmerId, querySeasonDetailId = "") => {
   try {
     const now = new Date();
 
-    const activeSeasonDetail = await SeasonDetail.findOne({
-      startDate: { $lte: now },
-      $or: [{ endDate: null }, { endDate: { $gte: now } }],
-    }).lean();
+    const seasonDetail = await resolveSeasonDetail(querySeasonDetailId);
 
-    if (!activeSeasonDetail) return { hasActiveSeason: false, data: [] };
+    // Nếu hệ thống hoàn toàn không có mùa vụ nào
+    if (!seasonDetail) {
+      return { hasActiveSeason: false, isSeasonEnded: false, data: [] };
+    }
 
+    // 2. Xác định xem mùa vụ được chọn đã kết thúc hay chưa
+    const isSeasonEnded = seasonDetail.endDate
+      ? new Date(seasonDetail.endDate) < now
+      : false;
+
+    // 3. NẾU ĐÃ KẾT THÚC: Trả về cờ isSeasonEnded = true và ngừng tính toán (bảo vệ tài nguyên server)
+    if (isSeasonEnded) {
+      return { hasActiveSeason: true, isSeasonEnded: true, data: [] };
+    }
+
+    // 4. Nếu chưa kết thúc, tìm kiếm các assignment của farmer trong mùa vụ đó
     const assignments = await SeasonPlotAssignment.find({
-      seasonDetail: activeSeasonDetail._id,
+      seasonDetail: seasonDetail._id,
       user: farmerId,
       status: "active",
     })
       .populate("plot", "name")
       .lean();
 
-    if (!assignments.length) return { hasActiveSeason: true, data: [] };
+    if (!assignments.length)
+      return { hasActiveSeason: true, isSeasonEnded: false, data: [] };
 
     const sowingTask = await Task.findOne({
       "recommendation.isSowingTask": true,
     }).lean();
+
     const allPrepTasks = await Task.find({
       "recommendation.isSuggested": true,
       "recommendation.startDay": { $lt: 0 },
@@ -463,6 +476,7 @@ const getDailyRecommendations = async (farmerId) => {
       })
         .select("task date createdAt")
         .lean();
+
       const completedTaskIds = new Set(
         completedLogs.map((log) => String(log.task)),
       );
@@ -509,7 +523,8 @@ const getDailyRecommendations = async (farmerId) => {
           }
         }
       } else {
-        if (now >= new Date(activeSeasonDetail.startDate)) {
+        // ĐÃ SỬA: Thay đổi activeSeasonDetail.startDate thành seasonDetail.startDate
+        if (now >= new Date(seasonDetail.startDate)) {
           let pendingPrepCount = 0;
 
           for (const task of allPrepTasks) {
@@ -556,7 +571,11 @@ const getDailyRecommendations = async (farmerId) => {
       }
     }
 
-    return { hasActiveSeason: true, data: recommendations };
+    return {
+      hasActiveSeason: true,
+      isSeasonEnded: false,
+      data: recommendations,
+    };
   } catch (error) {
     throw new Error(`Lỗi khi tạo gợi ý: ${error.message}`);
   }

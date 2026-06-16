@@ -22,7 +22,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-  Legend, // ĐÃ THÊM: Import Legend từ recharts
+  Legend,
 } from "recharts";
 import LoadingScreen from "../../../components/Layout/LoadingScreen";
 import CustomDropdown from "../../../components/UI/CustomDropdown";
@@ -431,7 +431,7 @@ const FarmerDashboard = () => {
           </div>
         </div>
 
-        {/* ROW 3: Tiến độ canh tác*/}
+        {/* ROW 3: Tiến độ canh tác & Trợ lý */}
         <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
           <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm flex flex-col h-full">
             <div className="mb-2 flex items-center gap-2">
@@ -447,7 +447,6 @@ const FarmerDashboard = () => {
               <EmptyBlock text="Chưa bắt đầu làm đất." />
             ) : (
               <div className="w-full flex-1 min-h-[150px] overflow-hidden">
-                {/* Tính toán chiều cao linh hoạt tránh bị rỗng khoảng không */}
                 <div
                   style={{
                     height: Math.max(100, charts.cropProgress.length * 40 + 40),
@@ -500,8 +499,8 @@ const FarmerDashboard = () => {
             )}
           </div>
 
-          {/* Cảnh báo dịch bệnh / Trợ lý sinh học */}
-          <AssistantCard />
+          {/* Cảnh báo dịch bệnh / Trợ lý sinh học - ĐÃ TRUYỀN SELECTED SEASON ID */}
+          <AssistantCard selectedSeasonId={selectedSeasonId} />
         </div>
       </div>
     </div>

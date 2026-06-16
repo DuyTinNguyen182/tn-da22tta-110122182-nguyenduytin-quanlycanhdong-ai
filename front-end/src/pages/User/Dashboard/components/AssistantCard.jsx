@@ -3,10 +3,11 @@ import { CheckCircle2, ChevronRight, Sparkles, X, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../../services/api";
 
-const SmartAssistantCard = () => {
+const SmartAssistantCard = ({ selectedSeasonId }) => {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [hasActiveSeason, setHasActiveSeason] = useState(true); // Thêm state quản lý mùa vụ
+  const [hasActiveSeason, setHasActiveSeason] = useState(true);
+  const [isSeasonEnded, setIsSeasonEnded] = useState(false); // Quản lý trạng thái mùa vụ đã kết thúc
 
   // State điều khiển Popup Xem tất cả
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,20 +16,28 @@ const SmartAssistantCard = () => {
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        const res = await api.get("/farmer-dashboard/recommendations");
+        setLoading(true); // Bật trạng thái loading khi đổi mùa vụ dữ liệu mới
+
+        // Gửi kèm tham số lọc seasonId lên API
+        const res = await api.get("/farmer-dashboard/recommendations", {
+          params: selectedSeasonId ? { seasonId: selectedSeasonId } : {},
+        });
 
         let rawData = [];
         let active = true;
+        let ended = false;
 
-        // Xử lý đọc data tương thích với API mới
+        // Xử lý đọc dữ liệu tương thích với API
         if (res.data && !Array.isArray(res.data)) {
           rawData = res.data.data || [];
           active = res.data.hasActiveSeason ?? true;
+          ended = res.data.isSeasonEnded ?? false;
         } else {
           rawData = res.data || [];
         }
 
         setHasActiveSeason(active);
+        setIsSeasonEnded(ended);
 
         const grouped = rawData.reduce((acc, curr) => {
           if (!acc[curr.taskId]) {
@@ -52,35 +61,35 @@ const SmartAssistantCard = () => {
 
         setRecommendations(groupedArray);
       } catch (error) {
-        console.error("Lỗi tải gợi ý:", error);
+        console.error("Lỗi tải gợi ý công việc:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchRecommendations();
-  }, []);
+  }, [selectedSeasonId]);
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm animate-pulse h-32">
+      <div className="flex h-full flex-col rounded-2xl border border-emerald-100 bg-white p-3 shadow-sm animate-pulse min-h-[180px]">
         <div className="h-4 w-1/2 bg-gray-200 rounded mb-3"></div>
         <div className="h-12 bg-gray-100 rounded mb-2"></div>
       </div>
     );
   }
 
-  // ĐÃ SỬA: Thông báo riêng khi KHÔNG CÓ mùa vụ
+  // Khối thông báo riêng khi KHÔNG CÓ mùa vụ nào đang hoạt động
   if (!hasActiveSeason) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-3 shadow-sm">
+      <div className="flex h-full flex-col rounded-2xl border border-gray-200 bg-gray-50 p-3 shadow-sm min-h-[180px]">
         <div className="flex items-center gap-2 mb-1.5">
           <div className="rounded-xl bg-white p-1.5 shadow-sm border border-gray-100 text-gray-500">
             <Info className="h-4 w-4" />
           </div>
           <h2 className="text-sm font-bold text-gray-700">Gợi ý công việc</h2>
         </div>
-        <p className="text-xs text-gray-500 ml-9 leading-relaxed">
+        <p className="text-xs text-gray-500 ml-9 leading-relaxed flex-1">
           Chưa có mùa vụ nào đang hoạt động. Hãy chờ Hợp tác xã cấu hình mùa vụ
           mới nhé.
         </p>
@@ -88,10 +97,28 @@ const SmartAssistantCard = () => {
     );
   }
 
-  // Thông báo khi CÓ mùa vụ nhưng ruộng đang ổn (không có việc cần làm)
+  // Khối thông báo riêng khi chọn xem MÙA VỤ CŨ ĐÃ KẾT THÚC
+  if (isSeasonEnded) {
+    return (
+      <div className="flex h-full flex-col rounded-2xl border border-amber-100 bg-amber-50/40 p-3 shadow-sm min-h-[180px]">
+        <div className="flex items-center gap-2 mb-1.5">
+          <div className="rounded-xl bg-white p-1.5 shadow-sm border border-amber-100 text-amber-600">
+            <Info className="h-4 w-4" />
+          </div>
+          <h2 className="text-sm font-bold text-amber-800">Gợi ý công việc</h2>
+        </div>
+        <p className="text-xs text-amber-700 ml-9 leading-relaxed flex-1">
+          Mùa vụ này đã kết thúc tốt đẹp. Bạn có thể chọn mùa vụ hiện tại (nếu
+          có) để xem gợi ý công việc.
+        </p>
+      </div>
+    );
+  }
+
+  // Thông báo khi CÓ mùa vụ nhưng ruộng đang ổn ổn định (Không có việc đến hạn)
   if (recommendations.length === 0) {
     return (
-      <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-3 shadow-sm">
+      <div className="flex h-full flex-col rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-3 shadow-sm min-h-[180px]">
         <div className="flex items-center gap-2 mb-1.5">
           <div className="rounded-xl bg-white p-1.5 shadow-sm border border-emerald-100 text-emerald-600">
             <CheckCircle2 className="h-4 w-4" />
@@ -100,7 +127,7 @@ const SmartAssistantCard = () => {
             Gợi ý công việc
           </h2>
         </div>
-        <p className="text-xs text-emerald-700 ml-9 leading-relaxed">
+        <p className="text-xs text-emerald-700 ml-9 leading-relaxed flex-1">
           Đồng ruộng đang phát triển rất tốt. Hiện chưa có công việc nào tới hạn
           cần xử lý ngay.
         </p>
@@ -113,7 +140,8 @@ const SmartAssistantCard = () => {
 
   return (
     <>
-      <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-3 shadow-sm relative overflow-hidden">
+      {/* Container chính bọc ngoài sử dụng flex flex-col h-full */}
+      <div className="flex flex-col h-full rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-3 shadow-sm relative overflow-hidden min-h-[180px]">
         <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-yellow-200/50 blur-2xl"></div>
 
         <div className="flex items-center gap-2 mb-2.5 relative z-10">
@@ -130,7 +158,8 @@ const SmartAssistantCard = () => {
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 relative z-10">
+        {/* Thân danh sách: flex-1 chiếm toàn bộ khoảng trống đẩy footer luôn neo ở đáy */}
+        <div className="flex-1 flex flex-col gap-2 relative z-10 mb-3">
           {topRecommendations.map((rec, index) => (
             <div
               key={index}
@@ -158,8 +187,8 @@ const SmartAssistantCard = () => {
           ))}
         </div>
 
-        {/* FOOTER: Nút Tiến hành và Xem tất cả */}
-        <div className="mt-3 flex items-center justify-between relative z-10 border-t border-emerald-200/60 pt-2.5">
+        {/* Footer chứa nút bấm: luôn nằm ở dưới cùng nhờ khối flex-1 phía trên */}
+        <div className="mt-auto flex items-center justify-between relative z-10 border-t border-emerald-200/60 pt-2.5">
           {hasMore ? (
             <button
               onClick={() => setIsModalOpen(true)}
