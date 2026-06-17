@@ -230,7 +230,136 @@ const getLogsBySeason = async (seasonId, userId, fieldId = null) => {
   return logs.map(mapLogOutput);
 };
 
+// 1. Ràng buộc ngày tương lai và chi phí âm
+const validateBasicInputs = (date, cost) => {
+  if (date) {
+    const inputDate = new Date(date);
+    inputDate.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (inputDate > today) {
+      throw new Error("Không thể ghi nhật ký cho một ngày trong tương lai.");
+    }
+  }
+
+  if (cost !== undefined && Number(cost) < 0) {
+    throw new Error(
+      "Chi phí không hợp lệ. Vui lòng nhập số lớn hơn hoặc bằng 0.",
+    );
+  }
+};
+
+// 2. Ràng buộc ngày thực hiện phải nằm trong vụ mùa
+const validateDateWithinSeason = (date, season) => {
+  const logDate = new Date(date);
+  logDate.setHours(0, 0, 0, 0);
+
+  if (season.startDate) {
+    const sDate = new Date(season.startDate);
+    sDate.setHours(0, 0, 0, 0);
+    if (logDate < sDate) {
+      throw new Error("Ngày thực hiện không được trước ngày bắt đầu vụ mùa.");
+    }
+  }
+  if (season.endDate) {
+    const eDate = new Date(season.endDate);
+    eDate.setHours(23, 59, 59, 999);
+    if (logDate > eDate) {
+      throw new Error("Ngày thực hiện không được sau ngày kết thúc vụ mùa.");
+    }
+  }
+};
+
+// 3. Ràng buộc thứ tự thời gian
+const validateChronologicalOrder = async (
+  date,
+  seasonPlotAssignmentIds,
+  excludeLogId = null,
+  originalDate = null,
+) => {
+  const newDate = new Date(date);
+  newDate.setHours(0, 0, 0, 0);
+
+  const pastQuery = {
+    seasonPlotAssignments: { $in: seasonPlotAssignmentIds },
+  };
+
+  if (excludeLogId) {
+    pastQuery._id = { $ne: excludeLogId };
+    if (originalDate) {
+      // Thiết lập mốc cuối ngày của ngày gốc
+      const origDateEnd = new Date(originalDate);
+      origDateEnd.setHours(23, 59, 59, 999);
+
+      // Tìm các công việc diễn ra TRƯỚC hoặc TRONG CÙNG NGÀY
+      pastQuery.date = { $lte: origDateEnd };
+    }
+  }
+
+  // KIỂM TRA GIỚI HẠN DƯỚI: Không nhỏ hơn công việc diễn ra trước nó
+  const previousLog = await DiaryLog.findOne(pastQuery)
+    .sort({ date: -1 })
+    .lean();
+
+  if (previousLog) {
+    const prevDate = new Date(previousLog.date);
+    prevDate.setHours(0, 0, 0, 0);
+    if (newDate < prevDate) {
+      throw new Error(
+        `Ngày thực hiện không được nhỏ hơn công việc trước đó (${prevDate.toLocaleDateString("vi-VN")}).`,
+      );
+    }
+  }
+
+  // KIỂM TRA GIỚI HẠN TRÊN: Chỉ chặn khi có log ở NGÀY HÔM SAU trở đi
+  if (excludeLogId && originalDate) {
+    const origDateEnd = new Date(originalDate);
+    origDateEnd.setHours(23, 59, 59, 999);
+
+    const futureQuery = {
+      seasonPlotAssignments: { $in: seasonPlotAssignmentIds },
+      _id: { $ne: excludeLogId },
+      date: { $gt: origDateEnd },
+    };
+
+    const nextLog = await DiaryLog.findOne(futureQuery)
+      .sort({ date: 1 })
+      .lean();
+
+    if (nextLog) {
+      const nextDate = new Date(nextLog.date);
+      nextDate.setHours(0, 0, 0, 0);
+      if (newDate > nextDate) {
+        throw new Error(
+          `Ngày thực hiện không được lớn hơn công việc kế tiếp sau nó (${nextDate.toLocaleDateString("vi-VN")}).`,
+        );
+      }
+    }
+  }
+};
+
+// 4. Ràng buộc không được xóa nếu có công việc sau nó
+const validateNoSubsequentTaskForDeletion = async (logToDelete) => {
+  const origDateEnd = new Date(logToDelete.date);
+  origDateEnd.setHours(23, 59, 59, 999);
+
+  const query = {
+    seasonPlotAssignments: { $in: logToDelete.seasonPlotAssignments },
+    date: { $gt: origDateEnd }, // Chỉ chặn xóa nếu có công việc ở NGÀY HÔM SAU
+  };
+
+  const newerLog = await DiaryLog.findOne(query).lean();
+  if (newerLog) {
+    throw new Error(
+      "Không thể xóa do đã có công việc khác thực hiện sau ngày này. Vui lòng xóa các công việc mới hơn trước.",
+    );
+  }
+};
 const createLog = async (data, userId) => {
+  validateBasicInputs(data.date, data.cost);
+
   const seasonValue = data.seasonId || data.season;
   const resolvedTaskId = await resolveTaskId({
     taskId: data.taskId || data.task,
@@ -240,6 +369,7 @@ const createLog = async (data, userId) => {
 
   const season = await getSeasonForUser(seasonValue);
   ensureActiveSeasonForMutation(season, "thêm");
+  validateDateWithinSeason(data.date, season);
 
   const requestedScope =
     data.scope === "selected_plots"
@@ -263,9 +393,9 @@ const createLog = async (data, userId) => {
     (assignment) => assignment._id,
   );
 
+  await validateChronologicalOrder(data.date, assignmentIds);
   await validateRepetitionConstraint(resolvedTaskId, assignmentIds);
   await validatePrerequisiteConstraint(resolvedTaskId, assignmentIds);
-  // --------------------------------------
 
   const created = await DiaryLog.create({
     task: resolvedTaskId,
@@ -290,6 +420,11 @@ const updateLog = async (id, data, userId) => {
     throw new Error("Không tìm thấy nhật ký");
   }
 
+  validateBasicInputs(
+    data.date || existingLog.date,
+    data.cost !== undefined ? data.cost : existingLog.cost,
+  );
+
   const seasonId = getSeasonIdFromLog(existingLog);
   if (!seasonId) {
     throw new Error("Nhật ký không còn liên kết vụ mùa hợp lệ");
@@ -297,6 +432,8 @@ const updateLog = async (id, data, userId) => {
 
   const season = await getSeasonForUser(seasonId);
   ensureActiveSeasonForMutation(season, "chinh sua");
+
+  validateDateWithinSeason(data.date || existingLog.date, season);
 
   const updateData = { ...data };
   const existingPlotIds = (existingLog.seasonPlotAssignments || [])
@@ -363,9 +500,14 @@ const updateLog = async (id, data, userId) => {
   );
 
   const taskToValidate = updateData.task || existingLog.task._id;
-  const assignmentsToValidate =
-    updateData.seasonPlotAssignments ||
-    (existingLog.seasonPlotAssignments || []).map((a) => a._id);
+  const assignmentsToValidate = updateData.seasonPlotAssignments;
+
+  await validateChronologicalOrder(
+    data.date || existingLog.date,
+    assignmentsToValidate,
+    id,
+    existingLog.date,
+  );
 
   await validateRepetitionConstraint(taskToValidate, assignmentsToValidate, id);
   await validatePrerequisiteConstraint(taskToValidate, assignmentsToValidate);
@@ -393,6 +535,8 @@ const deleteLog = async (id, userId) => {
   if (!seasonId) {
     throw new Error("Nhật ký không còn liên kết vụ mùa hợp lệ");
   }
+
+  await validateNoSubsequentTaskForDeletion(existingLog);
 
   const season = await getSeasonForUser(seasonId);
   ensureActiveSeasonForMutation(season, "xoa");

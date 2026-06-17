@@ -218,6 +218,43 @@ const SaveDiseaseLogModal = ({
       return;
     }
 
+    if (!detectedDate) {
+      toast.warning("Vui lòng nhập ngày giờ phát hiện bệnh.");
+      return;
+    }
+
+    const inputDate = new Date(detectedDate);
+    const now = new Date();
+
+    if (inputDate > now) {
+      toast.warning("Ngày giờ phát hiện bệnh không được trong tương lai.");
+      return;
+    }
+
+    if (currentSeason) {
+      if (currentSeason.startDate) {
+        const startDate = new Date(currentSeason.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        if (inputDate < startDate) {
+          toast.warning(
+            `Ngày phát hiện bệnh không được trước ngày bắt đầu vụ mùa (${startDate.toLocaleDateString("vi-VN")}).`,
+          );
+          return;
+        }
+      }
+
+      if (currentSeason.endDate) {
+        const endDate = new Date(currentSeason.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        if (inputDate > endDate) {
+          toast.warning(
+            `Ngày phát hiện bệnh không được sau ngày kết thúc vụ mùa (${endDate.toLocaleDateString("vi-VN")}).`,
+          );
+          return;
+        }
+      }
+    }
+
     if (selectedPlotIds.length === 0) {
       toast.warning("Vui lòng chọn ít nhất 1 thửa.");
       return;
@@ -397,6 +434,7 @@ const SaveDiseaseLogModal = ({
                   />
                   <input
                     type="datetime-local"
+                    max={getLocalDatetime()}
                     value={detectedDate}
                     onChange={(e) => setDetectedDate(e.target.value)}
                     className="w-full rounded-2xl border border-slate-200 py-3 pl-10 pr-3 text-slate-700 outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-50"

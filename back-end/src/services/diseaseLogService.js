@@ -469,6 +469,12 @@ const buildDiseaseLogPayload = async (
     data.status,
     existingLog?.status || "unprocessed",
   );
+
+  const detectedAt =
+    data.detectedAt || data.date || existingLog?.detectedAt || new Date();
+
+  validateDetectedDate(detectedAt, season);
+
   const nextPayload = {
     diseaseName,
     confidence:
@@ -483,8 +489,7 @@ const buildDiseaseLogPayload = async (
       normalizeSource(existingLog?.source, "ai_scan"),
     ),
     imageName: String(data.imageName || existingLog?.imageName || "").trim(),
-    detectedAt:
-      data.detectedAt || data.date || existingLog?.detectedAt || new Date(),
+    detectedAt,
     status,
     processingNote: String(
       data.processingNote || existingLog?.processingNote || "",
@@ -668,6 +673,41 @@ const buildDiseaseWarningDraft = ({
     },
   ],
 });
+
+const validateDetectedDate = (detectedAt, season) => {
+  if (!detectedAt) return;
+
+  const detectedDate = new Date(detectedAt);
+  const now = new Date();
+
+  // 1. Không được ở tương lai
+  if (detectedDate > now) {
+    throw new Error(
+      "Ngày giờ phát hiện bệnh không được vượt quá thời điểm hiện tại.",
+    );
+  }
+
+  // 2. Phải nằm trong vụ mùa
+  if (season.startDate) {
+    const startDate = new Date(season.startDate);
+    startDate.setHours(0, 0, 0, 0); // Đầu ngày bắt đầu vụ
+    if (detectedDate < startDate) {
+      throw new Error(
+        `Ngày phát hiện bệnh không được trước ngày bắt đầu vụ mùa (${startDate.toLocaleDateString("vi-VN")}).`,
+      );
+    }
+  }
+
+  if (season.endDate) {
+    const endDate = new Date(season.endDate);
+    endDate.setHours(23, 59, 59, 999); // Cuối ngày kết thúc vụ
+    if (detectedDate > endDate) {
+      throw new Error(
+        `Ngày phát hiện bệnh không được sau ngày kết thúc vụ mùa (${endDate.toLocaleDateString("vi-VN")}).`,
+      );
+    }
+  }
+};
 
 const createDiseaseLog = async (data, userId, imageUrl = "") => {
   const payload = await buildDiseaseLogPayload(

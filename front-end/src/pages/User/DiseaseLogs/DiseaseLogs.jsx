@@ -401,6 +401,14 @@ const DiseaseLogs = () => {
       toast.warning("Vui lòng nhập tên bệnh.");
       return;
     }
+    if (!isHistoricalEdit && !form.detectedAt) {
+      toast.warning("Vui lòng nhập ngày giờ phát hiện bệnh.");
+      return;
+    }
+    if (!isHistoricalEdit && new Date(form.detectedAt) > new Date()) {
+      toast.warning("Ngày giờ phát hiện bệnh không được trong tương lai.");
+      return;
+    }
     if (!isHistoricalEdit && form.plotIds.length === 0) {
       toast.warning("Vui lòng chọn ít nhất 1 thửa.");
       return;
@@ -894,6 +902,7 @@ const DiseaseLogs = () => {
                   </label>
                   <input
                     type="datetime-local"
+                    max={getLocalDatetime()}
                     value={form.detectedAt}
                     onChange={(e) =>
                       setForm((prev) => ({

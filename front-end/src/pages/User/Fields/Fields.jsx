@@ -145,13 +145,32 @@ const Fields = () => {
   const handleSavePlot = async () => {
     if (!selectedField) return;
 
-    if (!plotForm.name.trim()) {
+    const plotName = plotForm.name.trim();
+    if (!plotName) {
       toast.warning("Vui lòng nhập tên thửa.");
       return;
     }
 
-    if (!Number.isFinite(Number(plotForm.area)) || Number(plotForm.area) <= 0) {
-      toast.warning("Diện tích phải lớn hơn 0.");
+    const isDuplicateName = plots.some(
+      (p) =>
+        p.name.trim().toLowerCase() === plotName.toLowerCase() &&
+        p._id !== editingPlot?._id,
+    );
+    if (isDuplicateName) {
+      toast.warning(`Tên thửa "${plotName}" đã tồn tại trong cánh đồng này.`);
+      return;
+    }
+
+    const areaValue = Number(plotForm.area);
+    if (!Number.isFinite(areaValue) || areaValue <= 0) {
+      toast.warning("Diện tích phải là một số lớn hơn 0.");
+      return;
+    }
+
+    if (areaValue > 1000000) {
+      toast.warning(
+        "Diện tích quá lớn (vượt quá 100 hecta), vui lòng kiểm tra lại.",
+      );
       return;
     }
 
@@ -552,6 +571,7 @@ const Fields = () => {
                   </label>
                   <input
                     type="number"
+                    min="0.1"
                     value={plotForm.area}
                     onChange={(e) =>
                       setPlotForm((prev) => ({ ...prev, area: e.target.value }))

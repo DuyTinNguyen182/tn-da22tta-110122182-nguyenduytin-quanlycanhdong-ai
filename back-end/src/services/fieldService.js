@@ -16,6 +16,23 @@ const normalizeFieldPayload = (data = {}) => {
     throw new Error("Tên cánh đồng là bắt buộc");
   }
 
+  if (name.length > 100) {
+    throw new Error("Tên cánh đồng không được vượt quá 100 ký tự");
+  }
+
+  //Bắt buộc tên phải chứa ít nhất một chữ cái
+  const hasLetters = /[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/.test(name);
+  if (!hasLetters) {
+    throw new Error(
+      "Tên cánh đồng không hợp lệ. Phải chứa ít nhất một chữ cái.",
+    );
+  }
+
+  //Giới hạn độ dài địa chỉ
+  if (address && address.length > 255) {
+    throw new Error("Địa chỉ cánh đồng không được vượt quá 255 ký tự");
+  }
+
   return { name, address };
 };
 

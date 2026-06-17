@@ -67,6 +67,8 @@ const FarmingLogModal = ({
     onTaskChange(selectedTask || null);
   };
 
+  const getToday = () => new Date().toISOString().split("T")[0];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4 backdrop-blur-sm transition-opacity">
       <div className="flex w-full max-w-xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-dropdown-enter">
@@ -120,6 +122,7 @@ const FarmingLogModal = ({
               </label>
               <input
                 type="date"
+                max={getToday()}
                 value={logForm.date}
                 onChange={(e) => onFormChange({ date: e.target.value })}
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm font-medium outline-none transition-all focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
@@ -132,6 +135,7 @@ const FarmingLogModal = ({
               <div className="relative">
                 <input
                   type="number"
+                  min="0"
                   value={logForm.cost}
                   onChange={(e) => onFormChange({ cost: e.target.value })}
                   className="w-full rounded-xl border border-gray-200 bg-white py-2 pl-8 pr-3 text-sm font-bold text-emerald-700 outline-none transition-all focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
