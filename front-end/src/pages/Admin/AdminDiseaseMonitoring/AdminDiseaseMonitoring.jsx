@@ -41,6 +41,7 @@ const AdminDiseaseMonitoring = () => {
     timeRange: "all",
     status: "",
   });
+  const [selectedRecipientIds, setSelectedRecipientIds] = useState([]);
 
   const fieldOptions = useMemo(
     () => [
@@ -71,7 +72,8 @@ const AdminDiseaseMonitoring = () => {
   );
 
   const selectedSeason = useMemo(
-    () => seasonDetails.find((season) => season._id === filters.seasonId) || null,
+    () =>
+      seasonDetails.find((season) => season._id === filters.seasonId) || null,
     [filters.seasonId, seasonDetails],
   );
 
@@ -225,6 +227,7 @@ const AdminDiseaseMonitoring = () => {
     setWarningPreview(null);
     setWarningForm(null);
     setSelectedWarningLogId("");
+    setSelectedRecipientIds([]);
   };
 
   const handleOpenWarningModal = async (log) => {
@@ -246,6 +249,7 @@ const AdminDiseaseMonitoring = () => {
       const res = await api.get(`/disease-logs/${log._id}/warning-preview`);
       setWarningPreview(res.data);
       setWarningForm(buildWarningFormFromPreview(res.data?.form));
+      setSelectedRecipientIds(res.data?.recipients?.map((r) => r.userId) || []);
     } catch (error) {
       console.error("Lỗi tải trước form cảnh báo bệnh:", error);
       toast.error(
@@ -278,6 +282,11 @@ const AdminDiseaseMonitoring = () => {
       return;
     }
 
+    if (selectedRecipientIds.length === 0) {
+      toast.warning("Vui lòng chọn ít nhất 1 nông dân để gửi.");
+      return;
+    }
+
     try {
       setWarningSubmitting(true);
 
@@ -286,6 +295,7 @@ const AdminDiseaseMonitoring = () => {
         {
           title: warningForm.title.trim(),
           content: warningForm.content.trim(),
+          recipientIds: selectedRecipientIds,
         },
         { timeout: 30000 },
       );
@@ -403,6 +413,8 @@ const AdminDiseaseMonitoring = () => {
         form={warningForm}
         loading={warningPreviewLoading}
         submitting={warningSubmitting}
+        selectedRecipientIds={selectedRecipientIds}
+        onRecipientChange={setSelectedRecipientIds}
         onClose={closeWarningModal}
         onChange={handleWarningFormChange}
         onSubmit={handleSubmitWarning}

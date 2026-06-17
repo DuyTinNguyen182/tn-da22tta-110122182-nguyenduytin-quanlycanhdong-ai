@@ -843,10 +843,17 @@ const sendDiseaseLogWarning = async (id, payload = {}, currentUser) => {
   ensureAdminUser(currentUser, "gửi cảnh báo dịch bệnh");
 
   const context = await buildDiseaseWarningContext(id, currentUser);
-  const { recipientMode, recipients } = resolveDiseaseWarningRecipients(
+  let { recipientMode, recipients } = resolveDiseaseWarningRecipients(
     context,
     payload.recipientMode || "field_all",
   );
+
+  if (Array.isArray(payload.recipientIds)) {
+    recipients = recipients.filter((recipient) =>
+      payload.recipientIds.includes(recipient.userId),
+    );
+    recipientMode = "selected_users";
+  }
 
   if (recipients.length === 0) {
     throw new Error("Không có nông dân phù hợp để gửi cảnh báo");
@@ -875,8 +882,7 @@ const sendDiseaseLogWarning = async (id, payload = {}, currentUser) => {
         userIds: recipients.map((recipient) => recipient.userId),
       },
       targetConfig: {
-        mode:
-          recipientMode === "reporter_only" ? "selected_users" : "field_users",
+        mode: recipientMode === "field_all" ? "field_users" : "selected_users",
         fieldId: recipientMode === "field_all" ? context.fieldId : null,
       },
       deliveryChannels: ["web", "email"],

@@ -7,11 +7,35 @@ const DiseaseWarningModal = ({
   form,
   loading,
   submitting,
+  selectedRecipientIds,
+  onRecipientChange,
   onClose,
   onChange,
   onSubmit,
 }) => {
   if (!open) return null;
+
+  const isAllSelected =
+    selectedRecipientIds?.length === preview?.recipients?.length &&
+    preview?.recipients?.length > 0;
+
+  const handleSelectAll = (e) => {
+    if (e.target.checked) {
+      onRecipientChange(preview?.recipients?.map((r) => r.userId) || []);
+    } else {
+      onRecipientChange([]);
+    }
+  };
+
+  const handleToggleRecipient = (userId, checked) => {
+    if (checked) {
+      onRecipientChange([...(selectedRecipientIds || []), userId]);
+    } else {
+      onRecipientChange(
+        (selectedRecipientIds || []).filter((id) => id !== userId),
+      );
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
@@ -24,8 +48,8 @@ const DiseaseWarningModal = ({
                 : "Gửi cảnh báo bệnh"}
             </h3>
             <p className="mt-1 text-sm text-gray-500">
-              Form đã nhập sẵn tên bệnh, thửa ảnh hưởng và người nhận. Admin chỉ
-              cần chỉnh tiêu đề hoặc nội dung nếu muốn.
+              Bạn có thể tùy chỉnh tiêu đề, nội dung và chọn chính xác những
+              nông dân cần gửi thông báo.
             </p>
           </div>
 
@@ -91,47 +115,67 @@ const DiseaseWarningModal = ({
                 </div>
 
                 <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                    <BellRing size={16} />
-                    Thửa bị ảnh hưởng
+                  <div className="flex items-center justify-between gap-2 border-b border-gray-50 pb-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+                      <Users size={16} />
+                      Người nhận ({selectedRecipientIds?.length || 0}/
+                      {preview?.recipients?.length || 0})
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-gray-600 hover:text-gray-900">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={handleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300 accent-emerald-600 focus:ring-emerald-500"
+                      />
+                      Chọn tất cả
+                    </label>
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(preview?.log?.plots || []).map((plot) => (
-                      <span
-                        key={plot?._id || plot?.name}
-                        className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
-                      >
-                        {plot?.name || "--"}
-                      </span>
-                    ))}
-                  </div>
-                </div>
 
-                <div className="rounded-3xl border border-white bg-white p-4 shadow-sm">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-                    <Users size={16} />
-                    Người nhận ({preview?.recipients?.length || 0})
-                  </div>
                   <div className="mt-3 space-y-3">
-                    {(preview?.recipients || []).map((recipient) => (
-                      <div
-                        key={recipient.userId}
-                        className="rounded-2xl border border-gray-100 bg-gray-50 px-3 py-3"
-                      >
-                        <p className="font-semibold text-gray-900">
-                          {recipient.fullName}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {recipient.email ||
-                            recipient.phone ||
-                            recipient.userId}
-                        </p>
-                        <p className="mt-2 text-xs leading-5 text-gray-600">
-                          Thửa thuộc cánh đồng:{" "}
-                          {(recipient.plotNames || []).join(", ") || "--"}
-                        </p>
-                      </div>
-                    ))}
+                    {(preview?.recipients || []).map((recipient) => {
+                      const isSelected = selectedRecipientIds?.includes(
+                        recipient.userId,
+                      );
+                      return (
+                        <label
+                          key={recipient.userId}
+                          className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-3 py-3 transition-all ${
+                            isSelected
+                              ? "border-emerald-200 bg-emerald-50/50"
+                              : "border-gray-100 bg-gray-50/50 opacity-70 hover:opacity-100"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) =>
+                              handleToggleRecipient(
+                                recipient.userId,
+                                e.target.checked,
+                              )
+                            }
+                            className="mt-1 h-4 w-4 rounded border-gray-300 accent-emerald-600 focus:ring-emerald-500"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`font-semibold ${isSelected ? "text-emerald-900" : "text-gray-900"}`}
+                            >
+                              {recipient.fullName}
+                            </p>
+                            <p className="mt-1 text-xs text-gray-500">
+                              {recipient.email ||
+                                recipient.phone ||
+                                recipient.userId}
+                            </p>
+                            <p className="mt-2 text-xs leading-5 text-gray-600">
+                              Thửa:{" "}
+                              {(recipient.plotNames || []).join(", ") || "--"}
+                            </p>
+                          </div>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -152,9 +196,11 @@ const DiseaseWarningModal = ({
           <button
             type="button"
             onClick={onSubmit}
-            disabled={loading || submitting}
+            disabled={
+              loading || submitting || selectedRecipientIds?.length === 0
+            }
             className={`inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold text-white transition-all ${
-              loading || submitting
+              loading || submitting || selectedRecipientIds?.length === 0
                 ? "cursor-not-allowed bg-gray-300"
                 : "bg-amber-500 hover:bg-amber-600"
             }`}
