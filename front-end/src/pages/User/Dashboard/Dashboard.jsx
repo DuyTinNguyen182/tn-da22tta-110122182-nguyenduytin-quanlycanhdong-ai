@@ -1,16 +1,21 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   BarChart3,
   Bug,
+  CalendarDays,
+  ChevronRight,
+  Info,
   Layers,
   Map,
+  MapPin,
   PieChart as PieChartIcon,
   RefreshCw,
   Sprout,
   Wallet,
-  Activity,
   ShieldAlert,
+  X,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -159,13 +164,107 @@ const EmptyBlock = ({ text }) => (
   </div>
 );
 
+const formatDateTime = (value) => {
+  if (!value) return "--";
+  const date = new Date(value);
+  return (
+    date.toLocaleDateString("vi-VN") +
+    " " +
+    date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })
+  );
+};
+
+const getDiseaseStatusMeta = (status) => {
+  if (status === "processed") {
+    return {
+      label: "Đã xử lý",
+      dotClass: "bg-emerald-500",
+      badgeClass: "bg-emerald-100 text-emerald-700",
+    };
+  }
+
+  return {
+    label: "Chưa xử lý",
+    dotClass: "bg-amber-500",
+    badgeClass: "bg-amber-100 text-amber-800",
+  };
+};
+
+const getDiseasePlotSummary = (log) => {
+  const plotNames = Array.isArray(log?.plots)
+    ? log.plots.map((plot) => plot?.name).filter(Boolean)
+    : [];
+
+  if (plotNames.length === 0) {
+    return log?.scope === "all_plots" ? "Toàn bộ thửa tham gia vụ" : "--";
+  }
+
+  return plotNames.join(", ");
+};
+
+const DiseaseLogItem = ({ log, inModal = false }) => {
+  const isUnprocessed = log.status !== "processed";
+  const statusMeta = getDiseaseStatusMeta(log.status);
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-2 rounded-xl border backdrop-blur-sm transition-all ${
+        isUnprocessed
+          ? "border-amber-300 bg-white shadow-md relative overflow-hidden"
+          : "border-gray-200 bg-white/60 shadow-sm"
+      } ${inModal ? "p-2" : "p-2"}`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span
+            className={`flex shrink-0 rounded-full ${statusMeta.dotClass} ${
+              isUnprocessed ? "animate-pulse" : ""
+            } ${inModal ? "h-2 w-2" : "h-1.5 w-1.5"}`}
+          ></span>
+          <p
+            className={`truncate font-bold text-gray-800 ${
+              inModal ? "text-sm" : "text-xs"
+            }`}
+          >
+            {log.diseaseName || "Bệnh chưa xác định"}
+          </p>
+          <span
+            className={`shrink-0 rounded-full font-bold ${statusMeta.badgeClass} ${
+              inModal ? "px-2 py-0.5 text-[10px]" : "px-1.5 py-0.5 text-[9px]"
+            }`}
+          >
+            {statusMeta.label}
+          </span>
+        </div>
+
+        <p
+          className={`text-gray-600 truncate ${
+            inModal ? "text-xs mt-1.5" : "text-[10px]"
+          }`}
+        >
+          <span className="text-gray-500">Thửa ảnh hưởng:</span>{" "}
+          <span className="font-medium text-amber-700">
+            {getDiseasePlotSummary(log)}
+          </span>
+          {" • "}
+          Ngày ghi nhận: {formatDateTime(log.detectedAt || log.createdAt)}
+        </p>
+      </div>
+    </div>
+  );
+};
+
 const FarmerDashboard = () => {
   const { toast } = useFeedback();
+  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState(EMPTY_DASHBOARD);
   const [seasonDetails, setSeasonDetails] = useState([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [diseaseLogs, setDiseaseLogs] = useState([]);
+  const [diseaseLoading, setDiseaseLoading] = useState(true);
+  const [isDiseaseModalOpen, setIsDiseaseModalOpen] = useState(false);
   const isFirstDashboardLoad = useRef(true);
   const skipNextDashboardFetch = useRef(false);
 
@@ -222,6 +321,39 @@ const FarmerDashboard = () => {
     fetchDashboard();
   }, [selectedSeasonId, toast]);
 
+  const fetchDiseaseLogs = useCallback(
+    async ({ showLoading = true } = {}) => {
+      try {
+        if (showLoading) setDiseaseLoading(true);
+        const res = await api.get("/disease-logs", {
+          params: {
+            ...(selectedSeasonId ? { seasonId: selectedSeasonId } : {}),
+            limit: 10,
+          },
+        });
+
+        const logs = Array.isArray(res.data) ? res.data : [];
+        setDiseaseLogs(
+          logs.sort(
+            (left, right) =>
+              new Date(right.detectedAt || right.createdAt || 0) -
+              new Date(left.detectedAt || left.createdAt || 0),
+          ),
+        );
+      } catch (error) {
+        console.error("Lỗi tải nhật ký bệnh gần đây:", error);
+        setDiseaseLogs([]);
+      } finally {
+        if (showLoading) setDiseaseLoading(false);
+      }
+    },
+    [selectedSeasonId],
+  );
+
+  useEffect(() => {
+    fetchDiseaseLogs();
+  }, [fetchDiseaseLogs]);
+
   const handleRefresh = async () => {
     try {
       setRefreshing(true);
@@ -229,6 +361,7 @@ const FarmerDashboard = () => {
         params: selectedSeasonId ? { seasonId: selectedSeasonId } : {},
       });
       setDashboard(res.data || EMPTY_DASHBOARD);
+      await fetchDiseaseLogs({ showLoading: false });
     } catch (error) {
       toast.error(error.response?.data?.message || "Không thể làm mới dữ liệu");
     } finally {
@@ -237,6 +370,33 @@ const FarmerDashboard = () => {
   };
 
   const { kpis, charts, alerts, liveFeeds } = dashboard;
+  const selectedSeason = seasonDetails.find(
+    (item) => item?._id === selectedSeasonId,
+  );
+  const selectedSeasonStatus =
+    selectedSeason?.status || selectedSeason?.seasonStatus || "";
+  const isSelectedSeasonEnded = ["completed", "ended"].includes(
+    selectedSeasonStatus,
+  );
+  const unprocessedDiseaseLogs = diseaseLogs.filter(
+    (log) => log.status !== "processed",
+  );
+  const hasUnprocessedDisease = unprocessedDiseaseLogs.length > 0;
+  const prioritizedDiseaseLogs = hasUnprocessedDisease
+    ? unprocessedDiseaseLogs
+    : diseaseLogs;
+  const visibleDiseaseLogs = prioritizedDiseaseLogs.slice(0, 2);
+  const hasMoreDiseaseLogs = prioritizedDiseaseLogs.length > 2;
+  const diseaseFooterText = hasUnprocessedDisease
+    ? `${unprocessedDiseaseLogs.length} bệnh cần xử lý`
+    : "Bạn vừa phát hiện dịch bệnh?";
+  const diseaseActionLabel = hasUnprocessedDisease
+    ? "Xử lý ngay"
+    : "Ghi chép ngay";
+  const diseaseModalTitle = hasUnprocessedDisease
+    ? "Bệnh chưa xử lý"
+    : "Nhật ký bệnh gần đây";
+  const goToDiseaseLogs = () => navigate("/disease-logs");
 
   if (loading) {
     return (
@@ -433,69 +593,91 @@ const FarmerDashboard = () => {
 
         {/* ROW 3: Tiến độ canh tác & Trợ lý */}
         <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
-          <div className="rounded-2xl border border-gray-200 bg-white p-2.5 shadow-sm flex flex-col h-full">
-            <div className="mb-2 flex items-center gap-2">
-              <div className="rounded-lg bg-sky-50 p-1.5">
-                <Activity className="h-4 w-4 text-sky-600" />
+          <div
+            className={`flex h-full min-h-[180px] flex-col overflow-hidden rounded-2xl border p-3 shadow-sm transition-colors duration-300 ${
+              hasUnprocessedDisease
+                ? "border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/50"
+                : "border-gray-200 bg-gradient-to-br from-white to-gray-50/80"
+            }`}
+          >
+            {/* Tiêu đề */}
+            <div className="mb-2.5 flex items-center gap-2">
+              <div
+                className={`rounded-xl border p-1.5 shadow-sm transition-colors ${
+                  hasUnprocessedDisease
+                    ? "border-amber-200 bg-white text-amber-600"
+                    : "border-gray-200 bg-white text-gray-500"
+                }`}
+              >
+                <ShieldAlert className="h-4 w-4" />
               </div>
-              <h2 className="text-xs font-semibold text-gray-900">
-                Tiến độ ruộng của bạn
-              </h2>
+              <div>
+                <h2
+                  className={`text-sm font-bold leading-tight transition-colors ${
+                    hasUnprocessedDisease ? "text-amber-900" : "text-gray-800"
+                  }`}
+                >
+                  Nhật ký bệnh gần đây
+                </h2>
+                {/* <p
+                  className={`text-[10px] font-medium transition-colors ${
+                    hasUnprocessedDisease ? "text-amber-700" : "text-gray-500"
+                  }`}
+                >
+                  Theo ghi nhận mới nhất
+                </p> */}
+              </div>
             </div>
 
-            {charts.cropProgress.length === 0 ? (
-              <EmptyBlock text="Chưa bắt đầu làm đất." />
+            {isSelectedSeasonEnded ? (
+              <p className="text-xs text-amber-700 ml-9 leading-relaxed flex-1">
+                Mùa vụ này đã kết thúc.
+              </p>
             ) : (
-              <div className="w-full flex-1 min-h-[150px] overflow-hidden">
-                <div
-                  style={{
-                    height: Math.max(100, charts.cropProgress.length * 40 + 40),
-                    minHeight: "100%",
-                  }}
-                >
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={charts.cropProgress}
-                      layout="vertical"
-                      margin={{ top: 5, right: 15, left: 0, bottom: 5 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        horizontal={false}
-                        stroke="#e5e7eb"
-                      />
-                      <XAxis
-                        type="number"
-                        tick={{ fill: "#6b7280", fontSize: 9 }}
-                      />
-                      <YAxis
-                        type="category"
-                        dataKey="stageName"
-                        tick={{ fill: "#374151", fontSize: 9 }}
-                        width={70}
-                      />
-                      <Tooltip
-                        formatter={(value) => [
-                          `${formatNumber(value)} m²`,
-                          "Diện tích",
-                        ]}
-                        contentStyle={{
-                          borderRadius: "12px",
-                          border: "1px solid #e5e7eb",
-                          fontSize: "11px",
-                        }}
-                      />
-                      <Bar
-                        dataKey="totalArea"
-                        name="Diện tích"
-                        radius={[0, 4, 4, 0]}
-                        fill="#0ea5e9"
-                        barSize={16}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+              <>
+                {diseaseLoading ? (
+                  <div className="flex-1 space-y-2">
+                    <div className="h-10 animate-pulse rounded-xl bg-white/70"></div>
+                    <div className="h-10 animate-pulse rounded-xl bg-white/60"></div>
+                  </div>
+                ) : prioritizedDiseaseLogs.length === 0 ? (
+                  <div className="flex min-h-[80px] flex-1 items-center justify-center rounded-xl border border-dashed border-amber-200 bg-white/60 px-3 text-center text-xs font-medium text-amber-700">
+                    Chưa có nhật ký bệnh nào trong mùa vụ này.
+                  </div>
+                ) : (
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    {visibleDiseaseLogs.map((log) => (
+                      <DiseaseLogItem key={log._id} log={log} inModal={true} />
+                    ))}
+                  </div>
+                )}
+
+                <div className="mt-auto flex items-center justify-between gap-2 border-t border-amber-200/70 pt-2.5">
+                  <div className="min-w-0">
+                    {hasMoreDiseaseLogs ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsDiseaseModalOpen(true)}
+                        className="text-[11px] font-bold text-amber-700 transition hover:text-amber-800 hover:underline"
+                      >
+                        Xem thêm ({prioritizedDiseaseLogs.length})
+                      </button>
+                    ) : (
+                      <p className="truncate text-[11px] font-semibold text-amber-700">
+                        {diseaseFooterText}
+                      </p>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={goToDiseaseLogs}
+                    className="flex shrink-0 items-center justify-center gap-1 rounded-lg bg-amber-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-amber-700 active:scale-95"
+                  >
+                    {diseaseActionLabel} <ChevronRight size={14} />
+                  </button>
                 </div>
-              </div>
+              </>
             )}
           </div>
 
@@ -503,6 +685,47 @@ const FarmerDashboard = () => {
           <AssistantCard selectedSeasonId={selectedSeasonId} />
         </div>
       </div>
+
+      {isDiseaseModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-gray-100 bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-100 p-4">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-5 w-5 text-amber-600" />
+                <h2 className="text-base font-bold text-gray-800">
+                  {diseaseModalTitle}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDiseaseModalOpen(false)}
+                className="rounded-lg p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 space-y-2.5 overflow-y-auto bg-gray-50/60 p-4">
+              {prioritizedDiseaseLogs.map((log) => (
+                <DiseaseLogItem key={log._id} log={log} />
+              ))}
+            </div>
+
+            <div className="rounded-b-2xl border-t border-gray-100 bg-white p-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDiseaseModalOpen(false);
+                  goToDiseaseLogs();
+                }}
+                className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-amber-600 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 active:scale-95"
+              >
+                {diseaseActionLabel} <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

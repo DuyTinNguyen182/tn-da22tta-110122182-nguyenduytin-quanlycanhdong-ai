@@ -108,8 +108,7 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
           <h2 className="text-sm font-bold text-amber-800">Gợi ý công việc</h2>
         </div>
         <p className="text-xs text-amber-700 ml-9 leading-relaxed flex-1">
-          Mùa vụ này đã kết thúc tốt đẹp. Bạn có thể chọn mùa vụ hiện tại (nếu
-          có) để xem gợi ý công việc.
+          Mùa vụ này đã kết thúc.
         </p>
       </div>
     );
@@ -158,7 +157,6 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
           </div>
         </div>
 
-        {/* Thân danh sách: flex-1 chiếm toàn bộ khoảng trống đẩy footer luôn neo ở đáy */}
         <div className="flex-1 flex flex-col gap-2 relative z-10 mb-3">
           {topRecommendations.map((rec, index) => (
             <div
@@ -166,17 +164,17 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
               className="flex items-center justify-between gap-2 rounded-xl bg-white/80 p-2 shadow-sm border border-white/60 backdrop-blur-sm"
             >
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-0.5">
+                <div className="flex items-center gap-1.5 mb-1">
                   {rec.urgency === "HIGH" ? (
-                    <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-red-500 animate-pulse"></span>
+                    <span className="flex h-2 w-2 shrink-0 rounded-full bg-red-500 animate-pulse"></span>
                   ) : (
-                    <span className="flex h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
+                    <span className="flex h-2 w-2 shrink-0 rounded-full bg-emerald-500"></span>
                   )}
-                  <p className="truncate text-xs font-bold text-gray-800">
+                  <p className="truncate text-sm font-bold text-gray-800">
                     {rec.taskName}
                   </p>
                 </div>
-                <p className="text-[10px] text-gray-600 truncate">
+                <p className="text-xs text-gray-600 truncate">
                   <span className="font-medium text-emerald-700">
                     {rec.plotNames.join(", ")}
                   </span>{" "}
@@ -187,7 +185,6 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
           ))}
         </div>
 
-        {/* Footer chứa nút bấm: luôn nằm ở dưới cùng nhờ khối flex-1 phía trên */}
         <div className="mt-auto flex items-center justify-between relative z-10 border-t border-emerald-200/60 pt-2.5">
           {hasMore ? (
             <button
@@ -261,7 +258,7 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
               <button
                 onClick={() => {
                   setIsModalOpen(false);
-                  navigate("/farmer/diary/create");
+                  navigate("/crops");
                 }}
                 className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
               >
