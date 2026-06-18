@@ -46,6 +46,8 @@ const SeasonFormModal = ({
               type="text"
               value={seasonName}
               onChange={(event) => onChange(event.target.value)}
+              disabled={submitting}
+              maxLength={50}
               placeholder="Ví dụ: Xuân Hè"
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
             />
@@ -55,6 +57,7 @@ const SeasonFormModal = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={submitting}
               className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
             >
               Hủy

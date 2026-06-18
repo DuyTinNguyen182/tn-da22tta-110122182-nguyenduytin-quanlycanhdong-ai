@@ -35,6 +35,8 @@ const AdminFields = () => {
   const [fieldPlotsMap, setFieldPlotsMap] = useState({});
   const [detailLoadingMap, setDetailLoadingMap] = useState({});
   const [deletingPlotId, setDeletingPlotId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingFieldId, setDeletingFieldId] = useState(null);
 
   const fetchFields = useCallback(async () => {
     try {
@@ -65,22 +67,26 @@ const AdminFields = () => {
     if (!normalized) return fields;
 
     return fields.filter((field) => {
-      const haystack = normalizeText([field.name, field.address].filter(Boolean).join(" "));
+      const haystack = normalizeText(
+        [field.name, field.address].filter(Boolean).join(" "),
+      );
       return haystack.includes(normalized);
     });
   }, [fields, keyword]);
 
   const activeDetailField = useMemo(
     () => fields.find((field) => field._id === detailFieldId) || null,
-    [detailFieldId, fields]
+    [detailFieldId, fields],
   );
 
   const detailPlots = useMemo(
     () => (detailFieldId ? fieldPlotsMap[detailFieldId] || [] : []),
-    [detailFieldId, fieldPlotsMap]
+    [detailFieldId, fieldPlotsMap],
   );
 
-  const isDetailLoading = detailFieldId ? Boolean(detailLoadingMap[detailFieldId]) : false;
+  const isDetailLoading = detailFieldId
+    ? Boolean(detailLoadingMap[detailFieldId])
+    : false;
 
   const fetchFieldPlots = async (fieldId, options = {}) => {
     if (!fieldId) {
@@ -99,7 +105,10 @@ const AdminFields = () => {
       setFieldPlotsMap((prev) => ({ ...prev, [fieldId]: plots }));
       return plots;
     } catch (error) {
-      toast.error(error.response?.data?.message || "Không thể tải danh sách thửa ruộng của cánh đồng.");
+      toast.error(
+        error.response?.data?.message ||
+          "Không thể tải danh sách thửa ruộng của cánh đồng.",
+      );
       return [];
     } finally {
       setDetailLoadingMap((prev) => ({ ...prev, [fieldId]: false }));
@@ -128,20 +137,55 @@ const AdminFields = () => {
   };
 
   const handleSaveField = async () => {
+    const trimmedName = fieldForm.name.trim();
+    const trimmedAddress = fieldForm.address.trim();
+
+    if (!trimmedName) {
+      toast.warning("Vui lòng nhập tên cánh đồng.");
+      return;
+    }
+
+    if (trimmedName.length > 100) {
+      toast.warning("Tên cánh đồng không được vượt quá 100 ký tự.");
+      return;
+    }
+
+    if (trimmedAddress && trimmedAddress.length > 255) {
+      toast.warning("Địa chỉ mô tả không được vượt quá 255 ký tự.");
+      return;
+    }
+
+    const hasLetters = /[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmedName);
+    if (!hasLetters) {
+      toast.warning("Tên cánh đồng phải chứa ít nhất một chữ cái.");
+      return;
+    }
+
     try {
+      setSubmitting(true);
+
+      const payload = {
+        name: trimmedName,
+        address: trimmedAddress,
+      };
+
       if (editingField) {
-        await api.put(`/fields/${editingField._id}`, fieldForm);
+        await api.put(`/fields/${editingField._id}`, payload);
       } else {
-        await api.post("/fields", fieldForm);
+        await api.post("/fields", payload);
       }
 
       setIsModalOpen(false);
       setFieldForm(emptyFieldForm);
       setEditingField(null);
-      toast.success(editingField ? "Đã cập nhật cánh đồng." : "Đã tạo cánh đồng mới.");
+      toast.success(
+        editingField ? "Đã cập nhật cánh đồng." : "Đã tạo cánh đồng mới.",
+      );
       await fetchFields();
     } catch (error) {
       toast.error(error.response?.data?.message || "Không thể lưu cánh đồng");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -157,13 +201,16 @@ const AdminFields = () => {
     if (!confirmed) return;
 
     try {
+      setDeletingFieldId(fieldId);
       await api.delete(`/fields/${fieldId}`);
       toast.success("Đã xóa cánh đồng.");
+
       setFieldPlotsMap((prev) => {
         const next = { ...prev };
         delete next[fieldId];
         return next;
       });
+
       if (detailFieldId === fieldId) {
         setDetailFieldId(null);
         setDetailKeyword("");
@@ -171,6 +218,8 @@ const AdminFields = () => {
       await fetchFields();
     } catch (error) {
       toast.error(error.response?.data?.message || "Không thể xóa cánh đồng");
+    } finally {
+      setDeletingFieldId(null);
     }
   };
 
@@ -206,9 +255,12 @@ const AdminFields = () => {
     <div className="h-full overflow-y-auto bg-gray-50 p-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Quản lý cánh đồng</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            Quản lý cánh đồng
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
-            Theo dõi nhanh từng cánh đồng và mở chi tiết để xem nông dân đang quản lý những thửa nào.
+            Theo dõi nhanh từng cánh đồng và mở chi tiết để xem nông dân đang
+            quản lý những thửa nào.
           </p>
         </div>
 

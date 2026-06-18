@@ -40,6 +40,8 @@ const StageModal = ({
               value={formData.name}
               onChange={onChange}
               required
+              disabled={submitting}
+              maxLength={100}
               className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 px-4 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
               placeholder="Ví dụ: Chuẩn bị đất"
               autoFocus
@@ -57,6 +59,7 @@ const StageModal = ({
               onChange={onChange}
               required
               min="0"
+              disabled={submitting}
               className="w-32 rounded-xl border border-gray-200 bg-gray-50 py-2.5 px-3 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
             />
           </div>
@@ -65,6 +68,7 @@ const StageModal = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={submitting}
               className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
             >
               Hủy

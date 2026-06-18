@@ -70,8 +70,23 @@ const AdminStages = () => {
       return;
     }
 
+    if (name.length > 100) {
+      toast.warning("Tên giai đoạn không được vượt quá 100 ký tự");
+      return;
+    }
+
     if (order < 0) {
       toast.warning("Thứ tự phải là số không âm");
+      return;
+    }
+
+    if (
+      editingStage &&
+      editingStage.name === name &&
+      editingStage.order === order
+    ) {
+      toast.info("Không có thay đổi nào để lưu.");
+      closeModal();
       return;
     }
 
@@ -107,7 +122,7 @@ const AdminStages = () => {
   const handleDelete = async (stage) => {
     const confirmed = await confirm({
       title: "Xóa giai đoạn?",
-      message: `Bạn có chắc muốn xóa giai đoạn '${stage.name}'?`,
+      message: `Bạn có chắc muốn xóa giai đoạn '${stage.name}'? Lưu ý: Chỉ có thể xóa nếu không có công việc nào đang thuộc giai đoạn này.`,
       confirmText: "Xóa giai đoạn",
       tone: "danger",
     });

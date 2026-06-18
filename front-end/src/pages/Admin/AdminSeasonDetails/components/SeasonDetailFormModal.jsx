@@ -79,6 +79,7 @@ const SeasonDetailFormModal = ({
                 placeholder="Chọn năm"
                 icon={CalendarDays}
                 variant="filter"
+                disabled={isEditing}
               />
             </div>
 
@@ -90,6 +91,7 @@ const SeasonDetailFormModal = ({
                 type="date"
                 value={formData.startDate}
                 onChange={(event) => onChange("startDate", event.target.value)}
+                disabled={submitting}
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
               />
             </div>
@@ -102,6 +104,7 @@ const SeasonDetailFormModal = ({
                 type="date"
                 value={formData.endDate}
                 onChange={(event) => onChange("endDate", event.target.value)}
+                disabled={submitting}
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
               />
             </div>
@@ -111,6 +114,7 @@ const SeasonDetailFormModal = ({
             <button
               type="button"
               onClick={onClose}
+              disabled={submitting}
               className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-50"
             >
               Hủy

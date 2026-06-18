@@ -5,6 +5,7 @@ const FieldModal = ({
   open,
   editingField,
   fieldForm,
+  submitting,
   onChange,
   onClose,
   onSave,
@@ -35,8 +36,10 @@ const FieldModal = ({
               type="text"
               value={fieldForm.name}
               onChange={(event) => onChange({ name: event.target.value })}
+              maxLength={100}
+              disabled={submitting}
               className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
-              placeholder="Ví dụ: Cánh đồng Bắc Kênh"
+              placeholder="Ví dụ: Cánh đồng Mỹ Tho"
               autoFocus
             />
           </div>
@@ -49,8 +52,10 @@ const FieldModal = ({
               rows={3}
               value={fieldForm.address}
               onChange={(event) => onChange({ address: event.target.value })}
+              maxLength={255}
+              disabled={submitting}
               className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
-              placeholder="Ví dụ: Ấp 2, xã Mỹ An, khu vực bắc kênh"
+              placeholder="Ví dụ: Ấp 2, xã Mỹ Tho, Tiền Giang"
             />
           </div>
         </div>
@@ -59,6 +64,7 @@ const FieldModal = ({
           <button
             type="button"
             onClick={onClose}
+            disabled={submitting}
             className="flex-1 rounded-xl bg-gray-200 px-4 py-2.5 font-medium text-gray-800 transition-all hover:bg-gray-300"
           >
             Hủy
@@ -66,6 +72,7 @@ const FieldModal = ({
           <button
             type="button"
             onClick={onSave}
+            disabled={submitting}
             className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 font-medium text-white transition-all hover:bg-emerald-700"
           >
             {editingField ? "Cập nhật" : "Tạo mới"}

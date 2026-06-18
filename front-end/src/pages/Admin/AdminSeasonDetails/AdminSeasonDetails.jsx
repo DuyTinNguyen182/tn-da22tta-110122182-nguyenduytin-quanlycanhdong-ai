@@ -135,6 +135,41 @@ const AdminSeasonDetails = () => {
       return;
     }
 
+    // 1. Ràng buộc: Ngày kết thúc không được nhỏ hơn ngày bắt đầu
+    if (
+      formData.endDate &&
+      new Date(formData.endDate) < new Date(formData.startDate)
+    ) {
+      toast.warning("Ngày kết thúc không thể diễn ra trước ngày bắt đầu.");
+      return;
+    }
+
+    // 2. Chặn gọi API nếu không có thay đổi (khi Update)
+    if (editingDetail) {
+      const existingYear = editingDetail.year
+        ? String(editingDetail.year)
+        : String(new Date(editingDetail.startDate).getFullYear());
+
+      const existingStart = editingDetail.startDate
+        ? new Date(editingDetail.startDate).toISOString().slice(0, 10)
+        : "";
+      const existingEnd = editingDetail.endDate
+        ? new Date(editingDetail.endDate).toISOString().slice(0, 10)
+        : "";
+
+      const isUnchanged =
+        formData.seasonId === (editingDetail.season?._id || "") &&
+        formData.year === existingYear &&
+        formData.startDate === existingStart &&
+        (formData.endDate || "") === existingEnd;
+
+      if (isUnchanged) {
+        toast.info("Không có thay đổi nào để lưu.");
+        closeFormModal();
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       if (editingDetail) {

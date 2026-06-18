@@ -105,6 +105,17 @@ const AdminSeasons = () => {
       return;
     }
 
+    if (seasonName.trim().length > 50) {
+      toast.warning("Tên mùa vụ không được vượt quá 50 ký tự");
+      return;
+    }
+
+    if (editingSeason && editingSeason.name === seasonName.trim()) {
+      toast.info("Không có thay đổi nào để lưu.");
+      closeFormModal();
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (editingSeason) {
@@ -124,6 +135,7 @@ const AdminSeasons = () => {
         setSeasons((prev) => sortSeasons([...prev, res.data]));
         toast.success("Đã tạo mùa vụ mới.");
       }
+      closeFormModal();
 
       clearForm();
     } catch (err) {
@@ -169,7 +181,7 @@ const AdminSeasons = () => {
   const handleDelete = async (season) => {
     const confirmed = await confirm({
       title: "Xóa mùa vụ?",
-      message: `Bạn có chắc muốn xóa mùa vụ '${season.name}'?`,
+      message: `Bạn có chắc muốn xóa mùa vụ '${season.name}'? Lưu ý: Chỉ có thể xóa nếu mùa vụ này chưa được phân công cho bất kỳ thửa ruộng nào.`,
       confirmText: "Xóa mùa vụ",
       tone: "danger",
     });
