@@ -85,6 +85,7 @@ const TaskFormModal = ({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
+              disabled={submitting}
               placeholder="Ví dụ: Bón phân đợt 1, Xịt trừ rầy nâu..."
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
             />
@@ -100,6 +101,7 @@ const TaskFormModal = ({
               options={categoryOptions}
               placeholder="Chọn nhóm danh mục"
               variant="active"
+              disabled={submitting}
             />
           </div>
 
@@ -112,6 +114,7 @@ const TaskFormModal = ({
                 type="number"
                 value={order}
                 onChange={(e) => setOrder(Number(e.target.value))}
+                disabled={submitting}
                 min="0"
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
               />
@@ -124,6 +127,7 @@ const TaskFormModal = ({
                 <input
                   type="checkbox"
                   checked={isRepeatable}
+                  disabled={submitting}
                   onChange={(e) => setIsRepeatable(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                 />
@@ -145,6 +149,7 @@ const TaskFormModal = ({
               placeholder="Chọn các công việc bắt buộc làm trước"
               multi
               variant="active"
+              disabled={submitting}
             />
           </div>
 
@@ -163,6 +168,7 @@ const TaskFormModal = ({
                 options={recTypeOptions}
                 placeholder="Chọn loại mốc"
                 variant="active"
+                disabled={submitting}
               />
             </div>
 
@@ -176,6 +182,7 @@ const TaskFormModal = ({
                   min="0"
                   value={startDay}
                   onChange={(e) => setStartDay(Number(e.target.value))}
+                  disabled={submitting}
                   className="w-16 rounded-lg border border-gray-200 p-1.5 text-sm text-center font-semibold outline-none focus:border-blue-500"
                 />
                 <span className="text-sm text-gray-600">đến ngày</span>
@@ -184,6 +191,7 @@ const TaskFormModal = ({
                   min="0"
                   value={endDay}
                   onChange={(e) => setEndDay(Number(e.target.value))}
+                  disabled={submitting}
                   className="w-16 rounded-lg border border-gray-200 p-1.5 text-sm text-center font-semibold outline-none focus:border-blue-500"
                 />
                 <span className="text-sm text-gray-600">sau sạ</span>

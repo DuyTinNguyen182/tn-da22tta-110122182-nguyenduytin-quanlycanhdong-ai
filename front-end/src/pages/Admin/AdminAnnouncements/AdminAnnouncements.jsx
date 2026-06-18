@@ -6,10 +6,7 @@ import AdminAnnouncementsFilterBar from "./components/AdminAnnouncementsFilterBa
 import AdminAnnouncementsTable from "./components/AdminAnnouncementsTable.jsx";
 import AnnouncementFormModal from "./components/AnnouncementFormModal.jsx";
 import AnnouncementDetailModal from "./components/AnnouncementDetailModal.jsx";
-import {
-  EMPTY_FORM,
-  createFormFromItem,
-} from "./adminAnnouncementsUtils.jsx";
+import { EMPTY_FORM, createFormFromItem } from "./adminAnnouncementsUtils.jsx";
 
 const INITIAL_PAGINATION = {
   page: 1,
@@ -226,6 +223,42 @@ const AdminAnnouncements = () => {
     if (form.targetMode === "selected_users" && form.userIds.length === 0) {
       toast.warning("Vui lòng chọn ít nhất 1 nông dân");
       return;
+    }
+
+    if (editingId) {
+      const originalItem = items.find((i) => i._id === editingId);
+      if (originalItem) {
+        const origTargetMode = originalItem.targetMode || "all_farmers";
+        const origFieldId = originalItem.targetFieldId || "";
+        const origUserIds = (originalItem.audienceUserIds || [])
+          .slice()
+          .sort()
+          .join(",");
+        const currentUserIds = (
+          form.targetMode === "selected_users" ? form.userIds : []
+        )
+          .slice()
+          .sort()
+          .join(",");
+
+        const isUnchanged =
+          originalItem.title === payload.title &&
+          originalItem.content === payload.content &&
+          originalItem.type === payload.type &&
+          (originalItem.isVisible === true) === payload.isVisible &&
+          origTargetMode === payload.targetConfig.mode &&
+          (origTargetMode === "field_users"
+            ? origFieldId === (payload.targetConfig.fieldId || "")
+            : true) &&
+          (origTargetMode === "selected_users"
+            ? origUserIds === currentUserIds
+            : true);
+
+        if (isUnchanged) {
+          toast.info("Không có thay đổi nào để lưu.");
+          return;
+        }
+      }
     }
 
     try {

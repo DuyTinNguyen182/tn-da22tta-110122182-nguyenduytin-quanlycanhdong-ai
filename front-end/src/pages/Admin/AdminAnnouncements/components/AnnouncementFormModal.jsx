@@ -104,6 +104,7 @@ const AnnouncementFormModal = ({
                 options={FORM_TYPE_OPTIONS}
                 placeholder="Chọn loại"
                 icon={BellRing}
+                disabled={submitting}
               />
             </label>
 
@@ -299,7 +300,9 @@ const AnnouncementFormModal = ({
             <input
               value={form.title}
               onChange={(event) => onFormChange("title", event.target.value)}
-              placeholder="Ví dụ: Cảnh báo sâu bệnh tuần này"
+              disabled={submitting}
+              maxLength={200}
+              placeholder="Ví dụ: Cảnh báo dịch bệnh tuần này"
               className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             />
           </label>
@@ -312,6 +315,8 @@ const AnnouncementFormModal = ({
               rows={5}
               value={form.content}
               onChange={(event) => onFormChange("content", event.target.value)}
+              disabled={submitting}
+              maxLength={3000}
               placeholder="Nhập nội dung chi tiết để hiển thị cho nông dân..."
               className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             />

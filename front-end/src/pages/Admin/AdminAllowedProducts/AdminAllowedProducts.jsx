@@ -167,13 +167,36 @@ const AdminAllowedProducts = () => {
     }
 
     const payload = {
-      product_name: productName,
-      category: category.toLowerCase(), // Backend lưu chữ thường: 'pesticide', 'fertilizer'
+      product_name: productName.trim(),
+      category: category.toLowerCase(),
       target_issues: processArrayInput(targetIssues),
       usage_periods: processArrayInput(usagePeriods),
-      instructions,
+      instructions: instructions.trim(),
       is_active: isActive,
     };
+
+    if (modalMode === "edit" && editingId) {
+      const originalItem = products.find((p) => p._id === editingId);
+      if (originalItem) {
+        const isArrayEqual = (a, b) =>
+          JSON.stringify([...(a || [])].sort()) ===
+          JSON.stringify([...(b || [])].sort());
+
+        const isUnchanged =
+          originalItem.product_name === payload.product_name &&
+          originalItem.category === payload.category &&
+          originalItem.instructions === payload.instructions &&
+          originalItem.is_active === payload.is_active &&
+          isArrayEqual(originalItem.target_issues, payload.target_issues) &&
+          isArrayEqual(originalItem.usage_periods, payload.usage_periods);
+
+        if (isUnchanged) {
+          toast.info("Không có thay đổi nào để lưu.");
+          closeTaskModal();
+          return;
+        }
+      }
+    }
 
     setSubmitting(true);
     try {

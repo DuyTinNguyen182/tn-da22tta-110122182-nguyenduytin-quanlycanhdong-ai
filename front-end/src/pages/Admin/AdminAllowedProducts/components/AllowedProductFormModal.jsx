@@ -58,6 +58,8 @@ const AllowedProductFormModal = ({
               <input
                 value={productName}
                 onChange={(e) => setProductName(e.target.value)}
+                disabled={submitting}
+                maxLength={150}
                 placeholder="VD: Amistar Top 325SC"
                 className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
               />
@@ -84,6 +86,8 @@ const AllowedProductFormModal = ({
             <input
               value={targetIssues}
               onChange={(e) => setTargetIssues(e.target.value)}
+              disabled={submitting}
+              maxLength={500}
               placeholder="VD: đạo ôn, khô vằn, còi cọc..."
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
             />
@@ -96,6 +100,8 @@ const AllowedProductFormModal = ({
             <input
               value={usagePeriods}
               onChange={(e) => setUsagePeriods(e.target.value)}
+              disabled={submitting}
+              maxLength={500}
               placeholder="VD: bón lót, đẻ nhánh, làm đòng..."
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
             />
@@ -110,6 +116,8 @@ const AllowedProductFormModal = ({
               rows={3}
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
+              disabled={submitting}
+              maxLength={3000}
               placeholder="VD: Pha 25ml cho bình 25 lít nước. Phun tập trung phần gốc rạ..."
               className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 resize-none"
             />

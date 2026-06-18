@@ -224,6 +224,23 @@ const AdminTasks = () => {
       return;
     }
 
+    if (newTaskRecType === "AFTER") {
+      const start = Number(newTaskStartDay) || 0;
+      const end = Number(newTaskEndDay) || 0;
+
+      if (start < 0 || end < 0) {
+        toast.warning("Ngày bắt đầu và kết thúc không được là số âm.");
+        return;
+      }
+
+      if (end < start) {
+        toast.warning(
+          "Ngày kết thúc khung thời gian không được nhỏ hơn ngày bắt đầu.",
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       await api.post("/tasks", {
@@ -283,6 +300,56 @@ const AdminTasks = () => {
       toast.warning("Giai đoạn và Tên công việc không được để trống");
       return;
     }
+    if (editingTaskOrder < 0) {
+      toast.warning("Thứ tự phải là số không âm");
+      return;
+    }
+
+    if (editingTaskRecType === "AFTER") {
+      const start = Number(editingTaskStartDay) || 0;
+      const end = Number(editingTaskEndDay) || 0;
+
+      if (start < 0 || end < 0) {
+        toast.warning("Ngày bắt đầu và kết thúc không được là số âm.");
+        return;
+      }
+
+      if (end < start) {
+        toast.warning(
+          "Ngày kết thúc khung thời gian không được nhỏ hơn ngày bắt đầu.",
+        );
+        return;
+      }
+    }
+
+    const originalTask = tasks.find((t) => t._id === id);
+    if (originalTask) {
+      const originalStage = originalTask.stage?._id || originalTask.stage || "";
+      const originalPrereq = (originalTask.prerequisites || [])
+        .map((p) => p._id || p)
+        .sort()
+        .join(",");
+      const currentPrereq = [...editingTaskPrerequisites].sort().join(",");
+
+      const uiRec = mapPayloadToRecType(originalTask.recommendation);
+
+      const isUnchanged =
+        originalStage === stageId &&
+        originalTask.name === name &&
+        originalTask.order === editingTaskOrder &&
+        originalTask.category === editingTaskCategory &&
+        (originalTask.isRepeatable ?? true) === editingTaskIsRepeatable &&
+        originalPrereq === currentPrereq &&
+        uiRec.type === editingTaskRecType &&
+        uiRec.start === editingTaskStartDay &&
+        uiRec.end === editingTaskEndDay;
+
+      if (isUnchanged) {
+        toast.info("Không có thay đổi nào để lưu.");
+        cancelEdit();
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -314,7 +381,7 @@ const AdminTasks = () => {
   const handleDelete = async (task) => {
     const confirmed = await confirm({
       title: "Xóa công việc?",
-      message: `Bạn có chắc muốn xóa '${task.name}'?`,
+      message: `Bạn có chắc muốn xóa '${task.name}'? Lưu ý: Không thể xóa nếu công việc này đã có nhật ký canh tác hoặc đang là điều kiện tiên quyết của công việc khác.`,
       confirmText: "Xóa công việc",
       tone: "danger",
     });
