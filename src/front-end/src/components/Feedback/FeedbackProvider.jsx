@@ -1,5 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Info, TriangleAlert, X } from "lucide-react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Info,
+  TriangleAlert,
+  X,
+} from "lucide-react";
 import { FeedbackContext } from "../../context/FeedbackContext";
 
 const TOAST_STYLES = {
@@ -59,12 +71,7 @@ const FeedbackProvider = ({ children }) => {
   }, []);
 
   const showToast = useCallback(
-    ({
-      type = "info",
-      title = "",
-      message = "",
-      duration = 3600,
-    }) => {
+    ({ type = "info", title = "", message = "", duration = 5000 }) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const nextToast = { id, type, title, message };
 
@@ -77,7 +84,7 @@ const FeedbackProvider = ({ children }) => {
       timeoutMapRef.current.set(id, timeoutId);
       return id;
     },
-    [removeToast]
+    [removeToast],
   );
 
   const confirm = useCallback((options = {}) => {
@@ -96,7 +103,7 @@ const FeedbackProvider = ({ children }) => {
       confirmState.resolve(result);
       setConfirmState(null);
     },
-    [confirmState]
+    [confirmState],
   );
 
   useEffect(() => {
@@ -110,15 +117,25 @@ const FeedbackProvider = ({ children }) => {
     () => ({
       show: showToast,
       success: (message, options = {}) =>
-        showToast({ type: "success", message, title: "Thành công", ...options }),
+        showToast({
+          type: "success",
+          message,
+          title: "Thành công",
+          ...options,
+        }),
       error: (message, options = {}) =>
-        showToast({ type: "error", message, title: "Có lỗi xảy ra", ...options }),
+        showToast({
+          type: "error",
+          message,
+          title: "Có lỗi xảy ra",
+          ...options,
+        }),
       warning: (message, options = {}) =>
         showToast({ type: "warning", message, title: "Lưu ý", ...options }),
       info: (message, options = {}) =>
         showToast({ type: "info", message, title: "Thông báo", ...options }),
     }),
-    [showToast]
+    [showToast],
   );
 
   const contextValue = useMemo(
@@ -126,7 +143,7 @@ const FeedbackProvider = ({ children }) => {
       toast,
       confirm,
     }),
-    [toast, confirm]
+    [toast, confirm],
   );
 
   return (
@@ -150,9 +167,13 @@ const FeedbackProvider = ({ children }) => {
                 </div>
                 <div className="min-w-0 flex-1">
                   {toastItem.title ? (
-                    <p className="text-sm font-bold text-gray-900">{toastItem.title}</p>
+                    <p className="text-sm font-bold text-gray-900">
+                      {toastItem.title}
+                    </p>
                   ) : null}
-                  <p className="mt-0.5 text-sm text-gray-600">{toastItem.message}</p>
+                  <p className="mt-0.5 text-sm text-gray-600">
+                    {toastItem.message}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -175,7 +196,9 @@ const FeedbackProvider = ({ children }) => {
                 <TriangleAlert size={22} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-gray-900">{confirmState.title}</h3>
+                <h3 className="text-lg font-bold text-gray-900">
+                  {confirmState.title}
+                </h3>
                 {confirmState.message ? (
                   <p className="mt-2 text-sm leading-relaxed text-gray-600">
                     {confirmState.message}

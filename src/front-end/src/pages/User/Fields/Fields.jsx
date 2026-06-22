@@ -174,6 +174,11 @@ const Fields = () => {
       return;
     }
 
+    if (areaValue < 500) {
+      toast.warning("Diện tích quá nhỏ (dưới 500 m²), vui lòng kiểm tra lại.");
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append("name", plotForm.name.trim());

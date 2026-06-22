@@ -202,9 +202,42 @@ const getDiseasePlotSummary = (log) => {
   return plotNames.join(", ");
 };
 
-const DiseaseLogItem = ({ log, inModal = false }) => {
+const DiseaseLogItem = ({ log, inModal = false, isPopup = false }) => {
   const isUnprocessed = log.status !== "processed";
   const statusMeta = getDiseaseStatusMeta(log.status);
+
+  if (isPopup) {
+    return (
+      <div
+        className={`rounded-xl border p-3 shadow-sm ${isUnprocessed ? "border-amber-300 bg-white" : "border-gray-100 bg-white"}`}
+      >
+        <div className="flex items-center gap-2 mb-1">
+          <span
+            className={`flex h-2 w-2 shrink-0 rounded-full ${statusMeta.dotClass} ${isUnprocessed ? "animate-pulse" : ""}`}
+          ></span>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-bold text-gray-800">
+              {log.diseaseName || "Bệnh chưa xác định"}
+            </p>
+            <span
+              className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold ${statusMeta.badgeClass}`}
+            >
+              {statusMeta.label}
+            </span>
+          </div>
+        </div>
+        <p className="text-xs text-gray-600 mb-1.5">
+          Thửa ảnh hưởng:{" "}
+          <span className="font-semibold text-emerald-700">
+            {getDiseasePlotSummary(log)}
+          </span>
+        </p>
+        <p className="text-xs text-gray-500 italic bg-gray-50 p-1.5 rounded border border-gray-100">
+          Ngày ghi nhận: {formatDateTime(log.detectedAt || log.createdAt)}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -246,7 +279,7 @@ const DiseaseLogItem = ({ log, inModal = false }) => {
           <span className="font-medium text-amber-700">
             {getDiseasePlotSummary(log)}
           </span>
-          {" • "}
+          {" - "}
           Ngày ghi nhận: {formatDateTime(log.detectedAt || log.createdAt)}
         </p>
       </div>
@@ -414,7 +447,6 @@ const FarmerDashboard = () => {
   return (
     <div className="min-h-[calc(100vh-80px)] bg-gray-100 px-2 py-2 sm:px-4 lg:px-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-2">
-        {/* ROW 1: KPIs & Bộ Lọc */}
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <KpiCard
             title="Số thửa đang canh tác"
@@ -486,7 +518,6 @@ const FarmerDashboard = () => {
           </div>
         </div>
 
-        {/* ROW 2: Chi phí theo danh mục & Giai đoạn */}
         <div className="grid grid-cols-1 gap-2 xl:grid-cols-5">
           <div className="rounded-2xl border border-gray-200 bg-white p-3 shadow-sm xl:col-span-3">
             <div className="mb-3 flex items-center gap-2">
@@ -591,7 +622,6 @@ const FarmerDashboard = () => {
           </div>
         </div>
 
-        {/* ROW 3: Tiến độ canh tác & Trợ lý */}
         <div className="grid grid-cols-1 gap-2 xl:grid-cols-2">
           <div
             className={`flex h-full min-h-[180px] flex-col overflow-hidden rounded-2xl border p-3 shadow-sm transition-colors duration-300 ${
@@ -600,15 +630,8 @@ const FarmerDashboard = () => {
                 : "border-gray-200 bg-gradient-to-br from-white to-gray-50/80"
             }`}
           >
-            {/* Tiêu đề */}
             <div className="mb-2.5 flex items-center gap-2">
-              <div
-                className={`rounded-xl border p-1.5 shadow-sm transition-colors ${
-                  hasUnprocessedDisease
-                    ? "border-amber-200 bg-white text-amber-600"
-                    : "border-gray-200 bg-white text-gray-500"
-                }`}
-              >
+              <div className="rounded-xl border p-1.5 shadow-sm transition-colors border-amber-200 bg-white text-amber-600">
                 <ShieldAlert className="h-4 w-4" />
               </div>
               <div>
@@ -619,13 +642,6 @@ const FarmerDashboard = () => {
                 >
                   Nhật ký bệnh gần đây
                 </h2>
-                {/* <p
-                  className={`text-[10px] font-medium transition-colors ${
-                    hasUnprocessedDisease ? "text-amber-700" : "text-gray-500"
-                  }`}
-                >
-                  Theo ghi nhận mới nhất
-                </p> */}
               </div>
             </div>
 
@@ -681,7 +697,6 @@ const FarmerDashboard = () => {
             )}
           </div>
 
-          {/* Cảnh báo dịch bệnh / Trợ lý sinh học - ĐÃ TRUYỀN SELECTED SEASON ID */}
           <AssistantCard selectedSeasonId={selectedSeasonId} />
         </div>
       </div>
@@ -707,7 +722,7 @@ const FarmerDashboard = () => {
 
             <div className="flex-1 space-y-2.5 overflow-y-auto bg-gray-50/60 p-4">
               {prioritizedDiseaseLogs.map((log) => (
-                <DiseaseLogItem key={log._id} log={log} />
+                <DiseaseLogItem key={log._id} log={log} isPopup={true} />
               ))}
             </div>
 

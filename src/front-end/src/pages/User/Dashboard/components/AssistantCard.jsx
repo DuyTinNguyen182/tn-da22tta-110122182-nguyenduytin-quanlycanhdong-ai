@@ -7,18 +7,16 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hasActiveSeason, setHasActiveSeason] = useState(true);
-  const [isSeasonEnded, setIsSeasonEnded] = useState(false); // Quản lý trạng thái mùa vụ đã kết thúc
+  const [isSeasonEnded, setIsSeasonEnded] = useState(false);
 
-  // State điều khiển Popup Xem tất cả
   const [isModalOpen, setIsModalOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        setLoading(true); // Bật trạng thái loading khi đổi mùa vụ dữ liệu mới
+        setLoading(true);
 
-        // Gửi kèm tham số lọc seasonId lên API
         const res = await api.get("/farmer-dashboard/recommendations", {
           params: selectedSeasonId ? { seasonId: selectedSeasonId } : {},
         });
@@ -27,7 +25,6 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
         let active = true;
         let ended = false;
 
-        // Xử lý đọc dữ liệu tương thích với API
         if (res.data && !Array.isArray(res.data)) {
           rawData = res.data.data || [];
           active = res.data.hasActiveSeason ?? true;
@@ -54,6 +51,8 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
         }, {});
 
         const groupedArray = Object.values(grouped).sort((a, b) => {
+          if (a.isOverdue && !b.isOverdue) return -1;
+          if (!a.isOverdue && b.isOverdue) return 1;
           if (a.urgency === "HIGH" && b.urgency !== "HIGH") return -1;
           if (a.urgency !== "HIGH" && b.urgency === "HIGH") return 1;
           return 0;
@@ -79,7 +78,6 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
     );
   }
 
-  // Khối thông báo riêng khi KHÔNG CÓ mùa vụ nào đang hoạt động
   if (!hasActiveSeason) {
     return (
       <div className="flex h-full flex-col rounded-2xl border border-gray-200 bg-gray-50 p-3 shadow-sm min-h-[180px]">
@@ -97,7 +95,6 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
     );
   }
 
-  // Khối thông báo riêng khi chọn xem MÙA VỤ CŨ ĐÃ KẾT THÚC
   if (isSeasonEnded) {
     return (
       <div className="flex h-full flex-col rounded-2xl border border-amber-100 bg-amber-50/40 p-3 shadow-sm min-h-[180px]">
@@ -114,7 +111,6 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
     );
   }
 
-  // Thông báo khi CÓ mùa vụ nhưng ruộng đang ổn ổn định (Không có việc đến hạn)
   if (recommendations.length === 0) {
     return (
       <div className="flex h-full flex-col rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-teal-50/50 p-3 shadow-sm min-h-[180px]">
@@ -134,12 +130,11 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
     );
   }
 
-  const topRecommendations = recommendations.slice(0, 3);
-  const hasMore = recommendations.length > 3;
+  const topRecommendations = recommendations.slice(0, 2);
+  const hasMore = recommendations.length > 2;
 
   return (
     <>
-      {/* Container chính bọc ngoài sử dụng flex flex-col h-full */}
       <div className="flex flex-col h-full rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-100/50 p-3 shadow-sm relative overflow-hidden min-h-[180px]">
         <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-yellow-200/50 blur-2xl"></div>
 
@@ -165,20 +160,31 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5 mb-1">
-                  {rec.urgency === "HIGH" ? (
-                    <span className="flex h-2 w-2 shrink-0 rounded-full bg-red-500 animate-pulse"></span>
+                  {rec.isOverdue ? (
+                    <span className="flex h-2 w-2 shrink-0 rounded-full bg-red-600 animate-pulse"></span>
+                  ) : rec.urgency === "HIGH" ? (
+                    <span className="flex h-2 w-2 shrink-0 rounded-full bg-orange-500 animate-pulse"></span>
                   ) : (
                     <span className="flex h-2 w-2 shrink-0 rounded-full bg-emerald-500"></span>
                   )}
-                  <p className="truncate text-sm font-bold text-gray-800">
-                    {rec.taskName}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p
+                      className={`truncate text-sm font-bold ${rec.isOverdue ? "text-red-700" : "text-gray-800"}`}
+                    >
+                      {rec.taskName}
+                    </p>
+                    {rec.isOverdue && (
+                      <span className="shrink-0 rounded-md bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600 border border-red-200">
+                        Quá hạn
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-xs text-gray-600 truncate">
                   <span className="font-medium text-emerald-700">
                     {rec.plotNames.join(", ")}
                   </span>{" "}
-                  • {rec.message}
+                  - {rec.message}
                 </p>
               </div>
             </div>
@@ -206,7 +212,6 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
         </div>
       </div>
 
-      {/* MODAL POPUP: Xem tất cả gợi ý */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm animate-fadeIn">
           <div className="w-full max-w-md rounded-2xl border border-gray-100 bg-white shadow-xl flex flex-col max-h-[85vh]">
@@ -232,14 +237,27 @@ const SmartAssistantCard = ({ selectedSeasonId }) => {
                   className="rounded-xl bg-white p-3 shadow-sm border border-gray-100"
                 >
                   <div className="flex items-center gap-2 mb-1">
-                    {rec.urgency === "HIGH" ? (
-                      <span className="flex h-2 w-2 shrink-0 rounded-full bg-red-500 animate-pulse"></span>
+                    {/* Cập nhật màu chấm tròn */}
+                    {rec.isOverdue ? (
+                      <span className="flex h-2 w-2 shrink-0 rounded-full bg-red-600 animate-pulse"></span>
+                    ) : rec.urgency === "HIGH" ? (
+                      <span className="flex h-2 w-2 shrink-0 rounded-full bg-orange-500 animate-pulse"></span>
                     ) : (
                       <span className="flex h-2 w-2 shrink-0 rounded-full bg-emerald-500"></span>
                     )}
-                    <p className="text-sm font-bold text-gray-800">
-                      {rec.taskName}
-                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <p
+                        className={`text-sm font-bold ${rec.isOverdue ? "text-red-700" : "text-gray-800"}`}
+                      >
+                        {rec.taskName}
+                      </p>
+                      {rec.isOverdue && (
+                        <span className="shrink-0 rounded-md bg-red-100 px-1.5 py-0.5 text-[10px] font-bold text-red-600 border border-red-200">
+                          Quá hạn
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-gray-600 mb-1.5">
                     Áp dụng:{" "}

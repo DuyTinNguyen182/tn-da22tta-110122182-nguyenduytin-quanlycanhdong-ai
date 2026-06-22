@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { LogOut } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import HeaderOverview from "./HeaderOverview";
+import ConfirmLogout from "../Common/ConfirmLogout";
 
 // const pageTitleMap = {
 //   "/admin": "Tổng quan",
@@ -21,9 +22,14 @@ const AdminHeader = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // const pageTitle = pageTitleMap[location.pathname] || "Quản trị hệ thống";
+  const [showLogout, setShowLogout] = useState(false);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    setShowLogout(true);
+  };
+
+  const handleLogoutConfirm = async () => {
+    setShowLogout(false);
     await logout();
     navigate("/");
   };
@@ -61,6 +67,12 @@ const AdminHeader = () => {
           </button>
         </div>
       ) : null}
+
+      <ConfirmLogout
+        isOpen={showLogout}
+        onClose={() => setShowLogout(false)}
+        onConfirm={handleLogoutConfirm}
+      />
     </header>
   );
 };
