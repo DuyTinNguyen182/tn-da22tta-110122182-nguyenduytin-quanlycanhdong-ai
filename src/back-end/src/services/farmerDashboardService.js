@@ -498,7 +498,7 @@ const getDailyRecommendations = async (farmerId, querySeasonDetailId = "") => {
           "recommendation.isSuggested": true,
           "recommendation.isSowingTask": false,
           "recommendation.startDay": { $gte: 0, $lte: daysSinceSowing },
-          "recommendation.endDay": { $gte: daysSinceSowing },
+          // "recommendation.endDay": { $gte: daysSinceSowing },
         }).lean();
 
         for (const task of dueTasks) {
@@ -506,24 +506,29 @@ const getDailyRecommendations = async (farmerId, querySeasonDetailId = "") => {
 
           if (!isDone) {
             const isReady = checkPrerequisites(task, completedTaskIds);
-            if (isReady) {
-              recommendations.push({
-                plotId,
-                plotName,
-                taskId: task._id,
-                taskName: task.name,
-                type: "CARE",
-                message: `Lúa đang ${daysSinceSowing} ngày tuổi. Đã đến lịch ${task.name}.`,
-                urgency:
-                  daysSinceSowing === task.recommendation.endDay
-                    ? "HIGH"
-                    : "NORMAL",
-              });
-            }
+
+            const isOverdue = daysSinceSowing > task.recommendation.endDay;
+
+            recommendations.push({
+              plotId,
+              plotName,
+              taskId: task._id,
+              taskName: task.name,
+              type: "CARE",
+              message: isOverdue
+                ? `Lúa đang ${daysSinceSowing} ngày tuổi. Đã quá hạn lịch ${task.name}.`
+                : `Lúa đang ${daysSinceSowing} ngày tuổi. Đã đến lịch ${task.name}.`,
+              urgency: isOverdue
+                ? "OVERDUE"
+                : daysSinceSowing === task.recommendation.endDay
+                  ? "HIGH"
+                  : "NORMAL",
+              isOverdue: isOverdue,
+              isReady: isReady,
+            });
           }
         }
       } else {
-        // ĐÃ SỬA: Thay đổi activeSeasonDetail.startDate thành seasonDetail.startDate
         if (now >= new Date(seasonDetail.startDate)) {
           let pendingPrepCount = 0;
 

@@ -396,6 +396,7 @@ const createLog = async (data, userId) => {
   await validateChronologicalOrder(data.date, assignmentIds);
   await validateRepetitionConstraint(resolvedTaskId, assignmentIds);
   await validatePrerequisiteConstraint(resolvedTaskId, assignmentIds);
+  await validateTaskAgeConstraint(resolvedTaskId, assignmentIds, data.date);
 
   const created = await DiaryLog.create({
     task: resolvedTaskId,
@@ -511,6 +512,11 @@ const updateLog = async (id, data, userId) => {
 
   await validateRepetitionConstraint(taskToValidate, assignmentsToValidate, id);
   await validatePrerequisiteConstraint(taskToValidate, assignmentsToValidate);
+  await validateTaskAgeConstraint(
+    taskToValidate,
+    assignmentsToValidate,
+    data.date || existingLog.date,
+  );
 
   const updated = await buildDiaryLogPopulate(
     DiaryLog.findOneAndUpdate({ _id: id, user: userId }, updateData, {
@@ -596,7 +602,7 @@ const validatePrerequisiteConstraint = async (
       return;
     }
 
-    // 1. Lấy thông tin Tên thửa đất để hiển thị lỗi thân thiện
+    // 1. Lấy thông tin Tên thửa đất để hiển thị lỗi
     const assignments = await SeasonPlotAssignment.find({
       _id: { $in: seasonPlotAssignmentIds },
     })
@@ -658,6 +664,66 @@ const validatePrerequisiteConstraint = async (
       throw error;
     }
     throw new Error(`Xác thực ràng buộc tiên quyết thất bại: ${error.message}`);
+  }
+};
+
+// 5. Ràng buộc tuổi lúa (Biên độ an toàn)
+const validateTaskAgeConstraint = async (
+  taskId,
+  seasonPlotAssignmentIds,
+  logDate,
+) => {
+  try {
+    const Task = require("../models/taskModel");
+    const DiaryLog = require("../models/farmingLogModel");
+
+    // 1. Lấy thông tin công việc hiện tại
+    const task = await Task.findById(taskId).lean();
+
+    // Bỏ qua nếu không phải việc được gợi ý, hoặc là việc chuẩn bị/gieo sạ (startDay <= 0)
+    if (!task || !task.recommendation || !task.recommendation.isSuggested)
+      return;
+    if (task.recommendation.isSowingTask || task.recommendation.startDay <= 0)
+      return;
+
+    // 2. Tìm ID của công việc Gieo sạ trong hệ thống
+    const sowingTask = await Task.findOne({
+      "recommendation.isSowingTask": true,
+    }).lean();
+    if (!sowingTask) return;
+
+    // 3. Tìm ngày Gieo sạ thực tế trên các thửa này
+    const sowingLog = await DiaryLog.findOne({
+      task: sowingTask._id,
+      seasonPlotAssignments: { $in: seasonPlotAssignmentIds },
+    }).lean();
+
+    // Nếu chưa gieo sạ, hàm validatePrerequisiteConstraint sẽ chặn, không xử lý ở đây
+    if (!sowingLog) return;
+
+    // 4. Tính toán tuổi lúa tại thời điểm GHI NHẬT KÝ
+    const sowingDate = new Date(sowingLog.date);
+    sowingDate.setHours(0, 0, 0, 0);
+
+    const targetDate = new Date(logDate);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const daysSinceSowing = Math.floor(
+      (targetDate - sowingDate) / (1000 * 60 * 60 * 24),
+    );
+
+    // 5. Áp dụng BIÊN ĐỘ AN TOÀN (Cho phép làm sớm tối đa 2 ngày)
+    const SAFE_BUFFER = 2;
+    const minAllowedDay = task.recommendation.startDay - SAFE_BUFFER;
+
+    if (daysSinceSowing < minAllowedDay) {
+      throw new Error(
+        `Lúa tại thời điểm ghi nhận mới ${daysSinceSowing} ngày tuổi. Còn quá sớm để thực hiện "${task.name}" (sớm nhất từ ngày lúa ${minAllowedDay} ngày tuổi).`,
+      );
+    }
+  } catch (error) {
+    if (error.message.includes("Còn quá sớm")) throw error;
+    throw new Error(`Kiểm tra tuổi lúa thất bại: ${error.message}`);
   }
 };
 
