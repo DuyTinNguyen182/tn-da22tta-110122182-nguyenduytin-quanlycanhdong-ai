@@ -79,7 +79,7 @@ const Login = () => {
                 type="email"
                 autoComplete="email"
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
-                placeholder="nhanong@example.com"
+                placeholder="nhanong@gmail.com"
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
@@ -89,9 +89,17 @@ const Login = () => {
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Mật khẩu
-              </label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-sm font-medium text-slate-700">
+                  Mật khẩu
+                </label>
+                <a
+                  href="#"
+                  className="text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline transition-colors"
+                >
+                  Quên mật khẩu?
+                </a>
+              </div>
               <input
                 type="password"
                 autoComplete="current-password"
@@ -118,12 +126,17 @@ const Login = () => {
             </button>
           </form>
 
-          <p className="mt-7 text-center text-sm text-slate-500">
+          <div className="mt-7 text-center text-sm text-slate-500 leading-relaxed">
             Chưa có tài khoản?{" "}
-            <span className="font-semibold text-emerald-600">
-              Vui lòng liên hệ với Ban quản lý HTX để được cấp tài khoản.
-            </span>
-          </p>
+            <div className="font-semibold text-emerald-600 mt-1">
+              Vui lòng liên hệ Ban quản lý HTX để được cấp.
+              <br />
+              Hotline:{" "}
+              <a href="tel:0123456789" className="hover:underline">
+                0794 325 729
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
