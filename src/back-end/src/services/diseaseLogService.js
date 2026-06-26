@@ -679,9 +679,10 @@ const validateDetectedDate = (detectedAt, season) => {
 
   const detectedDate = new Date(detectedAt);
   const now = new Date();
+  const allowedFuture = new Date(now.getTime() + 5 * 60000);
 
   // 1. Không được ở tương lai
-  if (detectedDate > now) {
+  if (detectedDate > allowedFuture) {
     throw new Error(
       "Ngày giờ phát hiện bệnh không được vượt quá thời điểm hiện tại.",
     );
