@@ -32,7 +32,6 @@ exports.scanImage = async (file) => {
       throw customError;
     }
 
-    // Ném ra lỗi mạng hoặc lỗi hệ thống khác
     throw error;
   }
 };

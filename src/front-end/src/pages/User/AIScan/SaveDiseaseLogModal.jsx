@@ -272,7 +272,9 @@ const SaveDiseaseLogModal = ({
       description: buildDiagnosisDescriptionText(result),
       fieldId: selectedField?._id || "",
       seasonId: selectedSeason,
-      date: detectedDate,
+      date: detectedDate
+        ? new Date(detectedDate).toISOString()
+        : new Date().toISOString(),
       scope,
       plotIds: selectedPlotIds,
       imageName: selectedImage?.name || "",
