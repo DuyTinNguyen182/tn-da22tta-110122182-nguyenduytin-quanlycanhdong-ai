@@ -423,7 +423,9 @@ const DiseaseLogs = () => {
     const payload = {
       diseaseName: form.diseaseName,
       description: form.description,
-      detectedAt: form.detectedAt,
+      detectedAt: form.detectedAt
+        ? new Date(form.detectedAt).toISOString()
+        : new Date().toISOString(),
       fieldId: form.fieldId,
       seasonId: form.seasonId,
       scope: isAllSelected ? "all_plots" : "selected_plots",
