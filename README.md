@@ -1,4 +1,3 @@
-````markdown
 # XÂY DỰNG HỆ THỐNG QUẢN LÝ CÁNH ĐỒNG VÀ HỖ TRỢ DỰ ĐOÁN MỘT SỐ BỆNH TRÊN LÚA
 
 ## Thông tin chung
@@ -38,9 +37,10 @@
 ### Sao chép mã nguồn dự án
 
 ```bash
-git clone [https://github.com/DuyTinNguyen182/tn-da22tta-110122182-nguyenduytin-quanlycanhdong-ai.git](https://github.com/DuyTinNguyen182/tn-da22tta-110122182-nguyenduytin-quanlycanhdong-ai.git)
+git clone https://github.com/DuyTinNguyen182/tn-da22tta-110122182-nguyenduytin-quanlycanhdong-ai.git
 cd tn-da22tta-110122182-nguyenduytin-quanlycanhdong-ai
 ```
+
 ````
 
 ### Cấu hình biến môi trường
@@ -56,7 +56,7 @@ MONGO_URI=<MongoDB Connection String>
 JWT_SECRET=<JWT Secret Key>
 OPENAI_API_KEY=<OpenAI API Key>
 OPENAI_MODEL=gpt-4o-mini
-PYTHON_AI_SERVICE_URL=[http://127.0.0.1:5000/predict](http://127.0.0.1:5000/predict)
+PYTHON_AI_SERVICE_URL=http://127.0.0.1:5000/predict
 AI_SERVICE_TIMEOUT_MS=60000
 CLOUDINARY_CLOUD_NAME=<Cloudinary Cloud Name>
 CLOUDINARY_API_KEY=<Cloudinary API Key>
@@ -75,7 +75,7 @@ Tạo tệp `.env` trong thư mục `src/front-end` với nội dung:
 
 ```env
 VITE_API_BASE_URL=http://localhost:4000/api
-VITE_OPEN_METEO_URL=[https://api.open-meteo.com/v1/forecast](https://api.open-meteo.com/v1/forecast)
+VITE_OPEN_METEO_URL=https://api.open-meteo.com/v1/forecast
 
 ```
 
@@ -122,5 +122,4 @@ python app.py
 © 2026 Bản quyền thuộc về Nguyễn Duy Tín - Đại học Trà Vinh
 
 ```
-
-```
+````
