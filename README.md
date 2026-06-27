@@ -3,7 +3,7 @@
 ## Thông tin chung
 
 **Trường**: Trường Kỹ thuật & Công nghệ - Đại học Trà Vinh  
-**Khoa**: Công nghệ thông tin
+**Khoa**: Công nghệ thông tin  
 **Loại**: Đồ án tốt nghiệp ngành Công nghệ thông tin khoá 2022 - 2026
 
 **Giảng viên hướng dẫn**: ThS. Phạm Minh Đương  
@@ -40,8 +40,6 @@
 git clone https://github.com/DuyTinNguyen182/tn-da22tta-110122182-nguyenduytin-quanlycanhdong-ai.git
 cd tn-da22tta-110122182-nguyenduytin-quanlycanhdong-ai
 ```
-
-````
 
 ### Cấu hình biến môi trường
 
@@ -122,4 +120,5 @@ python app.py
 © 2026 Bản quyền thuộc về Nguyễn Duy Tín - Đại học Trà Vinh
 
 ```
-````
+
+```
