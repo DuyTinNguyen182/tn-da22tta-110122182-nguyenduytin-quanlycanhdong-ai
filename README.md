@@ -118,7 +118,3 @@ python app.py
 ## Giấy phép
 
 © 2026 Bản quyền thuộc về Nguyễn Duy Tín - Đại học Trà Vinh
-
-```
-
-```
