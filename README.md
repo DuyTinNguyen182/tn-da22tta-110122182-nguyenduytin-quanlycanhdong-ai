@@ -4,10 +4,45 @@
 
 **Trường**: Trường Kỹ thuật & Công nghệ - Đại học Trà Vinh  
 **Khoa**: Công nghệ thông tin  
-**Loại**: Đồ án tốt nghiệp ngành Công nghệ thông tin khoá 2022 - 2026
+**Loại**: Đồ án tốt nghiệp ngành Công nghệ thông tin khoá 2022 - 2026  
+**Giảng viên hướng dẫn**: ThS. Phạm Minh Đương
 
-**Giảng viên hướng dẫn**: ThS. Phạm Minh Đương  
-**Sinh viên thực hiện**: Nguyễn Duy Tín - 110122182 - DA22TTA
+**Sinh viên thực hiện**: Nguyễn Duy Tín - 110122182 - DA22TTA  
+**Email**: `duytinnguyen84@gmail.com`  
+**SĐT**: `0794325729`
+
+---
+
+## Mục tiêu và Kiến trúc
+
+### Mục tiêu
+
+- Xây dựng một hệ thống quản lý cánh đồng toàn diện, hỗ trợ quản lý thửa ruộng, mùa vụ, nhật ký canh tác và nhật ký bệnh.
+
+- Ứng dụng trí tuệ nhân tạo (sử dụng mô hình EfficientNet-B1 kết hợp Transfer Learning) để dự đoán bệnh trên lúa thông qua hình ảnh.
+
+- Tích hợp trợ lý ảo dựa trên API của mô hình ngôn ngữ lớn (LLM) nhằm tư vấn kỹ thuật canh tác và hướng xử lý bệnh kịp thời.
+
+- Cung cấp giao diện người dùng trực quan, ổn định và dễ sử dụng cho cả nông dân và cán bộ quản lý hệ thống.
+
+### Kiến trúc hệ thống
+
+- Hệ thống được phát triển dựa trên kiến trúc Client-Server và giao tiếp qua chuẩn RESTful API.
+
+- **Nền tảng chính:** Triển khai trên nền tảng MERN Stack (MongoDB, ExpressJS, ReactJS, NodeJS).
+
+- **Kiến trúc dịch vụ:** Áp dụng kiến trúc Microservices để tách biệt module xử lý AI thành một dịch vụ hoạt động độc lập.
+
+- **Thành phần công nghệ cụ thể:**
+- **Front-end (Giao diện):** Xây dựng theo kiến trúc Single Page Application (SPA) bằng ReactJS, Vite và Tailwind CSS.
+
+- **Back-end (Máy chủ):** Xử lý logic và API bằng NodeJS và framework ExpressJS.
+
+- **Database & Storage:** Lưu trữ dữ liệu với MongoDB và hình ảnh qua Cloudinary.
+
+- **AI Service (Dịch vụ trí tuệ nhân tạo):** Phát triển độc lập bằng Python, Flask và TensorFlow để chạy mô hình EfficientNet-B1.
+
+- **LLM:** Kết nối với OpenAI API để vận hành chức năng tư vấn.
 
 ---
 
@@ -20,7 +55,7 @@
   `NodeJS`, `ExpressJS`, `MongoDB`, `Cloudinary`
 
 - **AI Service & API**:
-  `Python`, `Flask`, `TensorFlow / Keras (Mô hình EfficientNet-B1)`, `OpenAI API (LLM)`
+  `Python`, `Flask`, `TensorFlow / Keras`, `Mô hình EfficientNet-B1`, `OpenAI API (LLM)`
 
 ---
 
