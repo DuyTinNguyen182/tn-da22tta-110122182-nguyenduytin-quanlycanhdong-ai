@@ -1,4 +1,5 @@
-from __future__ import annotations
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import argparse
 import json
@@ -9,493 +10,254 @@ from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, precision_score, recall_score, f1_score
 from sklearn.model_selection import train_test_split
+from sklearn.utils.class_weight import compute_class_weight
 
 AUTOTUNE = tf.data.AUTOTUNE
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-DEFAULT_CONFIDENCE_THRESHOLD = 0.8
+DEFAULT_CONFIDENCE_THRESHOLD = 0.80
 DEFAULT_CONFIDENCE_GAP_THRESHOLD = 0.12
+
 DISPLAY_NAME_MAP = {
-    "bacterial_leaf_blight": "Bệnh bạc lá",
-    "bacterial_leaf_streak": "Bệnh sọc lá vi khuẩn",
+    "bacterial_leaf_blight": "Bệnh bạc lá (cháy bìa lá)",
+    "bacterial_leaf_streak": "Sọc lá vi khuẩn (sọc trong)",
     "bacterial_panicle_blight": "Bệnh lem lép hạt",
     "blast": "Bệnh đạo ôn",
     "brown_spot": "Bệnh đốm nâu",
-    "dead_heart": "Tim chết (dảnh héo)",
+    "dead_heart": "Tim chết (sâu đục thân)",
     "downy_mildew": "Bệnh sương mai",
-    "hispa": "Bọ hispa hại lá",
+    "hispa": "Bọ hispa (sâu gai) hại lá",
     "normal": "Lá lúa khỏe",
     "tungro": "Bệnh vàng lùn (tungro)",
 }
 
-
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Train a Colab-friendly rice disease classifier for the Paddy Doctor dataset."
-    )
-    parser.add_argument(
-        "--data-dir",
-        required=True,
-        help="Path to the extracted dataset root containing train_images/ and test_images/.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="./artifacts/paddy_efficientnetb0",
-        help="Directory used to store the trained model and metadata.",
-    )
-    parser.add_argument(
-        "--image-size",
-        type=int,
-        default=224,
-        help="Image size used for training and inference.",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=32,
-        help="Batch size. Use 24 or 16 if Colab GPU RAM is limited.",
-    )
-    parser.add_argument(
-        "--epochs-head",
-        type=int,
-        default=5,
-        help="Epochs for the frozen backbone stage.",
-    )
-    parser.add_argument(
-        "--epochs-finetune",
-        type=int,
-        default=6,
-        help="Epochs for the fine-tuning stage.",
-    )
-    parser.add_argument(
-        "--fine-tune-layers",
-        type=int,
-        default=40,
-        help="How many backbone layers to unfreeze during fine-tuning.",
-    )
-    parser.add_argument(
-        "--val-split",
-        type=float,
-        default=0.15,
-        help="Validation split taken from train_images.",
-    )
-    parser.add_argument(
-        "--learning-rate",
-        type=float,
-        default=1e-3,
-        help="Learning rate for the classifier head stage.",
-    )
-    parser.add_argument(
-        "--fine-tune-learning-rate",
-        type=float,
-        default=1e-4,
-        help="Learning rate for the fine-tuning stage.",
-    )
-    parser.add_argument(
-        "--dropout",
-        type=float,
-        default=0.3,
-        help="Dropout added before the classification layer.",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=42,
-        help="Random seed for reproducibility.",
-    )
+    parser = argparse.ArgumentParser(description="Huấn luyện mô hình nhận dự đoán bệnh trên lúa")
+    parser.add_argument("--data-dir", required=True, help="Đường dẫn tới thư mục chứa train_images")
+    parser.add_argument("--output-dir", default="./artifacts/paddy_efficientnet", help="Thư mục lưu model")
+    parser.add_argument("--image-size", type=int, default=240)
+    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--epochs-head", type=int, default=10)
+    parser.add_argument("--epochs-finetune", type=int, default=25)
+    parser.add_argument("--fine-tune-layers", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=42)
     return parser.parse_args()
-
 
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     tf.random.set_seed(seed)
-    try:
-        tf.keras.utils.set_random_seed(seed)
-    except AttributeError:
-        pass
-
-
-def enable_mixed_precision_if_available():
-    gpus = tf.config.list_physical_devices("GPU")
-    if not gpus:
-        print("No GPU detected. Training will work, but it will be much slower.")
-        return False
-
-    try:
-        from tensorflow.keras import mixed_precision
-
-        mixed_precision.set_global_policy("mixed_float16")
-        print("Mixed precision enabled for faster Colab training.")
-        return True
-    except Exception as error:
-        print(f"Mixed precision was not enabled: {error}")
-        return False
-
 
 def discover_class_names(train_dir):
     class_names = sorted(path.name for path in train_dir.iterdir() if path.is_dir())
     if not class_names:
-        raise FileNotFoundError(f"No class folders were found inside: {train_dir}")
+        raise FileNotFoundError(f"Không tìm thấy thư mục class nào trong: {train_dir}")
     return class_names
 
-
 def collect_split_samples(split_dir, class_names):
-    paths = []
-    labels = []
-
+    paths, labels = [], []
     for class_index, class_name in enumerate(class_names):
         class_dir = split_dir / class_name
-        if not class_dir.exists():
-            raise FileNotFoundError(f"Missing expected class directory: {class_dir}")
+        image_paths = [p for p in class_dir.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS]
 
-        image_paths = [
-            path
-            for path in sorted(class_dir.rglob("*"))
-            if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
-        ]
-
-        paths.extend(str(path) for path in image_paths)
-        labels.extend([class_index] * len(image_paths))
-
-    if not paths:
-        raise FileNotFoundError(f"No image files were found inside: {split_dir}")
+        for p in image_paths:
+            paths.append(str(p))
+            labels.append(class_index)
 
     return paths, labels
 
-
-def print_distribution(name, labels, class_names):
-    counts = Counter(labels)
-    print(f"\n{name} distribution:")
-    for index, class_name in enumerate(class_names):
-        print(f"  {class_name}: {counts.get(index, 0)}")
-
-
-def decode_image(path, label, image_size):
+def decode_image_with_central_crop(path, label, image_size, num_classes):
     image_bytes = tf.io.read_file(path)
     image = tf.io.decode_image(image_bytes, channels=3, expand_animations=False)
-    image.set_shape([None, None, 3])
-    image = tf.image.resize(
-        image, [image_size, image_size], method=tf.image.ResizeMethod.BILINEAR
-    )
-    image = tf.cast(image, tf.float32)
-    return image, label
 
+    shape = tf.shape(image)
+    min_dim = tf.minimum(shape[0], shape[1])
+    image = tf.image.resize_with_crop_or_pad(image, min_dim, min_dim)
+    image = tf.image.resize(image, [image_size, image_size])
+
+    image = tf.cast(image, tf.float32)
+    label_one_hot = tf.one_hot(label, num_classes)
+    return image, label_one_hot
 
 def build_augmenter():
-    return tf.keras.Sequential(
-        [
-            tf.keras.layers.RandomFlip("horizontal_and_vertical"),
-            tf.keras.layers.RandomRotation(0.08),
-            tf.keras.layers.RandomZoom(0.12),
-            tf.keras.layers.RandomContrast(0.1),
-        ],
-        name="augmenter",
-    )
+    return tf.keras.Sequential([
+        tf.keras.layers.RandomFlip("horizontal_and_vertical"),
+        tf.keras.layers.RandomRotation(0.10),
+        tf.keras.layers.RandomBrightness(0.15),
+        tf.keras.layers.RandomContrast(0.15),
+    ], name="augmenter")
 
-
-def build_dataset(paths, labels, image_size, batch_size, training, seed):
+def build_dataset(paths, labels, image_size, batch_size, num_classes, training, seed):
     dataset = tf.data.Dataset.from_tensor_slices((paths, labels))
-
     if training:
-        dataset = dataset.shuffle(
-            buffer_size=min(len(paths), 4096),
-            seed=seed,
-            reshuffle_each_iteration=True,
-        )
+        dataset = dataset.shuffle(buffer_size=4096, seed=seed)
 
     dataset = dataset.map(
-        lambda path, label: decode_image(path, label, image_size),
-        num_parallel_calls=AUTOTUNE,
-    )
-    dataset = dataset.batch(batch_size)
+        lambda path, label: decode_image_with_central_crop(path, label, image_size, num_classes),
+        num_parallel_calls=AUTOTUNE
+    ).batch(batch_size)
 
     if training:
         augmenter = build_augmenter()
         dataset = dataset.map(
             lambda images, labels: (augmenter(images, training=True), labels),
-            num_parallel_calls=AUTOTUNE,
+            num_parallel_calls=AUTOTUNE
         )
-
     return dataset.prefetch(AUTOTUNE)
 
-
-def build_model(num_classes, image_size, dropout):
-    inputs = tf.keras.Input(shape=(image_size, image_size, 3), name="image")
-    base_model = tf.keras.applications.EfficientNetB0(
-        include_top=False,
-        weights="imagenet",
-        input_shape=(image_size, image_size, 3),
+def build_model(num_classes, image_size):
+    inputs = tf.keras.Input(shape=(image_size, image_size, 3))
+    base_model = tf.keras.applications.EfficientNetB1(
+        include_top=False, weights="imagenet", input_tensor=inputs
     )
     base_model.trainable = False
-
-    x = base_model(inputs, training=False)
-    x = tf.keras.layers.GlobalAveragePooling2D(name="avg_pool")(x)
-    x = tf.keras.layers.Dropout(dropout, name="dropout")(x)
-    outputs = tf.keras.layers.Dense(
-        num_classes,
-        activation="softmax",
-        dtype="float32",
-        name="predictions",
-    )(x)
-
-    model = tf.keras.Model(inputs=inputs, outputs=outputs, name="paddy_disease_model")
-    return model, base_model
-
-
-def build_optimizer(learning_rate):
-    try:
-        return tf.keras.optimizers.AdamW(
-            learning_rate=learning_rate,
-            weight_decay=1e-4,
-        )
-    except AttributeError:
-        return tf.keras.optimizers.Adam(learning_rate=learning_rate)
-
+    x = tf.keras.layers.GlobalAveragePooling2D()(base_model.output)
+    x = tf.keras.layers.Dropout(0.2)(x)
+    outputs = tf.keras.layers.Dense(num_classes, activation="softmax", dtype="float32")(x)
+    return tf.keras.Model(inputs, outputs), base_model
 
 def compile_model(model, learning_rate):
+    loss_fn = tf.keras.losses.CategoricalCrossentropy(label_smoothing=0.1)
     model.compile(
-        optimizer=build_optimizer(learning_rate),
-        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
+        loss=loss_fn,
         metrics=[
-            tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy"),
-            tf.keras.metrics.SparseTopKCategoricalAccuracy(
-                k=3, name="top3_accuracy"
-            ),
+            tf.keras.metrics.CategoricalAccuracy(name="accuracy"),
+            tf.keras.metrics.TopKCategoricalAccuracy(k=3, name="top3_accuracy"),
         ],
     )
-
-
-def configure_fine_tuning(base_model, fine_tune_layers):
-    base_model.trainable = True
-    fine_tune_layers = max(1, min(fine_tune_layers, len(base_model.layers)))
-    freeze_until = len(base_model.layers) - fine_tune_layers
-
-    for index, layer in enumerate(base_model.layers):
-        should_train = index >= freeze_until
-        if isinstance(layer, tf.keras.layers.BatchNormalization):
-            layer.trainable = False
-        else:
-            layer.trainable = should_train
-
-
-def build_callbacks(output_dir, append_log):
-    best_model_path = output_dir / "best_model.keras"
-    return [
-        tf.keras.callbacks.ModelCheckpoint(
-            filepath=str(best_model_path),
-            monitor="val_accuracy",
-            mode="max",
-            save_best_only=True,
-            verbose=1,
-        ),
-        tf.keras.callbacks.EarlyStopping(
-            monitor="val_accuracy",
-            mode="max",
-            patience=3,
-            restore_best_weights=True,
-            verbose=1,
-        ),
-        tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_loss",
-            factor=0.25,
-            patience=2,
-            min_lr=1e-6,
-            verbose=1,
-        ),
-        tf.keras.callbacks.CSVLogger(
-            filename=str(output_dir / "training_log.csv"),
-            append=append_log,
-        ),
-    ]
-
-
-def evaluate_model(model, dataset):
-    metrics = model.evaluate(dataset, verbose=1, return_dict=True)
-    return {key: float(value) for key, value in metrics.items()}
-
-
-def save_json(path, payload):
-    with path.open("w", encoding="utf-8") as file:
-        json.dump(payload, file, indent=2, ensure_ascii=False)
-
-
-def build_display_names(class_names):
-    return [DISPLAY_NAME_MAP.get(name, name.replace("_", " ").title()) for name in class_names]
-
-
-def save_reports(output_dir, model, test_dataset, test_labels, class_names):
-    probabilities = model.predict(test_dataset, verbose=1)
-    predictions = np.argmax(probabilities, axis=1)
-
-    report = classification_report(
-        test_labels,
-        predictions,
-        target_names=class_names,
-        output_dict=True,
-        zero_division=0,
-    )
-    matrix = confusion_matrix(test_labels, predictions).tolist()
-
-    save_json(output_dir / "classification_report.json", report)
-    save_json(
-        output_dir / "confusion_matrix.json",
-        {"labels": class_names, "matrix": matrix},
-    )
-
 
 def main():
     args = parse_args()
     set_seed(args.seed)
-    enable_mixed_precision_if_available()
+
+    if tf.config.list_physical_devices("GPU"):
+        tf.keras.mixed_precision.set_global_policy("mixed_float16")
+        print("Trạng thái GPU: Mixed Precision đã được kích hoạt.")
 
     data_dir = Path(args.data_dir).expanduser().resolve()
     output_dir = Path(args.output_dir).expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     train_dir = data_dir / "train_images"
-    test_dir = data_dir / "test_images"
-
     if not train_dir.exists():
-        raise FileNotFoundError(
-            f"Dataset not found. Expected directory is missing: {train_dir}"
-        )
+        raise FileNotFoundError(f"Không tìm thấy thư mục: {train_dir}")
 
     class_names = discover_class_names(train_dir)
-    display_names = build_display_names(class_names)
+    num_classes = len(class_names)
+    display_names = [DISPLAY_NAME_MAP.get(name, name) for name in class_names]
 
-    all_train_paths, all_train_labels = collect_split_samples(train_dir, class_names)
-    train_paths, val_paths, train_labels, val_labels = train_test_split(
-        all_train_paths,
-        all_train_labels,
-        test_size=args.val_split,
-        stratify=all_train_labels,
-        random_state=args.seed,
+    all_paths, all_labels = collect_split_samples(train_dir, class_names)
+
+    print("\n--- THÔNG TIN BỘ DỮ LIỆU ---")
+    print(f"Tổng số ảnh gốc: {len(all_paths)}")
+
+    X_temp, X_test, y_temp, y_test = train_test_split(
+        all_paths, all_labels, test_size=0.15, stratify=all_labels, random_state=args.seed
+    )
+    X_train, X_val, y_train, y_val = train_test_split(
+        X_temp, y_temp, test_size=0.1764, stratify=y_temp, random_state=args.seed
     )
 
-    if test_dir.exists():
-        test_paths, test_labels = collect_split_samples(test_dir, class_names)
-    else:
-        print("No test_images directory found. Validation split will also be used as test.")
-        test_paths, test_labels = val_paths, val_labels
+    print(f"Số lượng tập Train: {len(X_train)} ảnh")
+    print(f"Số lượng tập Validation: {len(X_val)} ảnh")
+    print(f"Số lượng tập Test: {len(X_test)} ảnh")
+    print("----------------------------\n")
 
-    print(f"Classes ({len(class_names)}): {class_names}")
-    print(f"Train samples: {len(train_paths)}")
-    print(f"Validation samples: {len(val_paths)}")
-    print(f"Test samples: {len(test_paths)}")
-    print_distribution("Train", train_labels, class_names)
-    print_distribution("Validation", val_labels, class_names)
-    print_distribution("Test", test_labels, class_names)
+    class_weights_array = compute_class_weight(
+        class_weight='balanced',
+        classes=np.unique(y_train),
+        y=y_train
+    )
+    class_weight_dict = {i: float(weight) for i, weight in enumerate(class_weights_array)}
 
-    train_dataset = build_dataset(
-        train_paths,
-        train_labels,
-        args.image_size,
-        args.batch_size,
-        training=True,
-        seed=args.seed,
-    )
-    val_dataset = build_dataset(
-        val_paths,
-        val_labels,
-        args.image_size,
-        args.batch_size,
-        training=False,
-        seed=args.seed,
-    )
-    test_dataset = build_dataset(
-        test_paths,
-        test_labels,
-        args.image_size,
-        args.batch_size,
-        training=False,
-        seed=args.seed,
+    train_dataset = build_dataset(X_train, y_train, args.image_size, args.batch_size, num_classes, True, args.seed)
+    val_dataset = build_dataset(X_val, y_val, args.image_size, args.batch_size, num_classes, False, args.seed)
+    test_dataset = build_dataset(X_test, y_test, args.image_size, args.batch_size, num_classes, False, args.seed)
+
+    model, base_model = build_model(num_classes, args.image_size)
+
+    callbacks = [
+        tf.keras.callbacks.ModelCheckpoint(str(output_dir / "best_model.keras"), monitor="val_accuracy", save_best_only=True, verbose=1),
+        tf.keras.callbacks.EarlyStopping(monitor="val_accuracy", patience=6, restore_best_weights=True),
+        tf.keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5, patience=3, min_lr=1e-6)
+    ]
+
+    start_time = time.time()
+
+    print("\n--- GIAI ĐOẠN 1: Huấn luyện lớp Classification ---")
+    compile_model(model, learning_rate=1e-3)
+    model.fit(
+        train_dataset, validation_data=val_dataset, epochs=args.epochs_head,
+        class_weight=class_weight_dict, callbacks=callbacks
     )
 
-    model, base_model = build_model(
-        num_classes=len(class_names),
-        image_size=args.image_size,
-        dropout=args.dropout,
+    print("\n--- GIAI ĐOẠN 2: Fine-Tuning mở rộng ---")
+    base_model.trainable = True
+    for layer in base_model.layers[:-args.fine_tune_layers]:
+        layer.trainable = False
+
+    for layer in base_model.layers:
+        if isinstance(layer, tf.keras.layers.BatchNormalization):
+            layer.trainable = False
+
+    compile_model(model, learning_rate=1e-4)
+    model.fit(
+        train_dataset, validation_data=val_dataset, epochs=args.epochs_head + args.epochs_finetune,
+        initial_epoch=args.epochs_head, class_weight=class_weight_dict, callbacks=callbacks
     )
 
-    training_started_at = time.time()
-    compile_model(model, args.learning_rate)
+    print("\n--- GIAI ĐOẠN 3: ĐÁNH GIÁ TRÊN TẬP TEST BÍ MẬT ---")
+    best_model = tf.keras.models.load_model(str(output_dir / "best_model.keras"), compile=False)
+    compile_model(best_model, learning_rate=1e-4)
 
-    histories = {}
-    if args.epochs_head > 0:
-        print("\nStage 1/2 - train classification head")
-        history = model.fit(
-            train_dataset,
-            validation_data=val_dataset,
-            epochs=args.epochs_head,
-            callbacks=build_callbacks(output_dir, append_log=False),
-            verbose=1,
-        )
-        histories["head"] = history.history
+    print("Đang chạy dự đoán trên tập Test để tính toán các chỉ số báo cáo...")
+    y_pred_probs = best_model.predict(test_dataset, verbose=1)
+    y_pred = np.argmax(y_pred_probs, axis=1)
 
-    if args.epochs_finetune > 0:
-        print("\nStage 2/2 - fine tune top backbone layers")
-        configure_fine_tuning(base_model, args.fine_tune_layers)
-        compile_model(model, args.fine_tune_learning_rate)
-        history = model.fit(
-            train_dataset,
-            validation_data=val_dataset,
-            epochs=args.epochs_head + args.epochs_finetune,
-            initial_epoch=args.epochs_head,
-            callbacks=build_callbacks(output_dir, append_log=True),
-            verbose=1,
-        )
-        histories["finetune"] = history.history
+    acc = accuracy_score(y_test, y_pred)
+    precision = precision_score(y_test, y_pred, average='weighted')
+    recall = recall_score(y_test, y_pred, average='weighted')
+    f1 = f1_score(y_test, y_pred, average='weighted')
 
-    best_model_path = output_dir / "best_model.keras"
-    if best_model_path.exists():
-        model = tf.keras.models.load_model(best_model_path)
+    print("\n================ TỔNG KẾT CHỈ SỐ ĐÁNH GIÁ ================")
+    print(f"- Accuracy (Độ chính xác): {acc * 100:.2f}%")
+    print(f"- Precision (Độ chuẩn xác): {precision * 100:.2f}%")
+    print(f"- Recall (Độ phủ):          {recall * 100:.2f}%")
+    print(f"- F1-Score:                 {f1 * 100:.2f}%")
+    print("==========================================================\n")
 
-    val_metrics = evaluate_model(model, val_dataset)
-    test_metrics = evaluate_model(model, test_dataset)
-    save_reports(output_dir, model, test_dataset, test_labels, class_names)
+    print("--- BÁO CÁO PHÂN LOẠI CHI TIẾT (CLASSIFICATION REPORT) ---")
+    print(classification_report(y_test, y_pred, target_names=class_names, digits=4))
 
-    final_h5_path = output_dir / "rice_disease_model.h5"
+    print("--- MA TRẬN NHẦM LẪN (CONFUSION MATRIX) ---")
+    cm = confusion_matrix(y_test, y_pred)
+    print(cm)
+    print("----------------------------------------------------------\n")
+
     final_keras_path = output_dir / "rice_disease_model.keras"
-    model.save(str(final_h5_path), include_optimizer=False)
-    model.save(str(final_keras_path), include_optimizer=False)
+    best_model.save(str(final_keras_path), include_optimizer=False)
 
-    save_json(output_dir / "class_names.json", class_names)
-    save_json(
-        output_dir / "model_metadata.json",
-        {
-            "backbone": "EfficientNetB0",
-            "image_size": [args.image_size, args.image_size],
-            "input_range": "0_255",
-            "confidence_threshold": DEFAULT_CONFIDENCE_THRESHOLD,
-            "confidence_gap_threshold": DEFAULT_CONFIDENCE_GAP_THRESHOLD,
-            "num_classes": len(class_names),
-            "class_names": class_names,
-            "display_names": display_names,
-            "train_samples": len(train_paths),
-            "val_samples": len(val_paths),
-            "test_samples": len(test_paths),
-            "epochs_head": args.epochs_head,
-            "epochs_finetune": args.epochs_finetune,
-            "fine_tune_layers": args.fine_tune_layers,
-            "batch_size": args.batch_size,
-            "seed": args.seed,
-            "val_metrics": val_metrics,
-            "test_metrics": test_metrics,
-            "training_minutes": round((time.time() - training_started_at) / 60, 2),
-        },
-    )
-    save_json(output_dir / "history.json", histories)
+    metadata = {
+        "backbone": "EfficientNetB1",
+        "image_size": [args.image_size, args.image_size],
+        "input_range": "0_255",
+        "num_classes": num_classes,
+        "class_names": class_names,
+        "display_names": display_names,
+        "confidence_threshold": DEFAULT_CONFIDENCE_THRESHOLD,
+        "confidence_gap_threshold": DEFAULT_CONFIDENCE_GAP_THRESHOLD,
+        "test_accuracy": float(acc),
+        "training_minutes": round((time.time() - start_time) / 60, 2),
+    }
+    with open(output_dir / "model_metadata.json", "w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
 
-    print("\nTraining finished.")
-    print(f"Best model (.keras): {best_model_path}")
-    print(f"Portable model (.h5): {final_h5_path}")
-    print(f"Class names: {output_dir / 'class_names.json'}")
-    print(f"Metadata: {output_dir / 'model_metadata.json'}")
-    print(f"Validation metrics: {val_metrics}")
-    print(f"Test metrics: {test_metrics}")
+    with open(output_dir / "class_names.json", "w", encoding="utf-8") as f:
+        json.dump(class_names, f, ensure_ascii=False, indent=2)
 
+    print(f"Huấn luyện hoàn tất. File .keras được lưu tại thư mục: {output_dir.name}")
 
 if __name__ == "__main__":
     main()
