@@ -616,7 +616,7 @@ const AIScan = () => {
           {loading ? (
             <>
               <Loader2 size={18} className="animate-spin" />
-              Đang phân tích...
+              Đang phân tích
             </>
           ) : (
             <>

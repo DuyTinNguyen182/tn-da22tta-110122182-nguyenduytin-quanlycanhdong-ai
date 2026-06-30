@@ -242,7 +242,7 @@ const AdminAllowedProducts = () => {
       <div className="mb-6 flex flex-col xl:flex-row xl:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 mb-5">
-            Danh mục Vật tư HTX
+            Danh mục Vật tư
           </h1>
           {/* <p className="text-sm text-gray-500 mt-1">
             Quản lý danh mục vật tư được phép sử dụng, cung cấp dữ liệu nền tảng
