@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -93,12 +93,12 @@ const Login = () => {
                 <label className="block text-sm font-medium text-slate-700">
                   Mật khẩu
                 </label>
-                <a
-                  href="#"
+                <Link
+                  to="/forgot-password"
                   className="text-sm font-medium text-emerald-600 hover:text-emerald-700 hover:underline transition-colors"
                 >
                   Quên mật khẩu?
-                </a>
+                </Link>
               </div>
               <input
                 type="password"

@@ -93,6 +93,48 @@ const updatePassword = async (req, res) => {
   }
 };
 
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Vui lòng nhập email" });
+    }
+
+    await authService.requestPasswordReset(email);
+
+    res.status(200).json({
+      message:
+        "Nếu email tồn tại trong hệ thống, chúng tôi đã gửi liên kết đặt lại mật khẩu.",
+    });
+  } catch (error) {
+    res.status(500).json({
+      message:
+        error.message || "Không thể gửi email đặt lại mật khẩu. Vui lòng thử lại sau.",
+    });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        message: "Vui lòng nhập đầy đủ thông tin đặt lại mật khẩu",
+      });
+    }
+
+    await authService.resetPassword(token, newPassword);
+
+    res.status(200).json({ message: "Đặt lại mật khẩu thành công" });
+  } catch (error) {
+    res.status(400).json({
+      message: error.message || "Không thể đặt lại mật khẩu",
+    });
+  }
+};
+
 const logout = async (req, res) => {
   res.clearCookie(jwtConfig.COOKIE_NAME, {
     httpOnly: true,
@@ -111,4 +153,6 @@ module.exports = {
   logout,
   updateProfile,
   updatePassword,
+  forgotPassword,
+  resetPassword,
 };

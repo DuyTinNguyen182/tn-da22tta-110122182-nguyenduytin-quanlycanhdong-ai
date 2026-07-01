@@ -2,6 +2,7 @@
 import {
   CalendarDays,
   Edit2,
+  Eye,
   ImageIcon,
   Plus,
   Save,
@@ -79,6 +80,20 @@ const formatDate = (value) => {
 const getLogPlots = (log) =>
   Array.isArray(log?.plots) ? log.plots.filter(Boolean) : [];
 
+const getSourceLabel = (source) =>
+  source === "manual" ? "Thủ công" : "AI scan";
+
+const DetailInfo = ({ label, value, children }) => (
+  <div className="rounded-xl bg-gray-50/80 p-3 ring-1 ring-gray-100">
+    <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">
+      {label}
+    </p>
+    <div className="mt-1 break-words text-sm font-medium text-gray-700">
+      {children || value || "--"}
+    </div>
+  </div>
+);
+
 const DiseaseLogs = () => {
   const { toast, confirm } = useFeedback();
   const [fields, setFields] = useState([]);
@@ -92,6 +107,7 @@ const DiseaseLogs = () => {
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLog, setEditingLog] = useState(null);
+  const [selectedDetailLog, setSelectedDetailLog] = useState(null);
   const [showFiltersMobile, setShowFiltersMobile] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [filters, setFilters] = useState({
@@ -127,22 +143,6 @@ const DiseaseLogs = () => {
       })),
     ],
     [filterSeasons],
-  );
-
-  const formSeasonOptions = useMemo(
-    () => [
-      { value: "", label: "Chọn mùa vụ" },
-      ...formSeasons.map((s) => ({
-        value: s._id,
-        label: (() => {
-          const year = getSeasonYear(s);
-          const base = s.seasonName || s.name || "Mùa vụ";
-          return year ? `${base} ${year}` : base;
-        })(),
-        dot: s.status === "active" ? "bg-emerald-500" : "bg-gray-300",
-      })),
-    ],
-    [formSeasons],
   );
 
   const loadFields = async () => {
@@ -321,6 +321,31 @@ const DiseaseLogs = () => {
   const hasActiveFilters = Boolean(
     keyword.trim() || filters.fieldId || filters.seasonId || filters.status,
   );
+
+  const selectedDetailData = useMemo(() => {
+    if (!selectedDetailLog) return null;
+
+    const plots = getLogPlots(selectedDetailLog);
+    const plotCount = plots.length || selectedDetailLog.plotCount || 0;
+    const seasonLabel =
+      selectedDetailLog.seasonLabel ||
+      (selectedDetailLog.season
+        ? formatSeasonLabel(selectedDetailLog.season)
+        : null) ||
+      "Chưa có mùa vụ";
+
+    return {
+      statusMeta: getStatusMeta(selectedDetailLog.status),
+      plots,
+      plotCount,
+      seasonLabel,
+      scopeLabel:
+        selectedDetailLog.scope === "all_plots"
+          ? "Toàn bộ thửa"
+          : `${plotCount} thửa`,
+      sourceLabel: getSourceLabel(selectedDetailLog.source),
+    };
+  }, [selectedDetailLog]);
 
   const openCreateModal = async () => {
     const fieldId = filters.fieldId || fields[0]?._id || "";
@@ -710,7 +735,7 @@ const DiseaseLogs = () => {
                         {statusMeta.label}
                       </span>
                       <span className="rounded-lg bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
-                        {log.source === "manual" ? "Thủ công" : "AI scan"}
+                        {getSourceLabel(log.source)}
                       </span>
                     </div>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 md:text-sm">
@@ -724,6 +749,15 @@ const DiseaseLogs = () => {
                   </div>
 
                   <div className="flex items-center gap-1.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDetailLog(log)}
+                      className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
+                      title="Xem chi tiết"
+                      aria-label="Xem chi tiết nhật ký bệnh"
+                    >
+                      <Eye size={15} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => openEditModal(log)}
@@ -837,6 +871,176 @@ const DiseaseLogs = () => {
           </p>
         )}
       </div>
+
+      {selectedDetailLog && selectedDetailData && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-3 backdrop-blur-sm sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Chi tiết nhật ký bệnh"
+        >
+          <div className="flex max-h-[85dvh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-dropdown-enter">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6">
+              <div className="min-w-0">
+                <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-0 py-1 text-xs font-semibold text-emerald-700">
+                  <Eye size={14} />
+                  Chi tiết nhật ký bệnh
+                </span>
+                <h3 className="mt-2 break-words text-lg font-bold text-gray-900 sm:text-xl">
+                  {selectedDetailLog.diseaseName || "Bệnh chưa xác định"}
+                </h3>
+                {/* <p className="mt-1 text-sm text-gray-500">
+                  {selectedDetailLog.fieldName || "Chưa có cánh đồng"} ·{" "}
+                  {selectedDetailData.seasonLabel}
+                </p> */}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedDetailLog(null)}
+                className="shrink-0 rounded-xl p-2 text-gray-400 transition-all hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Đóng cửa sổ chi tiết"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid flex-1 overflow-y-auto lg:grid-cols-[0.9fr_1.25fr]">
+              <div className="border-b border-gray-100 bg-gray-50/70 p-4 sm:p-6 lg:border-b-0 lg:border-r">
+                {selectedDetailLog.imageUrl ? (
+                  <a
+                    href={selectedDetailLog.imageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group/detail-img block overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm"
+                    title="Mở ảnh gốc"
+                  >
+                    <img
+                      src={selectedDetailLog.imageUrl}
+                      alt={selectedDetailLog.diseaseName || "Ảnh bệnh"}
+                      className="h-56 w-full object-cover transition-transform group-hover/detail-img:scale-105 sm:h-72 lg:h-[420px]"
+                    />
+                  </a>
+                ) : (
+                  <div className="flex h-56 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-white text-gray-400 sm:h-72 lg:h-[420px]">
+                    <ImageIcon size={30} />
+                    <p className="mt-2 text-sm font-medium">Chưa có ảnh</p>
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <span
+                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${selectedDetailData.statusMeta.className}`}
+                  >
+                    {selectedDetailData.statusMeta.label}
+                  </span>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    {selectedDetailData.sourceLabel}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-4 p-4 sm:p-6">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <DetailInfo label="Ngày phát hiện">
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarDays size={14} className="text-gray-400" />
+                      {formatDate(selectedDetailLog.detectedAt)}
+                    </span>
+                  </DetailInfo>
+                  <DetailInfo label="Cánh đồng">
+                    <span className="inline-flex items-center gap-1.5">
+                      <MapPin size={14} className="text-gray-400" />
+                      {selectedDetailLog.fieldName || "Chưa có cánh đồng"}
+                    </span>
+                  </DetailInfo>
+                  <DetailInfo
+                    label="Mùa vụ"
+                    value={selectedDetailData.seasonLabel}
+                  />
+                  <DetailInfo
+                    label="Phạm vi"
+                    value={selectedDetailData.scopeLabel}
+                  />
+                </div>
+
+                <section className="rounded-2xl border border-gray-100 bg-white p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-sm font-bold text-gray-900">
+                      Thửa bị ảnh hưởng
+                    </h4>
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-500">
+                      {selectedDetailData.scopeLabel}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex max-h-36 flex-wrap gap-2 overflow-y-auto pr-1">
+                    {selectedDetailData.plots.length > 0 ? (
+                      selectedDetailData.plots.map((plot) => (
+                        <span
+                          key={plot?._id || plot?.name}
+                          className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
+                        >
+                          {plot?.name || "--"}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-600">
+                        Toàn bộ thửa tham gia vụ.
+                      </p>
+                    )}
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-gray-100 bg-white p-4">
+                  <h4 className="text-sm font-bold text-gray-900">
+                    Mô tả bệnh
+                  </h4>
+                  <p className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-gray-700">
+                    {selectedDetailLog.description || "Chưa có mô tả."}
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-gray-100 bg-white p-4">
+                  <h4 className="text-sm font-bold text-gray-900">
+                    Ghi chú xử lý
+                  </h4>
+                  <div className="mt-2 whitespace-pre-line break-words text-sm leading-6 text-gray-700">
+                    {selectedDetailLog.processingNote || "Chưa có ghi chú."}
+                  </div>
+                  {selectedDetailLog.status === "processed" &&
+                    selectedDetailLog.processedAt && (
+                      <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">
+                        Đã xử lý ngày{" "}
+                        {formatDate(selectedDetailLog.processedAt)}
+                      </p>
+                    )}
+                </section>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <DetailInfo
+                    label="Ngày tạo"
+                    value={formatDate(selectedDetailLog.createdAt)}
+                  />
+                  <DetailInfo
+                    label="Cập nhật gần nhất"
+                    value={formatDate(selectedDetailLog.updatedAt)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 justify-end border-t border-gray-100 bg-gray-50 px-4 py-3 sm:px-6">
+              <button
+                type="button"
+                onClick={() => setSelectedDetailLog(null)}
+                className="rounded-xl px-4 py-2 text-sm font-semibold text-gray-600 transition-all hover:bg-gray-200"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">

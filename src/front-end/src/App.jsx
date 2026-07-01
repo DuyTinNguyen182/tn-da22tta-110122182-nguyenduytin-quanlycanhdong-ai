@@ -10,6 +10,8 @@ import AdminLayout from "./components/Layout/AdminLayout";
 import ScrollToTopButton from "./components/Layout/ScrollToTopButton";
 
 import Login from "./pages/Auth/Login";
+import ForgotPassword from "./pages/Auth/ForgotPassword";
+import ResetPassword from "./pages/Auth/ResetPassword";
 import Dashboard from "./pages/User/Dashboard/Dashboard";
 import Fields from "./pages/User/Fields/Fields";
 import CropsPage from "./pages/User/Crops/Crops";
@@ -44,6 +46,8 @@ function App() {
               <Route element={<PublicRoute />}>
                 <Route path="/" element={<Navigate to="/login" replace />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
               </Route>
 
               <Route element={<ProtectedLayout />}>

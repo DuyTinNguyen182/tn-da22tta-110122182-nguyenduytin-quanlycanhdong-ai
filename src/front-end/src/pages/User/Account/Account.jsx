@@ -25,6 +25,26 @@ const genderOptions = [
   { value: "other", label: "Khác" },
 ];
 
+const PROFILE_LIMITS = {
+  fullNameMin: 2,
+  fullNameMax: 80,
+  emailMax: 254,
+  addressMax: 255,
+};
+
+const PASSWORD_LIMITS = {
+  min: 6,
+  max: 64,
+};
+
+const normalizeProfileData = (data) => ({
+  fullName: data.fullName.trim().replace(/\s+/g, " "),
+  email: data.email.trim().toLowerCase(),
+  gender: data.gender,
+  phone: data.phone.trim(),
+  address: data.address.trim().replace(/\s+/g, " "),
+});
+
 const Account = () => {
   const { user, updateUser, logout } = useAuth();
   const navigate = useNavigate();
@@ -86,33 +106,44 @@ const Account = () => {
   });
 
   // Hàm validate thông tin tài khoản
-  const validateInfo = () => {
+  const validateInfo = (data = formData) => {
     const errors = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const phoneRegex = /(84|0[3|5|7|8|9])+([0-9]{8})\b/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    const fullNameRegex = /^[\p{L}\s'.-]+$/u;
+    const phoneRegex = /^(0[35789]\d{8}|\+?84[35789]\d{8})$/;
 
-    if (!formData.fullName?.trim()) {
+    if (!data.fullName) {
       errors.fullName = "Vui lòng nhập họ tên.";
+    } else if (data.fullName.length < PROFILE_LIMITS.fullNameMin) {
+      errors.fullName = "Họ tên phải có ít nhất 2 ký tự.";
+    } else if (data.fullName.length > PROFILE_LIMITS.fullNameMax) {
+      errors.fullName = "Họ tên không được vượt quá 80 ký tự.";
+    } else if (!fullNameRegex.test(data.fullName)) {
+      errors.fullName = "Họ tên chỉ gồm chữ cái, khoảng trắng và dấu câu cơ bản.";
     }
 
-    if (!formData.email?.trim()) {
+    if (!data.email) {
       errors.email = "Vui lòng nhập địa chỉ email.";
-    } else if (!emailRegex.test(formData.email)) {
+    } else if (data.email.length > PROFILE_LIMITS.emailMax) {
+      errors.email = "Email không được vượt quá 254 ký tự.";
+    } else if (!emailRegex.test(data.email)) {
       errors.email = "Email chưa đúng định dạng.";
     }
 
-    if (!genderOptions.some((option) => option.value === formData.gender)) {
+    if (!genderOptions.some((option) => option.value === data.gender)) {
       errors.gender = "Giới tính chưa hợp lệ.";
     }
 
-    if (!formData.phone?.trim()) {
+    if (!data.phone) {
       errors.phone = "Vui lòng nhập số điện thoại.";
-    } else if (!phoneRegex.test(formData.phone)) {
-      errors.phone = "Số điện thoại chưa hợp lệ.";
+    } else if (!phoneRegex.test(data.phone)) {
+      errors.phone = "Số điện thoại phải là số Việt Nam hợp lệ.";
     }
 
-    if (!formData.address?.trim()) {
+    if (!data.address) {
       errors.address = "Vui lòng nhập địa chỉ.";
+    } else if (data.address.length > PROFILE_LIMITS.addressMax) {
+      errors.address = "Địa chỉ không được vượt quá 255 ký tự.";
     }
 
     return errors;
@@ -128,8 +159,19 @@ const Account = () => {
 
     if (!passwordForm.newPassword?.trim()) {
       errors.newPassword = "Vui lòng nhập mật khẩu mới.";
-    } else if (passwordForm.newPassword.length < 6) {
+    } else if (passwordForm.newPassword.length < PASSWORD_LIMITS.min) {
       errors.newPassword = "Mật khẩu mới phải có ít nhất 6 ký tự.";
+    } else if (passwordForm.newPassword.length > PASSWORD_LIMITS.max) {
+      errors.newPassword = "Mật khẩu mới không được vượt quá 64 ký tự.";
+    } else if (passwordForm.newPassword !== passwordForm.newPassword.trim()) {
+      errors.newPassword = "Mật khẩu mới không được bắt đầu hoặc kết thúc bằng khoảng trắng.";
+    } else if (passwordForm.newPassword === passwordForm.currentPassword) {
+      errors.newPassword = "Mật khẩu mới không được trùng mật khẩu hiện tại.";
+    } else if (
+      !/[A-Za-z]/.test(passwordForm.newPassword) ||
+      !/\d/.test(passwordForm.newPassword)
+    ) {
+      errors.newPassword = "Mật khẩu mới cần có cả chữ và số.";
     }
 
     if (!passwordForm.confirmPassword?.trim()) {
@@ -145,8 +187,10 @@ const Account = () => {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
 
-    const validationErrors = validateInfo();
+    const normalizedData = normalizeProfileData(formData);
+    const validationErrors = validateInfo(normalizedData);
     if (Object.keys(validationErrors).length > 0) {
+      setFormData(normalizedData);
       setInfoErrors(validationErrors);
       toast.error("Vui lòng kiểm tra lại thông tin nhập.");
       return;
@@ -155,7 +199,7 @@ const Account = () => {
     setIsLoading(true);
 
     try {
-      const response = await api.put("/auth/profile", formData);
+      const response = await api.put("/auth/profile", normalizedData);
       if (response.data?.user) {
         updateUser(response.data.user);
       }
