@@ -24,6 +24,7 @@ const AdminSeasonDetails = () => {
   const [showFormModal, setShowFormModal] = useState(false);
   const [editingDetail, setEditingDetail] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [formErrors, setFormErrors] = useState({});
   const [formData, setFormData] = useState({
     seasonId: "",
     year: String(CURRENT_YEAR),
@@ -77,6 +78,7 @@ const AdminSeasonDetails = () => {
       startDate: "",
       endDate: "",
     });
+    setFormErrors({});
     setShowFormModal(true);
   };
 
@@ -98,12 +100,14 @@ const AdminSeasonDetails = () => {
         ? new Date(detail.endDate).toISOString().slice(0, 10)
         : "",
     });
+    setFormErrors({});
     setShowFormModal(true);
   };
 
   const closeFormModal = () => {
     setShowFormModal(false);
     setEditingDetail(null);
+    setFormErrors({});
     setFormData({
       seasonId: "",
       year: String(CURRENT_YEAR),
@@ -117,30 +121,78 @@ const AdminSeasonDetails = () => {
       ...prev,
       [field]: value,
     }));
+
+    setFormErrors((prev) => {
+      if (!prev[field]) return prev;
+
+      const nextErrors = { ...prev };
+      delete nextErrors[field];
+
+      if (field === "startDate" || field === "endDate") {
+        delete nextErrors.endDate;
+      }
+
+      return nextErrors;
+    });
+  };
+
+  const validateForm = () => {
+    const nextErrors = {};
+    const trimmedYear = String(formData.year || "").trim();
+
+    if (!editingDetail && !formData.seasonId) {
+      nextErrors.seasonId = "Vui lòng chọn danh mục mùa vụ gốc.";
+    }
+
+    if (!trimmedYear) {
+      nextErrors.year = "Vui lòng chọn năm.";
+    } else {
+      const numericYear = Number(trimmedYear);
+      if (
+        !Number.isInteger(numericYear) ||
+        numericYear < MIN_YEAR ||
+        numericYear > MAX_YEAR
+      ) {
+        nextErrors.year = `Năm phải trong khoảng ${MIN_YEAR} - ${MAX_YEAR}.`;
+      }
+    }
+
+    if (!formData.startDate) {
+      nextErrors.startDate = "Vui lòng chọn ngày bắt đầu.";
+    }
+
+    if (formData.endDate && formData.startDate) {
+      const startDate = new Date(formData.startDate);
+      const endDate = new Date(formData.endDate);
+      if (endDate < startDate) {
+        nextErrors.endDate = "Ngày kết thúc không thể nhỏ hơn ngày bắt đầu.";
+      }
+    }
+
+    const duplicateDetail = catalogSeasons.some((season) => {
+      if (!season?._id) return false;
+      if (editingDetail && season._id === editingDetail.season?._id)
+        return false;
+      return (
+        season._id === formData.seasonId &&
+        String(season.year || "") === trimmedYear
+      );
+    });
+
+    if (duplicateDetail && !nextErrors.seasonId && !nextErrors.year) {
+      nextErrors.seasonId = "Cặp mùa vụ và năm này đã tồn tại.";
+      nextErrors.year = "Cặp mùa vụ và năm này đã tồn tại.";
+    }
+
+    setFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSubmitDetail = async (event) => {
     event.preventDefault();
 
-    if (!editingDetail && !formData.seasonId) {
-      toast.warning("Vui lòng chọn danh mục mùa vụ gốc");
-      return;
-    }
-    if (!formData.year) {
-      toast.warning("Vui lòng chọn năm");
-      return;
-    }
-    if (!formData.startDate) {
-      toast.warning("Vui lòng chọn ngày bắt đầu");
-      return;
-    }
-
-    // 1. Ràng buộc: Ngày kết thúc không được nhỏ hơn ngày bắt đầu
-    if (
-      formData.endDate &&
-      new Date(formData.endDate) < new Date(formData.startDate)
-    ) {
-      toast.warning("Ngày kết thúc không thể diễn ra trước ngày bắt đầu.");
+    if (!validateForm()) {
+      toast.warning("Vui lòng kiểm tra lại các trường bắt buộc.");
       return;
     }
 
@@ -301,6 +353,7 @@ const AdminSeasonDetails = () => {
         catalogSeasons={catalogSeasons}
         yearOptions={YEAR_OPTIONS}
         formData={formData}
+        errors={formErrors}
         submitting={submitting}
         onChange={handleFormChange}
         onClose={closeFormModal}

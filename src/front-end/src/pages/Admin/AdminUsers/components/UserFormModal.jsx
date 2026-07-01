@@ -24,6 +24,7 @@ const UserFormModal = ({
   onStatusChange,
   onClose,
   onSubmit,
+  errors = {},
 }) => {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -63,10 +64,19 @@ const UserFormModal = ({
                   value={formData.fullName}
                   onChange={onChange}
                   required
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
+                  className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-all ${
+                    errors.fullName
+                      ? "border-rose-400 focus:border-rose-500 focus:bg-white"
+                      : "border-gray-200 focus:border-emerald-400 focus:bg-white"
+                  }`}
                   placeholder="Nguyễn Văn A"
                 />
               </div>
+              {errors.fullName ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.fullName}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -84,10 +94,19 @@ const UserFormModal = ({
                   value={formData.email}
                   onChange={onChange}
                   required
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
+                  className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-all ${
+                    errors.email
+                      ? "border-rose-400 focus:border-rose-500 focus:bg-white"
+                      : "border-gray-200 focus:border-emerald-400 focus:bg-white"
+                  }`}
                   placeholder="user@example.com"
                 />
               </div>
+              {errors.email ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.email}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -102,7 +121,11 @@ const UserFormModal = ({
                   onChange={onChange}
                   autoComplete="new-password"
                   required={!editingUser}
-                  className="hide-password-reveal w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 pr-11 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
+                  className={`hide-password-reveal w-full rounded-xl border bg-gray-50 px-4 py-2.5 pr-11 text-sm outline-none transition-all ${
+                    errors.password
+                      ? "border-rose-400 focus:border-rose-500 focus:bg-white"
+                      : "border-gray-200 focus:border-emerald-400 focus:bg-white"
+                  }`}
                   placeholder={
                     editingUser ? "Để trống nếu không đổi" : "Tối thiểu 6 ký tự"
                   }
@@ -121,6 +144,11 @@ const UserFormModal = ({
                   Chỉ nhập khi muốn thay đổi mật khẩu.
                 </p>
               ) : null}
+              {errors.password ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.password}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -135,7 +163,17 @@ const UserFormModal = ({
                   value: opt.value,
                   label: opt.label,
                 }))}
+                className={
+                  errors.role
+                    ? "rounded-xl ring-1 ring-rose-500 ring-inset"
+                    : ""
+                }
               />
+              {errors.role ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.role}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -147,7 +185,17 @@ const UserFormModal = ({
                 onChange={onStatusChange}
                 icon={ShieldCheck}
                 options={statusOptions}
+                className={
+                  errors.accountStatus
+                    ? "rounded-xl ring-1 ring-rose-500 ring-inset"
+                    : ""
+                }
               />
+              {errors.accountStatus ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.accountStatus}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -159,7 +207,17 @@ const UserFormModal = ({
                 onChange={onGenderChange}
                 icon={UserRound}
                 options={genderOptions}
+                className={
+                  errors.gender
+                    ? "rounded-xl ring-1 ring-rose-500 ring-inset"
+                    : ""
+                }
               />
+              {errors.gender ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.gender}
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -176,10 +234,19 @@ const UserFormModal = ({
                   name="phone"
                   value={formData.phone}
                   onChange={onChange}
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-all focus:border-emerald-400 focus:bg-white"
+                  className={`w-full rounded-xl border bg-gray-50 py-2.5 pl-10 pr-4 text-sm outline-none transition-all ${
+                    errors.phone
+                      ? "border-rose-400 focus:border-rose-500 focus:bg-white"
+                      : "border-gray-200 focus:border-emerald-400 focus:bg-white"
+                  }`}
                   placeholder="090xxxxxxx"
                 />
               </div>
+              {errors.phone ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.phone}
+                </p>
+              ) : null}
             </div>
           </div>
 

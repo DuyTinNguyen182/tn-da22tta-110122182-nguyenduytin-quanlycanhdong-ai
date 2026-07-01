@@ -37,6 +37,7 @@ const AdminFields = () => {
   const [deletingPlotId, setDeletingPlotId] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [deletingFieldId, setDeletingFieldId] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const fetchFields = useCallback(async () => {
     try {
@@ -118,6 +119,7 @@ const AdminFields = () => {
   const openCreateModal = () => {
     setEditingField(null);
     setFieldForm(emptyFieldForm);
+    setFieldErrors({});
     setIsModalOpen(true);
   };
 
@@ -127,6 +129,7 @@ const AdminFields = () => {
       name: field.name || "",
       address: field.address || "",
     });
+    setFieldErrors({});
     setIsModalOpen(true);
   };
 
@@ -139,27 +142,42 @@ const AdminFields = () => {
   const handleSaveField = async () => {
     const trimmedName = fieldForm.name.trim();
     const trimmedAddress = fieldForm.address.trim();
+    const normalizedName = trimmedName.toLowerCase();
+    const isDuplicateName = fields.some((field) => {
+      if (editingField?._id && field._id === editingField._id) return false;
+      return field.name?.trim().toLowerCase() === normalizedName;
+    });
+
+    const nextErrors = {};
 
     if (!trimmedName) {
-      toast.warning("Vui lòng nhập tên cánh đồng.");
-      return;
+      nextErrors.name = "Vui lòng nhập tên cánh đồng.";
     }
 
     if (trimmedName.length > 100) {
-      toast.warning("Tên cánh đồng không được vượt quá 100 ký tự.");
-      return;
+      nextErrors.name = "Tên cánh đồng không được vượt quá 100 ký tự.";
     }
 
     if (trimmedAddress && trimmedAddress.length > 255) {
-      toast.warning("Địa chỉ mô tả không được vượt quá 255 ký tự.");
-      return;
+      nextErrors.address = "Địa chỉ mô tả không được vượt quá 255 ký tự.";
     }
 
     const hasLetters = /[a-zA-Z\u00C0-\u024F\u1E00-\u1EFF]/.test(trimmedName);
     if (!hasLetters) {
-      toast.warning("Tên cánh đồng phải chứa ít nhất một chữ cái.");
+      nextErrors.name = "Tên cánh đồng phải chứa ít nhất một chữ cái.";
+    }
+
+    if (!nextErrors.name && isDuplicateName) {
+      nextErrors.name = "Tên cánh đồng này đã tồn tại.";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      toast.warning(Object.values(nextErrors).join(" "));
       return;
     }
+
+    setFieldErrors({});
 
     try {
       setSubmitting(true);

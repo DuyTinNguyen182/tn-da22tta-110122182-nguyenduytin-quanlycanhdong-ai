@@ -41,6 +41,10 @@ exports.remove = async (req, res) => {
     await stageService.deleteStage(req.params.id);
     res.json({ message: "Đã xóa giai đoạn" });
   } catch (error) {
+    console.error("Delete stage error:", {
+      stageId: req.params.id,
+      message: error.message,
+    });
     res.status(400).json({ message: error.message });
   }
 };

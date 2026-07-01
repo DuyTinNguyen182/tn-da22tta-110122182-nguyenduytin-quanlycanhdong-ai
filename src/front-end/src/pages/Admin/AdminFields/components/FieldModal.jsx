@@ -6,6 +6,7 @@ const FieldModal = ({
   editingField,
   fieldForm,
   submitting,
+  errors = {},
   onChange,
   onClose,
   onSave,
@@ -38,10 +39,21 @@ const FieldModal = ({
               onChange={(event) => onChange({ name: event.target.value })}
               maxLength={100}
               disabled={submitting}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+              required
+              aria-invalid={Boolean(errors.name)}
+              className={`w-full rounded-xl border px-4 py-2.5 outline-none transition-all focus:bg-white focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                errors.name
+                  ? "border-rose-300 bg-rose-50 focus:border-rose-500 focus:ring-rose-500/20"
+                  : "border-gray-200 bg-gray-50 focus:border-emerald-500 focus:ring-emerald-500/20"
+              }`}
               placeholder="Ví dụ: Cánh đồng Mỹ Tho"
               autoFocus
             />
+            {errors.name ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.name}
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -54,9 +66,19 @@ const FieldModal = ({
               onChange={(event) => onChange({ address: event.target.value })}
               maxLength={255}
               disabled={submitting}
-              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 outline-none transition-all focus:border-emerald-500 focus:bg-white focus:ring-2 focus:ring-emerald-500/20"
+              aria-invalid={Boolean(errors.address)}
+              className={`w-full resize-none rounded-xl border px-4 py-2.5 outline-none transition-all focus:bg-white focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                errors.address
+                  ? "border-rose-300 bg-rose-50 focus:border-rose-500 focus:ring-rose-500/20"
+                  : "border-gray-200 bg-gray-50 focus:border-emerald-500 focus:ring-emerald-500/20"
+              }`}
               placeholder="Ví dụ: Ấp 2, xã Mỹ Tho, Tiền Giang"
             />
+            {errors.address ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.address}
+              </p>
+            ) : null}
           </div>
         </div>
 

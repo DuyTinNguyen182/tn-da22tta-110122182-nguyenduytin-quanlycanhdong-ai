@@ -16,6 +16,7 @@ const AnnouncementFormModal = ({
   fieldOptions,
   farmerOptions,
   selectedFieldFarmers,
+  errors = {},
   onClose,
   onFormChange,
   onTargetModeChange,
@@ -98,27 +99,49 @@ const AnnouncementFormModal = ({
               <span className="mb-2 block text-sm font-semibold text-gray-700">
                 Loại
               </span>
-              <CustomDropdown
-                value={form.type}
-                onChange={(value) => onFormChange("type", value)}
-                options={FORM_TYPE_OPTIONS}
-                placeholder="Chọn loại"
-                icon={BellRing}
-                disabled={submitting}
-              />
+              <div
+                className={
+                  errors.type ? "rounded-2xl ring-2 ring-rose-200" : ""
+                }
+              >
+                <CustomDropdown
+                  value={form.type}
+                  onChange={(value) => onFormChange("type", value)}
+                  options={FORM_TYPE_OPTIONS}
+                  placeholder="Chọn loại"
+                  icon={BellRing}
+                  disabled={submitting}
+                />
+              </div>
+              {errors.type ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.type}
+                </p>
+              ) : null}
             </label>
 
             <label className="block">
               <span className="mb-2 block text-sm font-semibold text-gray-700">
                 Nhóm người nhận
               </span>
-              <CustomDropdown
-                value={form.targetMode}
-                onChange={onTargetModeChange}
-                options={TARGET_MODE_OPTIONS}
-                placeholder="Chọn nhóm người nhận"
-                icon={Users}
-              />
+              <div
+                className={
+                  errors.targetMode ? "rounded-2xl ring-2 ring-rose-200" : ""
+                }
+              >
+                <CustomDropdown
+                  value={form.targetMode}
+                  onChange={onTargetModeChange}
+                  options={TARGET_MODE_OPTIONS}
+                  placeholder="Chọn nhóm người nhận"
+                  icon={Users}
+                />
+              </div>
+              {errors.targetMode ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.targetMode}
+                </p>
+              ) : null}
             </label>
           </div>
 
@@ -127,13 +150,24 @@ const AnnouncementFormModal = ({
               <span className="mb-2 block text-sm font-semibold text-gray-700">
                 Cánh đồng nhận thông báo
               </span>
-              <CustomDropdown
-                value={form.fieldId}
-                onChange={(value) => onFormChange("fieldId", value)}
-                options={fieldOptions}
-                placeholder="Chọn cánh đồng"
-                icon={Users}
-              />
+              <div
+                className={
+                  errors.fieldId ? "rounded-2xl ring-2 ring-rose-200" : ""
+                }
+              >
+                <CustomDropdown
+                  value={form.fieldId}
+                  onChange={(value) => onFormChange("fieldId", value)}
+                  options={fieldOptions}
+                  placeholder="Chọn cánh đồng"
+                  icon={Users}
+                />
+              </div>
+              {errors.fieldId ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.fieldId}
+                </p>
+              ) : null}
 
               {form.fieldId ? (
                 <div className="mt-3">
@@ -181,6 +215,11 @@ const AnnouncementFormModal = ({
                 Chọn nông dân nhận thông báo (Đã chọn{" "}
                 {form.userIds?.length || 0})
               </span>
+              {errors.userIds ? (
+                <p className="mb-2 text-xs font-medium text-rose-600">
+                  {errors.userIds}
+                </p>
+              ) : null}
 
               <div className="relative" ref={dropdownRef}>
                 {/* Thanh tìm kiếm */}
@@ -301,10 +340,21 @@ const AnnouncementFormModal = ({
               value={form.title}
               onChange={(event) => onFormChange("title", event.target.value)}
               disabled={submitting}
+              required
               maxLength={200}
               placeholder="Ví dụ: Cảnh báo dịch bệnh tuần này"
-              className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              aria-invalid={Boolean(errors.title)}
+              className={`w-full rounded-2xl border bg-white px-4 py-3 text-sm outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                errors.title
+                  ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
+                  : "border-gray-200 focus:border-emerald-400 focus:ring-emerald-100"
+              }`}
             />
+            {errors.title ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.title}
+              </p>
+            ) : null}
           </label>
 
           <label className="block m-0 py-0">
@@ -316,10 +366,21 @@ const AnnouncementFormModal = ({
               value={form.content}
               onChange={(event) => onFormChange("content", event.target.value)}
               disabled={submitting}
+              required
               maxLength={3000}
               placeholder="Nhập nội dung chi tiết để hiển thị cho nông dân..."
-              className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+              aria-invalid={Boolean(errors.content)}
+              className={`w-full resize-none rounded-2xl border bg-white px-4 py-3 text-sm outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                errors.content
+                  ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
+                  : "border-gray-200 focus:border-emerald-400 focus:ring-emerald-100"
+              }`}
             />
+            {errors.content ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.content}
+              </p>
+            ) : null}
           </label>
 
           <label className="inline-flex cursor-pointer items-center gap-3 rounded-2xl bg-gray-50 px-4 py-2 mt-2">

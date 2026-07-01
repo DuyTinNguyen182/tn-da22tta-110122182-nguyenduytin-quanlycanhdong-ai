@@ -125,6 +125,7 @@ const AdminSeasonRecommendations = () => {
   const [savingSeasonId, setSavingSeasonId] = useState("");
   const [editingSeason, setEditingSeason] = useState(null);
   const [viewingSeason, setViewingSeason] = useState(null);
+  const [editorErrors, setEditorErrors] = useState({});
 
   const fetchData = async () => {
     try {
@@ -157,6 +158,16 @@ const AdminSeasonRecommendations = () => {
         [field]: value,
       },
     }));
+
+    if (field === "content") {
+      setEditorErrors((prev) => {
+        if (!prev.content) return prev;
+
+        const nextErrors = { ...prev };
+        delete nextErrors.content;
+        return nextErrors;
+      });
+    }
   };
 
   const saveSeasonRecommendation = async (season) => {
@@ -164,11 +175,14 @@ const AdminSeasonRecommendations = () => {
     const content = normalizeRichText(draft.content);
 
     if (isRichTextEmpty(content)) {
-      toast.warning(
-        `Vui lòng nhập nội dung khuyến nghị cho mùa vụ ${season.seasonName}.`,
-      );
-      return;
+      setEditorErrors({
+        content: `Vui lòng nhập nội dung khuyến nghị cho mùa vụ ${season.seasonName}.`,
+      });
+      toast.warning(`Vui lòng kiểm tra lại nội dung khuyến nghị.`);
+      return false;
     }
+
+    setEditorErrors({});
 
     try {
       setSavingSeasonId(season.seasonId);
@@ -178,8 +192,10 @@ const AdminSeasonRecommendations = () => {
       });
       toast.success(`Đã cập nhật khuyến nghị cho mùa vụ ${season.seasonName}.`);
       await fetchData();
+      return true;
     } catch (error) {
       toast.error(error.response?.data?.message || "Không thể lưu khuyến nghị");
+      return false;
     } finally {
       setSavingSeasonId("");
     }
@@ -299,7 +315,10 @@ const AdminSeasonRecommendations = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEditingSeason(season)}
+                        onClick={() => {
+                          setEditorErrors({});
+                          setEditingSeason(season);
+                        }}
                         className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
                       >
                         <Edit size={14} />
@@ -372,7 +391,10 @@ const AdminSeasonRecommendations = () => {
                 </h3>
               </div>
               <button
-                onClick={() => setEditingSeason(null)}
+                onClick={() => {
+                  setEditorErrors({});
+                  setEditingSeason(null);
+                }}
                 className="rounded-full p-2 text-gray-500 hover:bg-gray-100"
               >
                 <X size={20} />
@@ -393,6 +415,11 @@ const AdminSeasonRecommendations = () => {
                   />
                 </div>
               </div>
+              {editorErrors.content ? (
+                <p className="-mt-2 text-sm font-medium text-rose-600">
+                  {editorErrors.content}
+                </p>
+              ) : null}
               <div className="shrink-0 flex flex-wrap items-center justify-between gap-3">
                 <label className="inline-flex cursor-pointer items-center gap-3">
                   <CustomCheckbox
@@ -417,7 +444,10 @@ const AdminSeasonRecommendations = () => {
             <div className="flex justify-end gap-3 border-t border-gray-100 p-5">
               <button
                 type="button"
-                onClick={() => setEditingSeason(null)}
+                onClick={() => {
+                  setEditorErrors({});
+                  setEditingSeason(null);
+                }}
                 className="rounded-xl bg-gray-100 px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-200"
               >
                 Hủy
@@ -425,8 +455,10 @@ const AdminSeasonRecommendations = () => {
               <button
                 type="button"
                 onClick={async () => {
-                  await saveSeasonRecommendation(editingSeason);
-                  setEditingSeason(null);
+                  const saved = await saveSeasonRecommendation(editingSeason);
+                  if (saved) {
+                    setEditingSeason(null);
+                  }
                 }}
                 disabled={
                   savingSeasonId === editingSeason.seasonId ||

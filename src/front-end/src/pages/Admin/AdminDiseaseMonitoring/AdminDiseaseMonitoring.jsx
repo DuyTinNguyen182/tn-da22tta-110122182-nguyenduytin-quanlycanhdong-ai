@@ -35,6 +35,7 @@ const AdminDiseaseMonitoring = () => {
   const [selectedWarningLogId, setSelectedWarningLogId] = useState("");
   const [warningPreview, setWarningPreview] = useState(null);
   const [warningForm, setWarningForm] = useState(null);
+  const [warningFormErrors, setWarningFormErrors] = useState({});
   const [filters, setFilters] = useState({
     fieldId: "",
     seasonId: "",
@@ -228,6 +229,7 @@ const AdminDiseaseMonitoring = () => {
     setWarningForm(null);
     setSelectedWarningLogId("");
     setSelectedRecipientIds([]);
+    setWarningFormErrors({});
   };
 
   const handleOpenWarningModal = async (log) => {
@@ -250,6 +252,7 @@ const AdminDiseaseMonitoring = () => {
       setWarningPreview(res.data);
       setWarningForm(buildWarningFormFromPreview(res.data?.form));
       setSelectedRecipientIds(res.data?.recipients?.map((r) => r.userId) || []);
+      setWarningFormErrors({});
     } catch (error) {
       console.error("Lỗi tải trước form cảnh báo bệnh:", error);
       toast.error(
@@ -267,23 +270,54 @@ const AdminDiseaseMonitoring = () => {
       ...prev,
       [field]: value,
     }));
+
+    setWarningFormErrors((prev) => {
+      if (!prev[field]) return prev;
+
+      const nextErrors = { ...prev };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  };
+
+  const validateWarningForm = () => {
+    const nextErrors = {};
+    const title = warningForm?.title?.trim();
+    const content = warningForm?.content?.trim();
+    const availableRecipientIds =
+      warningPreview?.recipients?.map((r) => r.userId) || [];
+    const selectedRecipients = (selectedRecipientIds || []).filter((id) =>
+      availableRecipientIds.includes(id),
+    );
+
+    if (!title) {
+      nextErrors.title = "Vui lòng nhập tiêu đề cảnh báo.";
+    }
+
+    if (!content) {
+      nextErrors.content = "Vui lòng nhập nội dung cảnh báo.";
+    }
+
+    if (availableRecipientIds.length === 0) {
+      nextErrors.recipients = "Không có nông dân nào để gửi cảnh báo.";
+    } else if (selectedRecipients.length === 0) {
+      nextErrors.recipients = "Vui lòng chọn ít nhất 1 nông dân để gửi.";
+    } else if (
+      selectedRecipients.length !== (selectedRecipientIds || []).length
+    ) {
+      nextErrors.recipients =
+        "Danh sách người nhận đã thay đổi, vui lòng chọn lại.";
+    }
+
+    setWarningFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSubmitWarning = async () => {
     if (!selectedWarningLogId || !warningForm) return;
 
-    if (!warningForm.title.trim()) {
-      toast.warning("Vui lòng nhập tiêu đề cảnh báo.");
-      return;
-    }
-
-    if (!warningForm.content.trim()) {
-      toast.warning("Vui lòng nhập nội dung cảnh báo.");
-      return;
-    }
-
-    if (selectedRecipientIds.length === 0) {
-      toast.warning("Vui lòng chọn ít nhất 1 nông dân để gửi.");
+    if (!validateWarningForm()) {
+      toast.warning("Vui lòng kiểm tra lại các trường bắt buộc.");
       return;
     }
 
@@ -411,6 +445,7 @@ const AdminDiseaseMonitoring = () => {
         open={warningModalOpen}
         preview={warningPreview}
         form={warningForm}
+        errors={warningFormErrors}
         loading={warningPreviewLoading}
         submitting={warningSubmitting}
         selectedRecipientIds={selectedRecipientIds}

@@ -14,6 +14,8 @@ const CATEGORY_OPTIONS = [
   { value: "PESTICIDE", label: "Thuốc BVTV" },
 ];
 
+const CATEGORY_VALUES = new Set(CATEGORY_OPTIONS.map((option) => option.value));
+
 const AdminAllowedProducts = () => {
   const { toast, confirm } = useFeedback();
   const [products, setProducts] = useState([]);
@@ -37,6 +39,7 @@ const AdminAllowedProducts = () => {
   const [usagePeriods, setUsagePeriods] = useState(""); // Dạng chuỗi cách nhau dấu phẩy
   const [instructions, setInstructions] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [formErrors, setFormErrors] = useState({});
 
   // Phân trang
   const [currentPage, setCurrentPage] = useState(1);
@@ -118,6 +121,7 @@ const AdminAllowedProducts = () => {
     setInstructions("");
     setIsActive(true);
     setEditingId("");
+    setFormErrors({});
   };
 
   const openCreateModal = () => {
@@ -153,24 +157,58 @@ const AdminAllowedProducts = () => {
 
   // Helper chuyển đổi chuỗi nhập từ UI thành mảng để lưu DB
   const processArrayInput = (str) => {
-    if (!str) return [];
-    return str
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
+    if (!str?.trim()) return [];
+
+    return Array.from(
+      new Set(
+        str
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      ),
+    );
   };
 
   const handleSubmit = async () => {
-    if (!productName.trim() || !instructions.trim()) {
-      toast.warning("Vui lòng điền Tên sản phẩm và Hướng dẫn sử dụng");
+    const nextErrors = {};
+
+    if (!productName.trim()) {
+      nextErrors.productName = "Vui lòng nhập tên sản phẩm.";
+    }
+
+    if (!instructions.trim()) {
+      nextErrors.instructions = "Vui lòng nhập hướng dẫn sử dụng.";
+    }
+
+    if (!CATEGORY_VALUES.has(category)) {
+      nextErrors.category = "Vui lòng chọn phân loại hợp lệ.";
+    }
+
+    const normalizedTargetIssues = processArrayInput(targetIssues);
+    if (targetIssues.trim() && normalizedTargetIssues.length === 0) {
+      nextErrors.targetIssues =
+        "Mục tiêu xử lý phải có ít nhất một giá trị hợp lệ.";
+    }
+
+    const normalizedUsagePeriods = processArrayInput(usagePeriods);
+    if (usagePeriods.trim() && normalizedUsagePeriods.length === 0) {
+      nextErrors.usagePeriods =
+        "Giai đoạn áp dụng phải có ít nhất một giá trị hợp lệ.";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setFormErrors(nextErrors);
+      toast.warning("Vui lòng kiểm tra lại các trường bắt buộc.");
       return;
     }
+
+    setFormErrors({});
 
     const payload = {
       product_name: productName.trim(),
       category: category.toLowerCase(),
-      target_issues: processArrayInput(targetIssues),
-      usage_periods: processArrayInput(usagePeriods),
+      target_issues: normalizedTargetIssues,
+      usage_periods: normalizedUsagePeriods,
       instructions: instructions.trim(),
       is_active: isActive,
     };
@@ -330,6 +368,7 @@ const AdminAllowedProducts = () => {
         modalMode={modalMode}
         submitting={submitting}
         categoryOptions={CATEGORY_OPTIONS}
+        errors={formErrors}
         productName={productName}
         setProductName={setProductName}
         category={category}

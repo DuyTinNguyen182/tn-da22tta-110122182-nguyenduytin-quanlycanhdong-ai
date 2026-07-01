@@ -8,6 +8,7 @@ const SeasonDetailFormModal = ({
   catalogSeasons,
   yearOptions,
   formData,
+  errors = {},
   submitting,
   onChange,
   onClose,
@@ -61,8 +62,14 @@ const SeasonDetailFormModal = ({
                     label: cat.name,
                   }))}
                   placeholder="Chọn mùa vụ"
+                  aria-invalid={Boolean(errors.seasonId)}
                 />
               )}
+              {errors.seasonId ? (
+                <p className="text-xs font-medium text-rose-600">
+                  {errors.seasonId}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -80,7 +87,13 @@ const SeasonDetailFormModal = ({
                 icon={CalendarDays}
                 variant="filter"
                 disabled={isEditing}
+                aria-invalid={Boolean(errors.year)}
               />
+              {errors.year ? (
+                <p className="text-xs font-medium text-rose-600">
+                  {errors.year}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -92,8 +105,16 @@ const SeasonDetailFormModal = ({
                 value={formData.startDate}
                 onChange={(event) => onChange("startDate", event.target.value)}
                 disabled={submitting}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
+                aria-invalid={Boolean(errors.startDate)}
+                className={`w-full rounded-xl border px-4 py-2.5 outline-none focus:border-emerald-500 ${
+                  errors.startDate ? "border-rose-300" : "border-gray-200"
+                }`}
               />
+              {errors.startDate ? (
+                <p className="text-xs font-medium text-rose-600">
+                  {errors.startDate}
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -105,8 +126,16 @@ const SeasonDetailFormModal = ({
                 value={formData.endDate}
                 onChange={(event) => onChange("endDate", event.target.value)}
                 disabled={submitting}
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 outline-none focus:border-emerald-500"
+                aria-invalid={Boolean(errors.endDate)}
+                className={`w-full rounded-xl border px-4 py-2.5 outline-none focus:border-emerald-500 ${
+                  errors.endDate ? "border-rose-300" : "border-gray-200"
+                }`}
               />
+              {errors.endDate ? (
+                <p className="text-xs font-medium text-rose-600">
+                  {errors.endDate}
+                </p>
+              ) : null}
             </div>
           </div>
 

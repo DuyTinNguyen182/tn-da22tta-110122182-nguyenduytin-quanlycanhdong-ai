@@ -5,6 +5,7 @@ const DiseaseWarningModal = ({
   open,
   preview,
   form,
+  errors = {},
   loading,
   submitting,
   selectedRecipientIds,
@@ -80,8 +81,19 @@ const DiseaseWarningModal = ({
                 <input
                   value={form?.title || ""}
                   onChange={(event) => onChange("title", event.target.value)}
-                  className="w-full rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                  required
+                  aria-invalid={Boolean(errors.title)}
+                  className={`w-full rounded-2xl border bg-white px-4 py-3 text-sm outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                    errors.title
+                      ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
+                      : "border-gray-200 focus:border-emerald-400 focus:ring-emerald-100"
+                  }`}
                 />
+                {errors.title ? (
+                  <p className="mt-1 text-xs font-medium text-rose-600">
+                    {errors.title}
+                  </p>
+                ) : null}
               </label>
 
               <label className="block">
@@ -92,8 +104,19 @@ const DiseaseWarningModal = ({
                   rows={10}
                   value={form?.content || ""}
                   onChange={(event) => onChange("content", event.target.value)}
-                  className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm leading-6 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                  required
+                  aria-invalid={Boolean(errors.content)}
+                  className={`w-full resize-none rounded-2xl border bg-white px-4 py-3 text-sm leading-6 outline-none transition-all focus:ring-2 disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                    errors.content
+                      ? "border-rose-300 focus:border-rose-500 focus:ring-rose-100"
+                      : "border-gray-200 focus:border-emerald-400 focus:ring-emerald-100"
+                  }`}
                 />
+                {errors.content ? (
+                  <p className="mt-1 text-xs font-medium text-rose-600">
+                    {errors.content}
+                  </p>
+                ) : null}
               </label>
             </div>
 
@@ -131,6 +154,12 @@ const DiseaseWarningModal = ({
                       Chọn tất cả
                     </label>
                   </div>
+
+                  {errors.recipients ? (
+                    <p className="mt-3 rounded-2xl bg-rose-50 px-4 py-3 text-xs font-medium text-rose-700">
+                      {errors.recipients}
+                    </p>
+                  ) : null}
 
                   <div className="mt-3 space-y-3">
                     {(preview?.recipients || []).map((recipient) => {

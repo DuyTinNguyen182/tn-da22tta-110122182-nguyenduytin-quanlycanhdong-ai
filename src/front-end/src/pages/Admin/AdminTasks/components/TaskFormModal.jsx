@@ -10,6 +10,7 @@ const TaskFormModal = ({
   categoryOptions,
   taskOptionsForPrerequisites,
   recTypeOptions,
+  errors = {},
 
   // States
   stageId,
@@ -75,7 +76,17 @@ const TaskFormModal = ({
               placeholder="Chọn giai đoạn sản xuất"
               icon={Briefcase}
               variant="active"
+              className={
+                errors.stageId
+                  ? "rounded-xl ring-1 ring-rose-500 ring-inset"
+                  : ""
+              }
             />
+            {errors.stageId ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.stageId}
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -87,8 +98,17 @@ const TaskFormModal = ({
               onChange={(e) => setName(e.target.value)}
               disabled={submitting}
               placeholder="Ví dụ: Bón phân đợt 1, Xịt trừ rầy nâu..."
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+              className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all ${
+                errors.name
+                  ? "border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                  : "border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+              }`}
             />
+            {errors.name ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.name}
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -102,7 +122,17 @@ const TaskFormModal = ({
               placeholder="Chọn nhóm danh mục"
               variant="active"
               disabled={submitting}
+              className={
+                errors.category
+                  ? "rounded-xl ring-1 ring-rose-500 ring-inset"
+                  : ""
+              }
             />
+            {errors.category ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.category}
+              </p>
+            ) : null}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -116,8 +146,17 @@ const TaskFormModal = ({
                 onChange={(e) => setOrder(Number(e.target.value))}
                 disabled={submitting}
                 min="0"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
+                className={`w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all ${
+                  errors.order
+                    ? "border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                    : "border-gray-200 focus:border-emerald-500"
+                }`}
               />
+              {errors.order ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.order}
+                </p>
+              ) : null}
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-gray-700">
@@ -150,7 +189,17 @@ const TaskFormModal = ({
               multi
               variant="active"
               disabled={submitting}
+              className={
+                errors.prerequisites
+                  ? "rounded-xl ring-1 ring-rose-500 ring-inset"
+                  : ""
+              }
             />
+            {errors.prerequisites ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.prerequisites}
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-3">
@@ -169,7 +218,17 @@ const TaskFormModal = ({
                 placeholder="Chọn loại mốc"
                 variant="active"
                 disabled={submitting}
+                className={
+                  errors.recType
+                    ? "rounded-xl ring-1 ring-rose-500 ring-inset"
+                    : ""
+                }
               />
+              {errors.recType ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.recType}
+                </p>
+              ) : null}
             </div>
 
             {recType === "AFTER" && (
@@ -183,7 +242,11 @@ const TaskFormModal = ({
                   value={startDay}
                   onChange={(e) => setStartDay(Number(e.target.value))}
                   disabled={submitting}
-                  className="w-16 rounded-lg border border-gray-200 p-1.5 text-sm text-center font-semibold outline-none focus:border-blue-500"
+                  className={`w-16 rounded-lg border p-1.5 text-sm text-center font-semibold outline-none transition-all ${
+                    errors.startDay
+                      ? "border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                      : "border-gray-200 focus:border-blue-500"
+                  }`}
                 />
                 <span className="text-sm text-gray-600">đến ngày</span>
                 <input
@@ -192,11 +255,25 @@ const TaskFormModal = ({
                   value={endDay}
                   onChange={(e) => setEndDay(Number(e.target.value))}
                   disabled={submitting}
-                  className="w-16 rounded-lg border border-gray-200 p-1.5 text-sm text-center font-semibold outline-none focus:border-blue-500"
+                  className={`w-16 rounded-lg border p-1.5 text-sm text-center font-semibold outline-none transition-all ${
+                    errors.endDay
+                      ? "border-rose-400 bg-rose-50/30 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                      : "border-gray-200 focus:border-blue-500"
+                  }`}
                 />
                 <span className="text-sm text-gray-600">sau sạ</span>
               </div>
             )}
+            {errors.startDay ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.startDay}
+              </p>
+            ) : null}
+            {errors.endDay ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.endDay}
+              </p>
+            ) : null}
           </div>
         </div>
 

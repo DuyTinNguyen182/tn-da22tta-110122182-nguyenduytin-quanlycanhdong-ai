@@ -107,24 +107,19 @@ const updateStage = async (stageId, payload) => {
  * Delete a stage
  */
 const deleteStage = async (stageId) => {
-  try {
-    const Task = require("../models/taskModel");
+  const Task = require("../models/taskModel");
 
-    // Check if any tasks depend on this stage
-    const dependentTasks = await Task.findOne({ stage: stageId }).lean();
-    if (dependentTasks) {
-      throw new Error("Cannot delete stage with associated tasks");
-    }
-
-    const stage = await Stage.findByIdAndDelete(stageId).lean();
-    if (!stage) {
-      throw new Error("Stage not found");
-    }
-
-    return stage;
-  } catch (error) {
-    throw new Error(`Failed to delete stage: ${error.message}`);
+  const dependentTasks = await Task.findOne({ stage: stageId }).lean();
+  if (dependentTasks) {
+    throw new Error("Không thể xóa giai đoạn vì còn công việc liên quan");
   }
+
+  const stage = await Stage.findByIdAndDelete(stageId).lean();
+  if (!stage) {
+    throw new Error("Không tìm thấy giai đoạn");
+  }
+
+  return stage;
 };
 
 module.exports = {

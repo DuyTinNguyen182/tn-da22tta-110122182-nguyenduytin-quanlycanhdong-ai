@@ -150,7 +150,7 @@ const FeedbackProvider = ({ children }) => {
     <FeedbackContext.Provider value={contextValue}>
       {children}
 
-      <div className="pointer-events-none fixed right-4 top-4 z-[120] flex w-[min(380px,calc(100vw-2rem))] flex-col gap-3">
+      <div className="pointer-events-none fixed right-4 top-4 z-[1000] flex w-[min(380px,calc(100vw-2rem))] flex-col gap-3">
         {toasts.map((toastItem) => {
           const style = TOAST_STYLES[toastItem.type] || TOAST_STYLES.info;
           const Icon = style.icon;

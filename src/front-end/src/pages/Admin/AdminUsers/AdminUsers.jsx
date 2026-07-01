@@ -38,6 +38,20 @@ const genderOptions = [
   { value: "other", label: "Khác" },
 ];
 
+const validRoleValues = new Set(roleOptions.map((option) => option.value));
+const validStatusValues = new Set(statusOptions.map((option) => option.value));
+const validGenderValues = new Set(genderOptions.map((option) => option.value));
+
+const emptyErrors = {
+  fullName: "",
+  email: "",
+  password: "",
+  role: "",
+  accountStatus: "",
+  gender: "",
+  phone: "",
+};
+
 const AdminUsers = () => {
   const { user: currentUser } = useAuth();
   const { toast, confirm } = useFeedback();
@@ -50,12 +64,63 @@ const AdminUsers = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
+  const [formErrors, setFormErrors] = useState(emptyErrors);
   const [currentPage, setCurrentPage] = useState(1);
+
+  const resetFormErrors = () => {
+    setFormErrors(emptyErrors);
+  };
+
+  const validateForm = (data, isEditing = false) => {
+    const nextErrors = { ...emptyErrors };
+    const fullName = String(data.fullName || "").trim();
+    const email = String(data.email || "").trim();
+    const password = String(data.password || "").trim();
+    const phone = String(data.phone || "").trim();
+
+    if (!fullName) {
+      nextErrors.fullName = "Họ tên không được để trống";
+    } else if (fullName.length > 100) {
+      nextErrors.fullName = "Họ tên không được vượt quá 100 ký tự";
+    }
+
+    if (!email) {
+      nextErrors.email = "Email không được để trống";
+    }
+
+    if (!isEditing && !password) {
+      nextErrors.password = "Mật khẩu không được để trống";
+    } else if (password && password.length < 6) {
+      nextErrors.password = "Mật khẩu phải có ít nhất 6 ký tự";
+    }
+
+    if (!validRoleValues.has(data.role)) {
+      nextErrors.role = "Vai trò đã chọn không hợp lệ";
+    }
+
+    if (!validStatusValues.has(data.accountStatus)) {
+      nextErrors.accountStatus = "Trạng thái tài khoản không hợp lệ";
+    }
+
+    if (!validGenderValues.has(data.gender)) {
+      nextErrors.gender = "Giới tính đã chọn không hợp lệ";
+    }
+
+    if (phone) {
+      const normalizedPhone = phone.replace(/\s+/g, "");
+      if (!/^\d{9,11}$/.test(normalizedPhone)) {
+        nextErrors.phone = "Số điện thoại phải gồm 9 đến 11 chữ số";
+      }
+    }
+
+    return nextErrors;
+  };
 
   const closeUserModal = () => {
     setShowModal(false);
     setEditingUser(null);
     setFormData(emptyForm);
+    resetFormErrors();
   };
 
   const fetchUsers = async () => {
@@ -139,6 +204,7 @@ const AdminUsers = () => {
   const handleOpenCreate = () => {
     setEditingUser(null);
     setFormData(emptyForm);
+    resetFormErrors();
     setShowModal(true);
   };
 
@@ -154,18 +220,17 @@ const AdminUsers = () => {
       role: user.role || "farmer",
       accountStatus: user.accountStatus || "active",
     });
+    resetFormErrors();
     setShowModal(true);
   };
 
   const handleCreateUser = async (event) => {
     event.preventDefault();
 
-    if (
-      !formData.fullName.trim() ||
-      !formData.email.trim() ||
-      !formData.password.trim()
-    ) {
-      toast.warning("Vui lòng nhập đầy đủ họ tên, email và mật khẩu.");
+    const nextErrors = validateForm(formData, false);
+    setFormErrors(nextErrors);
+
+    if (Object.values(nextErrors).some(Boolean)) {
       return;
     }
 
@@ -197,8 +262,10 @@ const AdminUsers = () => {
 
     if (!editingUser) return;
 
-    if (!formData.fullName.trim() || !formData.email.trim()) {
-      toast.warning("Vui lòng nhập đầy đủ họ tên và email.");
+    const nextErrors = validateForm(formData, true);
+    setFormErrors(nextErrors);
+
+    if (Object.values(nextErrors).some(Boolean)) {
       return;
     }
 
@@ -352,6 +419,7 @@ const AdminUsers = () => {
         editingUser={editingUser}
         formData={formData}
         submitting={submitting}
+        errors={formErrors}
         roleOptions={roleOptions}
         statusOptions={statusOptions}
         genderOptions={genderOptions}

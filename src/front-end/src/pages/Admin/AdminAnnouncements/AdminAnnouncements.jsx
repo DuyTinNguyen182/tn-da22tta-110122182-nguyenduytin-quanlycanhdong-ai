@@ -8,6 +8,13 @@ import AnnouncementFormModal from "./components/AnnouncementFormModal.jsx";
 import AnnouncementDetailModal from "./components/AnnouncementDetailModal.jsx";
 import { EMPTY_FORM, createFormFromItem } from "./adminAnnouncementsUtils.jsx";
 
+const TYPE_VALUES = new Set(["notification", "warning"]);
+const TARGET_MODE_VALUES = new Set([
+  "all_farmers",
+  "field_users",
+  "selected_users",
+]);
+
 const INITIAL_PAGINATION = {
   page: 1,
   limit: 5,
@@ -37,6 +44,7 @@ const AdminAnnouncements = () => {
   const [submitting, setSubmitting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [formErrors, setFormErrors] = useState({});
   const [filters, setFilters] = useState({
     keyword: "",
     type: "all",
@@ -156,17 +164,20 @@ const AdminAnnouncements = () => {
     setIsFormModalOpen(false);
     setEditingId("");
     setForm(EMPTY_FORM);
+    setFormErrors({});
   };
 
   const openCreateModal = () => {
     setEditingId("");
     setForm(EMPTY_FORM);
+    setFormErrors({});
     setIsFormModalOpen(true);
   };
 
   const openEditModal = (item) => {
     setEditingId(item._id);
     setForm(createFormFromItem(item));
+    setFormErrors({});
     setIsFormModalOpen(true);
   };
 
@@ -175,6 +186,20 @@ const AdminAnnouncements = () => {
       ...prev,
       [field]: value,
     }));
+
+    setFormErrors((prev) => {
+      if (!prev[field]) return prev;
+
+      const nextErrors = { ...prev };
+      delete nextErrors[field];
+
+      if (field === "targetMode") {
+        delete nextErrors.fieldId;
+        delete nextErrors.userIds;
+      }
+
+      return nextErrors;
+    });
   };
 
   const handleTargetModeChange = (value) => {
@@ -184,9 +209,65 @@ const AdminAnnouncements = () => {
       fieldId: value === "field_users" ? prev.fieldId : "",
       userIds: value === "selected_users" ? prev.userIds : [],
     }));
+
+    setFormErrors((prev) => {
+      if (!prev.targetMode && !prev.fieldId && !prev.userIds) return prev;
+
+      const nextErrors = { ...prev, targetMode: undefined };
+      delete nextErrors.targetMode;
+      delete nextErrors.fieldId;
+      delete nextErrors.userIds;
+      return nextErrors;
+    });
+  };
+
+  const validateAnnouncementForm = () => {
+    const nextErrors = {};
+    const title = form.title?.trim();
+    const content = form.content?.trim();
+
+    if (!TYPE_VALUES.has(form.type)) {
+      nextErrors.type = "Vui lòng chọn loại thông báo hợp lệ.";
+    }
+
+    if (!title) {
+      nextErrors.title = "Vui lòng nhập tên thông báo/cảnh báo.";
+    }
+
+    if (!content) {
+      nextErrors.content = "Vui lòng nhập nội dung.";
+    }
+
+    if (!TARGET_MODE_VALUES.has(form.targetMode)) {
+      nextErrors.targetMode = "Vui lòng chọn nhóm người nhận hợp lệ.";
+    }
+
+    if (form.targetMode === "field_users") {
+      if (!form.fieldId) {
+        nextErrors.fieldId = "Vui lòng chọn cánh đồng nhận thông báo.";
+      } else if ((selectedFieldFarmers || []).length === 0) {
+        nextErrors.fieldId =
+          "Cánh đồng đã chọn chưa có nông dân để nhận thông báo.";
+      }
+    }
+
+    if (
+      form.targetMode === "selected_users" &&
+      (form.userIds || []).length === 0
+    ) {
+      nextErrors.userIds = "Vui lòng chọn ít nhất 1 nông dân.";
+    }
+
+    setFormErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
   const handleSubmit = async () => {
+    if (!validateAnnouncementForm()) {
+      toast.warning("Vui lòng kiểm tra lại các trường bắt buộc.");
+      return;
+    }
+
     const payload = {
       type: form.type,
       title: form.title.trim(),
@@ -440,6 +521,7 @@ const AdminAnnouncements = () => {
         open={isFormModalOpen}
         editingId={editingId}
         form={form}
+        errors={formErrors}
         optionsLoading={optionsLoading}
         submitting={submitting}
         fieldOptions={fieldOptions}

@@ -25,6 +25,20 @@ const REC_TYPE_OPTIONS = [
 ];
 
 const categoryOptions = TASK_CATEGORY_OPTIONS;
+const validTaskCategories = new Set(
+  TASK_CATEGORY_OPTIONS.map((item) => item.value),
+);
+const validRecTypes = new Set(REC_TYPE_OPTIONS.map((item) => item.value));
+
+const normalizeTaskIds = (items = [], excludedId = "") => {
+  return [
+    ...new Set(
+      (Array.isArray(items) ? items : [items])
+        .map((item) => String(item || "").trim())
+        .filter(Boolean),
+    ),
+  ].filter((item) => item !== excludedId);
+};
 
 // Hàm chuyển đổi dữ liệu từ UI Dropdown thành cấu trúc lưu DB
 const mapRecTypeToPayload = (type, start, end) => {
@@ -87,6 +101,7 @@ const AdminTasks = () => {
   const [newTaskRecType, setNewTaskRecType] = useState("NONE");
   const [newTaskStartDay, setNewTaskStartDay] = useState(0);
   const [newTaskEndDay, setNewTaskEndDay] = useState(0);
+  const [taskErrors, setTaskErrors] = useState({});
 
   // States form chỉnh sửa trực tiếp trên dòng
   const [editingTaskId, setEditingTaskId] = useState("");
@@ -198,62 +213,170 @@ const AdminTasks = () => {
     setEditingTaskEndDay(0);
   };
 
+  const clearTaskErrors = () => {
+    setTaskErrors({});
+  };
+
+  const validateTaskForm = ({
+    stageId,
+    name,
+    order,
+    category,
+    recType,
+    startDay,
+    endDay,
+    prerequisites,
+    currentTaskId = "",
+  }) => {
+    const nextErrors = {};
+    const trimmedName = String(name || "").trim();
+    const normalizedStageId = String(stageId || "").trim();
+    const normalizedCategory = String(category || "").trim();
+    const normalizedRecType = String(recType || "").trim();
+    const normalizedPrerequisites = normalizeTaskIds(
+      prerequisites,
+      currentTaskId,
+    );
+    const numericOrder = Number(order);
+    const numericStart = Number(startDay);
+    const numericEnd = Number(endDay);
+
+    if (!normalizedStageId) {
+      nextErrors.stageId = "Vui lòng chọn giai đoạn cho công việc";
+    } else if (
+      !stageOptions.some((option) => option.value === normalizedStageId)
+    ) {
+      nextErrors.stageId = "Giai đoạn đã chọn không hợp lệ";
+    }
+
+    if (!trimmedName) {
+      nextErrors.name = "Tên công việc không được để trống";
+    }
+
+    if (!validTaskCategories.has(normalizedCategory)) {
+      nextErrors.category = "Vui lòng chọn danh mục công việc hợp lệ";
+    }
+
+    if (!Number.isFinite(numericOrder) || numericOrder < 0) {
+      nextErrors.order = "Thứ tự phải là số không âm";
+    }
+
+    if (!validRecTypes.has(normalizedRecType)) {
+      nextErrors.recType = "Vui lòng chọn loại mốc thời gian hợp lệ";
+    }
+
+    const availablePrerequisites = new Set(
+      taskOptionsForPrerequisites.map((item) => String(item.value)),
+    );
+    const invalidPrerequisites = normalizedPrerequisites.filter(
+      (item) => !availablePrerequisites.has(item),
+    );
+    if (invalidPrerequisites.length > 0) {
+      nextErrors.prerequisites = "Công việc tiên quyết đã chọn không hợp lệ";
+    }
+
+    if (normalizedRecType === "AFTER") {
+      if (!Number.isFinite(numericStart) || numericStart < 0) {
+        nextErrors.startDay = "Ngày bắt đầu phải là số không âm";
+      }
+
+      if (!Number.isFinite(numericEnd) || numericEnd < 0) {
+        nextErrors.endDay = "Ngày kết thúc phải là số không âm";
+      } else if (
+        Number.isFinite(numericStart) &&
+        numericStart >= 0 &&
+        numericEnd < numericStart
+      ) {
+        nextErrors.endDay = "Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu";
+      }
+    }
+
+    const duplicateTask = tasks.find((item) => {
+      if (currentTaskId && String(item._id) === String(currentTaskId)) {
+        return false;
+      }
+
+      return (
+        String(item.stage?._id || item.stage || "") === normalizedStageId &&
+        String(item.name || "")
+          .trim()
+          .toLowerCase() === trimmedName.toLowerCase()
+      );
+    });
+
+    if (duplicateTask) {
+      nextErrors.name = `Đã tồn tại công việc với tên "${trimmedName}" trong giai đoạn này`;
+    }
+
+    return {
+      errors: nextErrors,
+      normalizedPrerequisites,
+      numericOrder,
+      numericStart,
+      numericEnd,
+      trimmedName,
+      normalizedStageId,
+      normalizedCategory,
+      normalizedRecType,
+    };
+  };
+
   const closeTaskModal = () => {
     setIsModalOpen(false);
     setModalMode("create");
+    clearTaskErrors();
     resetNewTaskForm();
     resetEditingTaskForm();
   };
 
   const openCreateModal = () => {
     setModalMode("create");
+    clearTaskErrors();
     resetNewTaskForm();
     setIsModalOpen(true);
   };
 
   const handleCreate = async () => {
-    const stageId = newStageId.trim();
-    const name = newTaskName.trim();
+    const validation = validateTaskForm({
+      stageId: newStageId,
+      name: newTaskName,
+      order: newTaskOrder,
+      category: newTaskCategory,
+      recType: newTaskRecType,
+      startDay: newTaskStartDay,
+      endDay: newTaskEndDay,
+      prerequisites: newTaskPrerequisites,
+    });
 
-    if (!stageId || !name) {
-      toast.warning("Vui lòng điền đầy đủ Giai đoạn và Tên công việc");
+    setTaskErrors(validation.errors);
+    if (Object.keys(validation.errors).length > 0) {
       return;
     }
-    if (newTaskOrder < 0) {
-      toast.warning("Thứ tự phải là số không âm");
-      return;
-    }
 
-    if (newTaskRecType === "AFTER") {
-      const start = Number(newTaskStartDay) || 0;
-      const end = Number(newTaskEndDay) || 0;
-
-      if (start < 0 || end < 0) {
-        toast.warning("Ngày bắt đầu và kết thúc không được là số âm.");
-        return;
-      }
-
-      if (end < start) {
-        toast.warning(
-          "Ngày kết thúc khung thời gian không được nhỏ hơn ngày bắt đầu.",
-        );
-        return;
-      }
-    }
+    const {
+      normalizedStageId: stageId,
+      trimmedName: name,
+      numericOrder,
+      normalizedCategory,
+      normalizedPrerequisites,
+      numericStart,
+      numericEnd,
+      normalizedRecType,
+    } = validation;
 
     setSubmitting(true);
     try {
       await api.post("/tasks", {
         stage: stageId,
         name,
-        order: newTaskOrder,
-        category: newTaskCategory,
+        order: numericOrder,
+        category: normalizedCategory,
         isRepeatable: newTaskIsRepeatable,
-        prerequisites: newTaskPrerequisites,
+        prerequisites: normalizedPrerequisites,
         recommendation: mapRecTypeToPayload(
-          newTaskRecType,
-          newTaskStartDay,
-          newTaskEndDay,
+          normalizedRecType,
+          numericStart,
+          numericEnd,
         ),
       });
 
@@ -271,6 +394,7 @@ const AdminTasks = () => {
 
   const startEdit = (task) => {
     setModalMode("edit");
+    clearTaskErrors();
     setEditingTaskId(task._id);
     setEditingTaskStageId(task.stage?._id || task.stage);
     setEditingTaskName(task.name || "");
@@ -278,7 +402,10 @@ const AdminTasks = () => {
     setEditingTaskCategory(task.category || "OTHER");
     setEditingTaskIsRepeatable(task.isRepeatable ?? true);
     setEditingTaskPrerequisites(
-      (task.prerequisites || []).map((p) => p._id || p),
+      normalizeTaskIds(
+        (task.prerequisites || []).map((p) => p._id || p),
+        task._id,
+      ),
     );
 
     const uiRec = mapPayloadToRecType(task.recommendation);
@@ -293,34 +420,33 @@ const AdminTasks = () => {
   };
 
   const handleUpdate = async (id) => {
-    const stageId = editingTaskStageId.trim();
-    const name = editingTaskName.trim();
+    const validation = validateTaskForm({
+      stageId: editingTaskStageId,
+      name: editingTaskName,
+      order: editingTaskOrder,
+      category: editingTaskCategory,
+      recType: editingTaskRecType,
+      startDay: editingTaskStartDay,
+      endDay: editingTaskEndDay,
+      prerequisites: editingTaskPrerequisites,
+      currentTaskId: id,
+    });
 
-    if (!stageId || !name) {
-      toast.warning("Giai đoạn và Tên công việc không được để trống");
+    setTaskErrors(validation.errors);
+    if (Object.keys(validation.errors).length > 0) {
       return;
     }
-    if (editingTaskOrder < 0) {
-      toast.warning("Thứ tự phải là số không âm");
-      return;
-    }
 
-    if (editingTaskRecType === "AFTER") {
-      const start = Number(editingTaskStartDay) || 0;
-      const end = Number(editingTaskEndDay) || 0;
-
-      if (start < 0 || end < 0) {
-        toast.warning("Ngày bắt đầu và kết thúc không được là số âm.");
-        return;
-      }
-
-      if (end < start) {
-        toast.warning(
-          "Ngày kết thúc khung thời gian không được nhỏ hơn ngày bắt đầu.",
-        );
-        return;
-      }
-    }
+    const {
+      normalizedStageId: stageId,
+      trimmedName: name,
+      numericOrder,
+      normalizedCategory,
+      normalizedPrerequisites,
+      numericStart,
+      numericEnd,
+      normalizedRecType,
+    } = validation;
 
     const originalTask = tasks.find((t) => t._id === id);
     if (originalTask) {
@@ -356,14 +482,14 @@ const AdminTasks = () => {
       await api.put(`/tasks/${id}`, {
         stage: stageId,
         name,
-        order: editingTaskOrder,
-        category: editingTaskCategory,
+        order: numericOrder,
+        category: normalizedCategory,
         isRepeatable: editingTaskIsRepeatable,
-        prerequisites: editingTaskPrerequisites,
+        prerequisites: normalizedPrerequisites,
         recommendation: mapRecTypeToPayload(
-          editingTaskRecType,
-          editingTaskStartDay,
-          editingTaskEndDay,
+          normalizedRecType,
+          numericStart,
+          numericEnd,
         ),
       });
       cancelEdit();
@@ -413,6 +539,14 @@ const AdminTasks = () => {
 
     await handleCreate();
   };
+
+  const modalPrerequisiteOptions = useMemo(() => {
+    const excludedTaskId = modalMode === "edit" ? editingTaskId : "";
+
+    return tasks
+      .filter((task) => String(task._id) !== String(excludedTaskId))
+      .map((task) => ({ value: task._id, label: task.name }));
+  }, [editingTaskId, modalMode, tasks]);
 
   return (
     <div className="h-full overflow-y-auto bg-gray-50 p-6">
@@ -473,8 +607,9 @@ const AdminTasks = () => {
         submitting={submitting}
         stageOptions={stageOptions}
         categoryOptions={categoryOptions}
-        taskOptionsForPrerequisites={taskOptionsForPrerequisites}
+        taskOptionsForPrerequisites={modalPrerequisiteOptions}
         recTypeOptions={REC_TYPE_OPTIONS}
+        errors={taskErrors}
         // Props for data (edit/create form)
         stageId={modalMode === "edit" ? editingTaskStageId : newStageId}
         setStageId={

@@ -7,6 +7,7 @@ const AllowedProductFormModal = ({
   modalMode,
   submitting,
   categoryOptions,
+  errors = {},
 
   productName,
   setProductName,
@@ -57,12 +58,25 @@ const AllowedProductFormModal = ({
               </label>
               <input
                 value={productName}
-                onChange={(e) => setProductName(e.target.value)}
+                onChange={(e) => {
+                  setProductName(e.target.value);
+                }}
                 disabled={submitting}
+                required
                 maxLength={150}
                 placeholder="VD: Amistar Top 325SC"
-                className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+                aria-invalid={Boolean(errors.productName)}
+                className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-gray-800 outline-none shadow-sm transition focus:ring-2 focus:ring-emerald-500/10 disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                  errors.productName
+                    ? "border-rose-300 focus:border-rose-500 focus:ring-rose-500/10"
+                    : "border-gray-200 focus:border-emerald-500"
+                }`}
               />
+              {errors.productName ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.productName}
+                </p>
+              ) : null}
             </div>
             <div>
               <label className="mb-1 block text-sm font-semibold text-gray-700">
@@ -70,12 +84,20 @@ const AllowedProductFormModal = ({
               </label>
               <CustomDropdown
                 value={category}
-                onChange={setCategory}
+                onChange={(value) => {
+                  setCategory(value);
+                }}
                 options={categoryOptions}
                 placeholder="Chọn phân loại"
                 icon={Package}
                 variant="active"
+                aria-invalid={Boolean(errors.category)}
               />
+              {errors.category ? (
+                <p className="mt-1 text-xs font-medium text-rose-600">
+                  {errors.category}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -85,12 +107,24 @@ const AllowedProductFormModal = ({
             </label>
             <input
               value={targetIssues}
-              onChange={(e) => setTargetIssues(e.target.value)}
+              onChange={(e) => {
+                setTargetIssues(e.target.value);
+              }}
               disabled={submitting}
               maxLength={500}
               placeholder="VD: đạo ôn, khô vằn, còi cọc..."
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
+              aria-invalid={Boolean(errors.targetIssues)}
+              className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-gray-800 outline-none shadow-sm transition disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                errors.targetIssues
+                  ? "border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                  : "border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+              }`}
             />
+            {errors.targetIssues ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.targetIssues}
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -99,12 +133,24 @@ const AllowedProductFormModal = ({
             </label>
             <input
               value={usagePeriods}
-              onChange={(e) => setUsagePeriods(e.target.value)}
+              onChange={(e) => {
+                setUsagePeriods(e.target.value);
+              }}
               disabled={submitting}
               maxLength={500}
               placeholder="VD: bón lót, đẻ nhánh, làm đòng..."
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500"
+              aria-invalid={Boolean(errors.usagePeriods)}
+              className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-gray-800 outline-none shadow-sm transition disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                errors.usagePeriods
+                  ? "border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                  : "border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+              }`}
             />
+            {errors.usagePeriods ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.usagePeriods}
+              </p>
+            ) : null}
           </div>
 
           <div>
@@ -115,12 +161,25 @@ const AllowedProductFormModal = ({
             <textarea
               rows={3}
               value={instructions}
-              onChange={(e) => setInstructions(e.target.value)}
+              onChange={(e) => {
+                setInstructions(e.target.value);
+              }}
               disabled={submitting}
+              required
               maxLength={3000}
               placeholder="VD: Pha 25ml cho bình 25 lít nước. Phun tập trung phần gốc rạ..."
-              className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-emerald-500 resize-none"
+              aria-invalid={Boolean(errors.instructions)}
+              className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-gray-800 outline-none shadow-sm transition resize-none disabled:cursor-not-allowed disabled:bg-gray-50 ${
+                errors.instructions
+                  ? "border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
+                  : "border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10"
+              }`}
             />
+            {errors.instructions ? (
+              <p className="mt-1 text-xs font-medium text-rose-600">
+                {errors.instructions}
+              </p>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
