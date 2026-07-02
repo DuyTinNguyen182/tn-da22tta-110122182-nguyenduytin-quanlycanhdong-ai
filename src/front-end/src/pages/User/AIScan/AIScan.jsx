@@ -965,7 +965,7 @@ const AIScan = () => {
   );
 
   return (
-    <div className="app-page-shell page-scroll-shell overflow-y-auto bg-[#f4f8f5] p-3 sm:p-4 md:overflow-hidden md:p-5">
+    <div className="app-page-shell mobile-page-scroll-shell overflow-y-auto bg-[#f4f8f5] p-3 sm:p-4 md:overflow-hidden md:p-5">
       <div className="mx-auto flex min-h-full max-w-7xl min-w-0 flex-col gap-4 md:h-full">
         <div className="grid min-w-0 gap-4 md:min-h-0 md:flex-1 xl:grid-cols-[1.06fr_0.94fr]">
           {uploadPanel}

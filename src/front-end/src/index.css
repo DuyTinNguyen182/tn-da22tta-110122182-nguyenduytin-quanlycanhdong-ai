@@ -114,7 +114,10 @@ input[type="reset"] {
 }
 
 @media (max-width: 767px) {
-  .app-page-shell.page-scroll-shell {
+  .app-page-shell.page-scroll-shell,
+  .app-page-shell.mobile-page-scroll-shell {
+    height: auto;
+    min-height: calc(100dvh - var(--app-top-offset) - var(--app-bottom-offset));
     padding-bottom: calc(var(--app-bottom-offset) + 1rem);
   }
 }
