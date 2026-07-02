@@ -508,7 +508,7 @@ const AIChat = () => {
       </div>
 
       {/* Input Box */}
-      <div className="sticky bottom-0 bg-white/75 backdrop-blur-xl border-t border-white/50 px-4 py-2.5 md:py-3 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] z-20">
+      <div className="shrink-0 bg-white/75 backdrop-blur-xl border-t border-white/50 px-4 py-2.5 md:py-3 shadow-[0_-10px_40px_rgba(0,0,0,0.03)] z-20">
         <div className="max-w-5xl mx-auto flex items-end gap-2.5 w-full">
           <div className="flex-1 bg-white rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] ring-1 ring-slate-100 overflow-hidden focus-within:ring-2 focus-within:ring-emerald-400 focus-within:shadow-emerald-100/50 transition-all duration-200">
             <textarea

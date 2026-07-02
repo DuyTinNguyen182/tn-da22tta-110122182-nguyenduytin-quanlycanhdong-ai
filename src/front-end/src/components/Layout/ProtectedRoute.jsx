@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Bell, Headset } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
@@ -36,6 +36,45 @@ const ProtectedLayout = () => {
   const isMobileLayout = useIsMobileLayout();
   const isAdmin = (user?.role || "").toLowerCase() === "admin";
   const enableMobileLayout = isMobileLayout && !isAdmin;
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    if (!enableMobileLayout || typeof window === "undefined") {
+      setIsKeyboardOpen(false);
+      return undefined;
+    }
+
+    const visualViewport = window.visualViewport;
+    if (!visualViewport) {
+      setIsKeyboardOpen(false);
+      return undefined;
+    }
+
+    const updateKeyboardState = () => {
+      const activeElement = document.activeElement;
+      const activeTag = activeElement?.tagName?.toLowerCase();
+      const isTextField =
+        activeTag === "input" ||
+        activeTag === "textarea" ||
+        Boolean(activeElement?.isContentEditable);
+      const viewportGap = window.innerHeight - visualViewport.height;
+
+      setIsKeyboardOpen(isTextField && viewportGap > 120);
+    };
+
+    updateKeyboardState();
+    visualViewport.addEventListener("resize", updateKeyboardState);
+    visualViewport.addEventListener("scroll", updateKeyboardState);
+    window.addEventListener("focusin", updateKeyboardState);
+    window.addEventListener("focusout", updateKeyboardState);
+
+    return () => {
+      visualViewport.removeEventListener("resize", updateKeyboardState);
+      visualViewport.removeEventListener("scroll", updateKeyboardState);
+      window.removeEventListener("focusin", updateKeyboardState);
+      window.removeEventListener("focusout", updateKeyboardState);
+    };
+  }, [enableMobileLayout]);
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -47,13 +86,16 @@ const ProtectedLayout = () => {
 
   if (enableMobileLayout) {
     const currentTitle = MOBILE_PAGE_TITLES[location.pathname] || "AgriSmart";
+    const hideMobileBottomNav = location.pathname === "/ask-ai" && isKeyboardOpen;
 
     return (
       <div
         className="min-h-screen bg-slate-50 font-sans text-slate-900"
         style={{
           "--app-top-offset": "calc(64px + env(safe-area-inset-top))",
-          "--app-bottom-offset": "calc(80px + env(safe-area-inset-bottom))",
+          "--app-bottom-offset": hideMobileBottomNav
+            ? "0px"
+            : "calc(80px + env(safe-area-inset-bottom))",
         }}
       >
         <header
@@ -146,7 +188,7 @@ const ProtectedLayout = () => {
           <Outlet />
         </main>
 
-        <MobileBottomNav />
+        {hideMobileBottomNav ? null : <MobileBottomNav />}
       </div>
     );
   }
